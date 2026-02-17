@@ -1,0 +1,23 @@
+.env
+.env.local
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+
+# Node
+node_modules/
+
+# IDEs
+.idea/
+.vscode/
+
+# Logs
+.log
