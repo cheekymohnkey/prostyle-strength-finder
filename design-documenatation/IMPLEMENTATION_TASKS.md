@@ -22,6 +22,7 @@ Objective:
 
 1. Repository structure for API, worker, frontend, shared contracts.
 2. Environment configuration contract (`local`, `staging`, `prod`) with parity by key names.
+3. Storage adapter plan and implementation path for S3-backed artifact storage.
 
 ### Out of Scope
 
@@ -207,6 +208,47 @@ Acceptance criteria:
 2. Known gaps are documented explicitly as Epic B+ follow-ups.
 3. Epic A done checklist is fully satisfied.
 
+## A8. S3 Storage Adapter + Bucket Structure Conventions (Planned)
+
+Description:
+- Add an S3-backed storage adapter abstraction and define bucket/key conventions for image and artifact storage.
+
+Implementation tasks:
+1. Define storage adapter interface in application/infrastructure boundary:
+- `putObject`
+- `getObject`
+- `deleteObject`
+- `getSignedUploadUrl` (if needed by frontend upload flow)
+- `getSignedReadUrl` (if needed for controlled retrieval)
+2. Implement `S3StorageAdapter` using AWS SDK with environment-driven config:
+- bucket name from `S3_BUCKET`
+- region from `AWS_REGION`
+- optional endpoint override for local simulation via `S3_ENDPOINT_OVERRIDE`
+3. Define key namespace conventions (prefix contract):
+- `baseline/`
+- `generated/`
+- `reference/`
+- `uploads/`
+- `analysis-artifacts/`
+4. Add content metadata conventions:
+- content type
+- source type
+- uploader/owner ID
+- created timestamp
+5. Add error mapping and retry behavior for transient S3 failures.
+6. Add local verification script or smoke command for put/get/delete flow.
+7. Document operational guardrails:
+- bucket separation by environment
+- least-privilege IAM policy expectations
+- lifecycle/retention default recommendations
+
+Acceptance criteria:
+1. API/worker can call one storage adapter interface without direct S3 SDK coupling in domain code.
+2. Upload and retrieval paths work in local pre-prod mode (via endpoint override or isolated dev bucket).
+3. Key naming convention is documented and consistently applied.
+4. Errors from storage operations are surfaced in a stable application error shape.
+5. README/docs include setup and verification instructions for storage path.
+
 ## Epic A Done Checklist
 
 1. Repository has agreed baseline structure for API, worker, frontend, shared contracts.
@@ -226,6 +268,7 @@ Acceptance criteria:
 5. A4 API Baseline
 6. A5 Worker Baseline
 7. A7 Verification and Handoff
+8. A8 S3 Storage Adapter + Bucket Structure Conventions
 
 ## Notes
 
