@@ -472,6 +472,97 @@ Impact on previously documented gaps:
 2. Remaining S3 hardening:
 - validate IAM/credential and bucket policies in staging/prod with live resources.
 
+## Next Session Task - IaC Provisioning for AWS Storage and Queue Foundations
+
+Objective:
+- Introduce Infrastructure as Code (IaC) to provision and manage required AWS resources for non-local environments, avoiding manual console setup except bootstrap credentials/authorization.
+
+Preferred approach:
+1. Terraform-first implementation.
+2. One root stack with environment-specific variable files (`uat`, `prod`).
+3. Remote state optional for first pass; local state acceptable initially if documented.
+
+Prerequisites (manual, one-time):
+1. Provisioning identity available (IAM user/role) with rights to manage:
+- S3 buckets and bucket policies
+- SQS queues and queue policies
+- IAM policies and role attachments (if module manages runtime roles)
+2. AWS CLI profile configured for provisioning account.
+3. Region decision confirmed (default currently `us-east-1`).
+
+In-scope resources for IaC:
+1. S3 bucket(s):
+- `prostyle-strength-finder-nonprod`
+- `prostyle-strength-finder-prod`
+2. S3 controls:
+- versioning enabled
+- default encryption enabled
+- public access block enabled
+- bucket policy with least privilege
+- lifecycle rules (starter defaults for transient artifacts)
+3. SQS queues:
+- primary analysis queue per environment
+- dead-letter queue per environment
+- redrive policy from primary -> DLQ
+4. Optional IAM outputs:
+- policy documents for app runtime permissions
+- role/policy attachment stubs if role ownership is in this repo
+
+Out of scope for this task:
+1. Lightsail compute provisioning.
+2. Cognito provisioning.
+3. DNS/certificate management.
+4. Full production observability/alarming setup.
+
+Deliverables:
+1. IaC directory structure (example):
+- `infra/terraform/modules/s3_bucket`
+- `infra/terraform/modules/sqs_queue`
+- `infra/terraform/envs/uat`
+- `infra/terraform/envs/prod`
+2. Reusable Terraform modules:
+- S3 module (versioning, encryption, lifecycle, policy hooks)
+- SQS module (queue + DLQ + redrive)
+3. Environment variable files and outputs:
+- bucket names
+- queue URLs
+- DLQ URLs
+- region
+4. Execution docs:
+- bootstrap instructions
+- `terraform init/plan/apply/destroy` commands
+- rollback guidance
+5. Integration mapping doc updates:
+- map Terraform outputs to `.env.staging.example`/`.env.prod.example` values
+
+Implementation plan (next session execution order):
+1. Create Terraform scaffolding and backend/provider config.
+2. Implement S3 module with required security defaults.
+3. Implement SQS module with DLQ/redrive defaults.
+4. Instantiate modules for `uat` and `prod`.
+5. Add outputs and env-mapping notes.
+6. Run `terraform validate` + `terraform plan` for each environment.
+7. Record expected apply sequence and safety checks.
+
+Acceptance criteria:
+1. All required non-local S3 and SQS resources can be provisioned via IaC only.
+2. No mandatory console configuration remains except initial credential/authorization setup.
+3. Terraform plan is clean/reproducible for both `uat` and `prod`.
+4. Generated outputs map directly to application env contract keys:
+- `S3_BUCKET`
+- `SQS_QUEUE_URL`
+- `SQS_DLQ_URL`
+- `AWS_REGION`
+5. Documentation is sufficient for a new engineer to run provisioning without tribal knowledge.
+
+Risks and controls:
+1. Risk: accidental production drift or destructive apply.
+Control: separate `uat`/`prod` env folders, explicit workspace/account checks, and documented plan review gate.
+2. Risk: over-permissive IAM policies.
+Control: start with least-privilege statements aligned to adapter operations only.
+3. Risk: naming collisions across accounts/regions.
+Control: include account/environment suffix strategy in module inputs.
+
 ## Follow-up 1 Completion - Durable Job/Run Persistence (2026-02-18)
 
 Objective:
