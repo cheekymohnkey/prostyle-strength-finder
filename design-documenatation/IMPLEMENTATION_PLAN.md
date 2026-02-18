@@ -29,7 +29,7 @@ Objective:
 
 Scope:
 1. Repository structure for API, worker, frontend, shared contracts.
-2. Environment configuration contract (`local`, `staging`, `prod`).
+2. Environment configuration contract (`local`, `uat`, `prod`).
 3. SQLite setup + migration framework.
 4. S3 storage adapter + bucket structure conventions.
 5. SQS queue setup + DLQ policy scaffolding.

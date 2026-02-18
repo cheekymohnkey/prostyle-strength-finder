@@ -4,7 +4,7 @@
 
 Use separate buckets per environment:
 - `prostyle-strength-finder-local`
-- `prostyle-strength-finder-staging`
+- `prostyle-strength-finder-uat`
 - `prostyle-strength-finder-prod`
 
 ## Key Prefix Contract
@@ -36,7 +36,7 @@ Minimum policy expectations:
 
 Execution note:
 - Current non-local adapter mode uses AWS CLI credentials/region resolution from runtime environment.
-- Verify role/profile/session configuration before staging/prod smoke tests.
+- Verify role/profile/session configuration before UAT/prod smoke tests.
 
 ## Lifecycle Defaults
 

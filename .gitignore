@@ -24,3 +24,11 @@ node_modules/
 
 # Local database artifacts
 data/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+
+**/tfplan

@@ -9,7 +9,8 @@ Depends on:
 
 ## Purpose
 
-Define one configuration contract across `local`, `staging`, and `prod` with consistent key names and adapter expectations.
+Define one configuration contract across `local`, `uat`, and `prod` with consistent key names and adapter expectations.
+For the current phase, these are the only supported environments beyond local: `uat` and `prod`.
 
 ## Parity Rule
 
@@ -22,7 +23,7 @@ Define one configuration contract across `local`, `staging`, and `prod` with con
 | Variable | Required | Components | Format | Notes |
 | --- | --- | --- | --- | --- |
 | `NODE_ENV` | Yes | API, Worker | `development|test|production` | Runtime mode for node process behavior. |
-| `APP_ENV` | Yes | API, Worker, Frontend | `local|staging|prod` | Deployment environment selector. |
+| `APP_ENV` | Yes | API, Worker, Frontend | `local|uat|prod` | Deployment environment selector. |
 | `PORT` | Yes | API | integer | API bind port in each environment. |
 | `DATABASE_URL` | Yes | API, Worker | SQLite DSN/path | MVP uses SQLite path (example: `file:./data/prostyle.db`). |
 | `SQS_QUEUE_URL` | Yes | API, Worker | URL | Primary queue URL. |
@@ -63,5 +64,5 @@ Define one configuration contract across `local`, `staging`, and `prod` with con
 Use these templates as the baseline:
 
 1. `.env.local.example`
-2. `.env.staging.example`
+2. `.env.uat.example`
 3. `.env.prod.example`

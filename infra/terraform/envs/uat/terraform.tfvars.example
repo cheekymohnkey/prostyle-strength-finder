@@ -1,0 +1,7 @@
+aws_region        = "us-east-1"
+aws_profile       = "default"
+environment       = "uat"
+s3_bucket_name    = "prostyle-strength-finder-uat"
+sqs_queue_name    = "prostyle-analysis-uat"
+sqs_dlq_name      = "prostyle-analysis-uat-dlq"
+max_receive_count = 5

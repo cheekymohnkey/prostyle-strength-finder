@@ -6,3 +6,4 @@ Purpose:
 
 Notes:
 - MVP deployment baseline is defined in `design-documenatation/TECHNICAL_DECISIONS.md`.
+- Terraform scaffolding for AWS S3/SQS is under `infra/terraform`.

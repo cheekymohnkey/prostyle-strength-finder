@@ -21,7 +21,7 @@ Objective:
 ### Scope
 
 1. Repository structure for API, worker, frontend, shared contracts.
-2. Environment configuration contract (`local`, `staging`, `prod`) with parity by key names.
+2. Environment configuration contract (`local`, `uat`, `prod`) with parity by key names.
 3. Storage adapter plan and implementation path for S3-backed artifact storage.
 
 ### Out of Scope
@@ -39,7 +39,7 @@ Objective:
 3. SQLite is MVP system of record; migration workflow is mandatory from day 1.
 4. Queue integration contract must support retry/backoff/dead-letter lifecycle.
 5. Shared contracts must be versioned and reusable by at least API + frontend, and preferably API + worker.
-6. Env parity rule is mandatory across `local`, `staging`, `prod`:
+6. Env parity rule is mandatory across `local`, `uat`, `prod`:
 - same variable names
 - same adapter interfaces
 - values vary by environment only
@@ -95,7 +95,7 @@ Description:
 - Establish SQLite as MVP system of record with a repeatable migration workflow from zero state.
 
 Implementation tasks:
-1. Define DB location strategy for each environment (`local`, `staging`, `prod`) via `DATABASE_URL`.
+1. Define DB location strategy for each environment (`local`, `uat`, `prod`) via `DATABASE_URL`.
 2. Add migration framework scaffolding and command entrypoints:
 - create migration
 - apply migrations
@@ -165,7 +165,7 @@ Implementation tasks:
 - local default guidance
 2. Create env templates:
 - `.env.local.example`
-- `.env.staging.example`
+- `.env.uat.example`
 - `.env.prod.example`
 3. Implement config loader + validation in API and worker.
 4. Implement frontend config mapping for public API base URL.
@@ -253,7 +253,7 @@ Acceptance criteria:
 
 1. Repository has agreed baseline structure for API, worker, frontend, shared contracts.
 2. Env contract document exists and includes required/optional keys with format notes.
-3. Env templates exist for `local`, `staging`, `prod`.
+3. Env templates exist for `local`, `uat`, `prod`.
 4. API and worker boot locally with validated config.
 5. Frontend bootstraps and targets configured API URL.
 6. Shared contracts are consumed by multiple components.
@@ -347,7 +347,7 @@ Execution summary:
 Epic A done checklist status:
 1. Repository baseline structure: complete.
 2. Environment contract document: complete.
-3. Env templates (`local`, `staging`, `prod`): complete.
+3. Env templates (`local`, `uat`, `prod`): complete.
 4. API + worker local boot with validated config: complete.
 5. Frontend bootstrap + configured API URL: complete.
 6. Shared contracts consumed across components: complete.
@@ -470,12 +470,13 @@ Impact on previously documented gaps:
 1. Gap resolved:
 - S3 operations and presigned URL signing are no longer scaffold-only for non-local mode.
 2. Remaining S3 hardening:
-- validate IAM/credential and bucket policies in staging/prod with live resources.
+- validate IAM/credential and bucket policies in UAT/prod with live resources.
 
 ## Next Session Task - IaC Provisioning for AWS Storage and Queue Foundations
 
 Objective:
 - Introduce Infrastructure as Code (IaC) to provision and manage required AWS resources for non-local environments, avoiding manual console setup except bootstrap credentials/authorization.
+- For now, non-local environments are limited to `uat` and `prod` (two only).
 
 Preferred approach:
 1. Terraform-first implementation.
@@ -492,7 +493,7 @@ Prerequisites (manual, one-time):
 
 In-scope resources for IaC:
 1. S3 bucket(s):
-- `prostyle-strength-finder-nonprod`
+- `prostyle-strength-finder-uat`
 - `prostyle-strength-finder-prod`
 2. S3 controls:
 - versioning enabled
@@ -533,7 +534,7 @@ Deliverables:
 - `terraform init/plan/apply/destroy` commands
 - rollback guidance
 5. Integration mapping doc updates:
-- map Terraform outputs to `.env.staging.example`/`.env.prod.example` values
+- map Terraform outputs to `.env.uat.example`/`.env.prod.example` values
 
 Implementation plan (next session execution order):
 1. Create Terraform scaffolding and backend/provider config.
@@ -594,4 +595,4 @@ Impact on previously documented gaps:
 2. Remaining follow-ups unchanged:
 - production SQS hardening
 - production JWKS observability and key-rotation playbook validation
-- staging/prod IAM and bucket-policy rollout validation for S3 paths
+- UAT/prod IAM and bucket-policy rollout validation for S3 paths

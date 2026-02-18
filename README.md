@@ -24,6 +24,16 @@ Primary design and planning docs:
 - `design-documenatation/IMPLEMENTATION_TASKS.md`
 - `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 
+## Environment Set
+
+Supported environments for the current phase:
+- `local`
+- `uat`
+- `prod`
+
+Policy:
+- Only two non-local environments are in scope right now: `uat` and `prod`.
+
 ## Local Quickstart
 
 1. Ensure Node.js 20 is installed and on `PATH`.

@@ -225,11 +225,11 @@ MVP shared component scope:
 4. Async job status indicator.
 5. Filter/sort controls for library and admin tables.
 
-## Decision 13: Environment Strategy (Local Pre-Prod + Optional Staging)
+## Decision 13: Environment Strategy (Local Pre-Prod + Two Non-Local Environments)
 
 Proposed:
 - Local-first pre-prod testing environment as standard workflow.
-- Optional lightweight staging environment for integration/UAT before production changes.
+- Two non-local environments only for now: `uat` and `prod`.
 
 Local pre-prod baseline:
 1. API process + worker process run locally.
@@ -237,8 +237,8 @@ Local pre-prod baseline:
 3. S3/SQS simulation via LocalStack, or separate low-risk AWS dev resources.
 4. Seed fixtures for recommendation, feedback, moderation, and queue-failure scenarios.
 
-Optional staging baseline:
-1. Single Lightsail staging instance.
+UAT baseline:
+1. Single Lightsail UAT instance.
 2. Isolated S3 bucket and SQS queue (separate from production).
 3. Production-like config shape with environment-specific values.
 
@@ -248,7 +248,7 @@ Why:
 - Maintains high confidence with low operational overhead.
 
 Required rule:
-- Environment parity by configuration contract (same env var names and service interfaces across local/staging/prod).
+- Environment parity by configuration contract (same env var names and service interfaces across local/uat/prod).
 
 ## Decision 14: Testing Strategy
 

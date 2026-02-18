@@ -1,0 +1,7 @@
+aws_region        = "us-east-1"
+aws_profile       = "default"
+environment       = "prod"
+s3_bucket_name    = "prostyle-strength-finder-prod"
+sqs_queue_name    = "prostyle-analysis-prod"
+sqs_dlq_name      = "prostyle-analysis-prod-dlq"
+max_receive_count = 5
