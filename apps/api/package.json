@@ -1,0 +1,8 @@
+{
+  "name": "@prostyle/api",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "echo 'API scaffold not initialized yet'"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "prostyle-strength-finder",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "api": "npm run dev --workspace=@prostyle/api",
+    "worker": "npm run dev --workspace=@prostyle/worker",
+    "frontend": "npm run dev --workspace=@prostyle/frontend",
+    "contracts": "npm run build --workspace=@prostyle/shared-contracts"
+  }
+}

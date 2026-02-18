@@ -1,0 +1,8 @@
+{
+  "name": "@prostyle/worker",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "echo 'Worker scaffold not initialized yet'"
+  }
+}
