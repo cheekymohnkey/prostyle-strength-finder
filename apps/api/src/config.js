@@ -62,6 +62,9 @@ function loadConfig() {
       clientId: requireEnv("COGNITO_CLIENT_ID"),
       issuer: requireEnv("COGNITO_ISSUER"),
       audience: requireEnv("COGNITO_AUDIENCE"),
+      jwtVerificationMode: process.env.AUTH_JWT_VERIFICATION_MODE
+        || (requireEnv("APP_ENV") === "local" ? "insecure" : "jwks"),
+      jwksCacheTtlSec: parseIntStrict(process.env.AUTH_JWKS_CACHE_TTL_SEC || "600", "AUTH_JWKS_CACHE_TTL_SEC"),
     },
     observability: {
       logLevel: requireEnv("LOG_LEVEL"),

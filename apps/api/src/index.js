@@ -1,6 +1,7 @@
 const http = require("http");
 const crypto = require("crypto");
 const { loadConfig } = require("./config");
+const { verifyJwt } = require("../../../scripts/auth/jwt");
 const { assertDatabaseReady } = require("../../../scripts/db/runtime");
 const {
   ensureReady,
@@ -36,35 +37,6 @@ function parseJsonBody(req) {
     });
     req.on("error", reject);
   });
-}
-
-function base64UrlDecode(value) {
-  return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function validateJwtShape(authHeader, config) {
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return { ok: false, reason: "Missing bearer token" };
-  }
-
-  const token = authHeader.slice("Bearer ".length).trim();
-  const segments = token.split(".");
-  if (segments.length !== 3) {
-    return { ok: false, reason: "JWT must have 3 segments" };
-  }
-
-  try {
-    const payload = JSON.parse(base64UrlDecode(segments[1]));
-    const iss = payload.iss;
-    const aud = payload.aud;
-    const audMatches = Array.isArray(aud) ? aud.includes(config.auth.audience) : aud === config.auth.audience;
-    if (iss !== config.auth.issuer || !audMatches) {
-      return { ok: false, reason: "JWT issuer or audience mismatch" };
-    }
-    return { ok: true, tokenPayload: payload };
-  } catch (_error) {
-    return { ok: false, reason: "JWT payload is not valid JSON" };
-  }
 }
 
 function createRequestContext(req, config) {
@@ -150,10 +122,11 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
     return;
   }
 
-  const authResult = validateJwtShape(req.headers.authorization, config);
-  if (!authResult.ok) {
+  try {
+    await verifyJwt(req.headers.authorization, config);
+  } catch (error) {
     sendError(res, 401, "UNAUTHORIZED", "Invalid authorization token", ctx, {
-      reason: authResult.reason,
+      reason: error.message,
     });
     return;
   }

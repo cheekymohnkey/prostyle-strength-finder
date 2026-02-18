@@ -37,6 +37,8 @@ Define one configuration contract across `local`, `staging`, and `prod` with con
 | `COGNITO_CLIENT_ID` | Yes | API, Worker | string | Cognito app client identifier. |
 | `COGNITO_ISSUER` | Yes | API, Worker | URL | JWT issuer expected by API. |
 | `COGNITO_AUDIENCE` | Yes | API, Worker | string | JWT audience expected by API. |
+| `AUTH_JWT_VERIFICATION_MODE` | No | API | `jwks|insecure` | `jwks` verifies signature against JWKS; `insecure` validates claims only (local dev only). |
+| `AUTH_JWKS_CACHE_TTL_SEC` | No | API | integer | JWKS cache TTL in seconds (default `600`). |
 | `LOG_LEVEL` | Yes | API, Worker | `debug|info|warn|error` | Structured logging level. |
 | `SERVICE_NAME` | Yes | API, Worker | string | Service identifier in logs. |
 | `LOG_INCLUDE_CORRELATION_IDS` | No | API, Worker | `true|false` | Defaults to `true` when omitted. |

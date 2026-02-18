@@ -355,8 +355,7 @@ Epic A done checklist status:
 
 Known gaps (Epic B+ follow-ups):
 1. Queue adapter integration exists (sqlite local + SQS mode), but production-hardening for SQS operational concerns is still pending.
-2. API auth is JWT shape + issuer/audience scaffold only; signature verification/JWKS integration is pending.
-3. Real AWS SDK-backed S3 operations/presigned URLs remain pending (current S3 mode is scaffold-level for non-local env).
+2. Real AWS SDK-backed S3 operations/presigned URLs remain pending (current S3 mode is scaffold-level for non-local env).
 
 ## A8 Implementation Results (2026-02-18)
 
@@ -418,6 +417,33 @@ Impact on previously documented gaps:
 - API and worker are now wired through one queue adapter abstraction, with local durable queue and SQS mode support.
 2. Remaining queue-related follow-up:
 - production SQS hardening (credentials strategy, telemetry, and failure-playbook coverage) remains for launch readiness.
+
+## Follow-up 3 Completion - JWT Signature Verification via JWKS (2026-02-18)
+
+Objective:
+- Replace JWT shape-only checks with signature-aware verification against Cognito JWKS.
+
+Implementation summary:
+1. Added auth verifier module:
+- `scripts/auth/jwt.js`
+2. Verification modes added:
+- `jwks` (default non-local): fetch/caches JWKS and verifies RS256 signatures using `kid`
+- `insecure` (local-only): validates issuer/audience/time claims without signature verification
+3. API auth middleware now uses verifier module instead of shape-only parsing.
+4. Added config/env contract variables:
+- `AUTH_JWT_VERIFICATION_MODE`
+- `AUTH_JWKS_CACHE_TTL_SEC`
+
+Verification evidence:
+1. Local mode (`insecure`) accepts valid issuer/audience token (`202` on protected submit).
+2. Invalid issuer token rejected with `401` and explicit reason.
+3. API runtime and syntax checks pass after auth integration changes.
+
+Impact on previously documented gaps:
+1. Gap resolved:
+- JWT verification is no longer shape-only; JWKS signature verification path is implemented.
+2. Remaining auth follow-up:
+- production JWKS observability/alerting and key-rotation playbook validation remain hardening tasks.
 
 ## Follow-up 1 Completion - Durable Job/Run Persistence (2026-02-18)
 

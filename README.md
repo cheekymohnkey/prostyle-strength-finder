@@ -40,6 +40,10 @@ Primary design and planning docs:
 7. Run frontend bootstrap check:
    `npm run frontend`
 
+Local auth note:
+- `.env.local.example` uses `AUTH_JWT_VERIFICATION_MODE=insecure` for local token testing only.
+- non-local environments should use `AUTH_JWT_VERIFICATION_MODE=jwks`.
+
 ## Storage Smoke Check
 
 With env loaded from `.env.local.example`, run:
