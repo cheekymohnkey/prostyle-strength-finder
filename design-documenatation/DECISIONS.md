@@ -47,28 +47,27 @@ Rationale: MidJourney has no public render API, and OpenAI models do not use Mid
 7. Shared vocabulary includes `baseline image` = 0 profiles + 0 srefs (default model behavior).
 Rationale: Reduces ambiguity in analysis and recommendation discussions.
 
+8. MVP delivery plan is documented in `design-documenatation/MVP_PATH.md`.
+Rationale: Keep phased scope and readiness criteria explicit before implementation resumes.
+
+9. MVP requires a high-level ERD and architecture principles/design before build execution.
+Rationale: Ensure SOLID/DRY-aligned implementation from day 1 and avoid structural rework.
+
+10. P0 user-needs analysis is complete and agreed.
+Rationale: User types, JTBDs, mode thresholds, and trust requirements are now explicit and approved.
+
+11. Recommendation mode thresholds are agreed:
+- `precision >= 0.65`
+- `close enough >= 0.45`
+Rationale: Enables consistent low-confidence handling and ranking behavior.
+
+12. Remaining technical blockers from `design-documenatation/TECHNICAL_DECISIONS.md` are resolved.
+Rationale: Build can proceed without unresolved technical prerequisites.
+
 ### Open
 
-1. UI framework choice.
-Options discussed: Streamlit, React/Next.js, other.
-Notes: Streamlit is fast to ship but can feel chatty/re-render heavy.
-
-2. Data storage strategy.
-Options discussed: JSON files, SQLite, Postgres (+ possible vector extension), hybrid.
-Notes: Need to balance speed, queryability, and migration cost.
-
-3. Backend architecture shape.
-Options discussed: lightweight scripts, API service, async job workers.
-Notes: Depends on expected scale and UX requirements.
-
-4. Canonical trait taxonomy.
+1. Canonical trait taxonomy.
 Notes: Needs a stable trait set and versioning strategy before schema finalization.
-
-5. Recommendation mode behavior.
-Notes: Need explicit rules for "precision" vs "close enough" ranking.
-
-6. Exploratory recommendation features (`Roll the Dice`, `Surprise Me`) for post-MVP.
-Notes: Valuable for creative discovery, but must be separated from reliability-focused recommendations.
 
 ### Deferred
 
@@ -80,6 +79,9 @@ Blocked by: backend architecture + UX flow decisions.
 
 3. Production hosting topology.
 Blocked by: stack decisions and expected usage patterns.
+
+4. Exploratory recommendation features (`Roll the Dice`, `Surprise Me`) for post-MVP.
+Rationale: Valuable for creative discovery, but not required to start MVP implementation.
 
 ## Decision Template (copy/paste)
 

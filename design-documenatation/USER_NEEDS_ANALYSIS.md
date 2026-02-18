@@ -2,9 +2,10 @@
 
 This document captures user needs before solution modeling.
 
-Status: In progress  
+Status: Complete  
 Last updated: 2026-02-18  
 Owners: Ryan + Codex
+Completed on: 2026-02-18
 
 ## Purpose
 
@@ -68,10 +69,10 @@ Out of scope:
 - Injects 1-2 random profile/sref elements.
 - Goal: preserve relevance while introducing novelty.
 
-## User Types (working draft)
+## User Types (agreed)
 
 ### User Type U1
-Status: Draft  
+Status: Agreed  
 Name: Application Administrator  
 Context: Single operator (currently Ryan) responsible for quality, reliability, and system operation across the full workflow.  
 Primary goals:
@@ -97,7 +98,7 @@ Rationale:
 
 ## Admin Task Catalog (U1)
 
-Status: Draft
+Status: Agreed
 
 ### AT-1 Analysis moderation
 Trigger:
@@ -176,7 +177,7 @@ Success criteria:
 3. Audit records support post-incident review.
 
 ### User Type U2
-Status: Draft  
+Status: Agreed  
 Name: Profile Contributor  
 Context: User who expands the system's profile library by uploading images and registering new profiles/srefs for analysis and recommendation use.  
 Primary goals:
@@ -196,7 +197,7 @@ Rationale:
 3. Separation from admin controls reduces accidental high-impact changes.
 
 ### User Type U3
-Status: Draft  
+Status: Agreed  
 Name: Recommendation Consumer  
 Context: User who wants the best profile/sref suggestions for a prompt or creative direction, without managing datasets or system configuration.  
 Primary goals:
@@ -223,10 +224,10 @@ Rationale:
 2. Clear rationale + confidence increases trust and reduces trial-and-error.
 3. Restricting operational controls keeps this flow simple and focused.
 
-## Jobs To Be Done (JTBD)
+## Jobs To Be Done (JTBD - agreed)
 
 ### JTBD-1
-Status: Draft  
+Status: Agreed  
 When: I have a prompt (and optionally reference images) and need to pick a profile/sref quickly.  
 I want to: run a recommendation flow that suggests the best profile/sref options, with reasons, confidence, and potential prompt improvements.  
 So I can: choose a profile/sref with less guesswork and fewer failed generations.  
@@ -243,7 +244,7 @@ Rationale:
 3. Prompt-improvement and post-result feedback strengthen the loop from recommendation to better outcomes.
 
 ### JTBD-2
-Status: Draft  
+Status: Agreed  
 When: I want to explore outside predictable recommendations without manually testing many variants.  
 I want to: use exploratory suggestion modes (for example, random or semi-random combinations) to generate novel profile/sref ideas.  
 So I can: discover unexpected but potentially useful stylistic directions faster.  
@@ -256,16 +257,21 @@ Rationale:
 2. Controlled randomness can increase creative range without replacing precision mode.
 
 ### JTBD-3
-Status: Open  
-When:  
-I want to:  
-So I can:  
-Success signal:  
+Status: Agreed  
+When: I am operating quality/governance workflows and detect low-quality or outdated analysis/profile behavior.  
+I want to: moderate analyses, update prompt curation, and adjust influence governance quickly.  
+So I can: keep recommendation quality trustworthy without blocking normal user workflows.  
+Success signal:
+1. I can action moderation/governance updates quickly from admin tools.
+2. Problematic entries stop affecting active recommendations immediately.
+3. Changes are auditable and reversible when needed.
 Rationale:
+1. Sustained recommendation quality depends on active governance, not one-time setup.
+2. Admin recovery and curation loops are essential for reliable operation.
 
 ## Main Recommendation Flow (All User Types)
 
-Status: Draft
+Status: Agreed
 
 ### Flow goal
 
@@ -327,7 +333,7 @@ Help any user (U1/U2/U3) move from prompt to a confident profile/sref choice wit
 2. U2 (Profile Contributor): uses same flow + can add new profile/sref candidates after gaps are observed.
 3. U3 (Recommendation Consumer): uses same flow only; no management/debug controls.
 
-### Flow acceptance criteria (working draft)
+### Flow acceptance criteria
 
 1. Time to first recommendation is within acceptable latency for selected mode.
 2. Recommendations include rationale and confidence for every surfaced option.
@@ -344,51 +350,55 @@ Help any user (U1/U2/U3) move from prompt to a confident profile/sref choice wit
 For each decision type, define what the tool must help the user decide.
 
 ### DM-1: Profile selection
-Status: Open  
-Decision:  
-Inputs available:  
-Output needed:  
-Confidence requirement:  
-Rationale:
+Status: Agreed  
+Decision: Choose the best style influence combination for the current prompt intent.  
+Inputs available: Prompt, optional references, mode (`precision`/`close enough`), user constraints.  
+Output needed: Ranked combinations with rationale, confidence, and risk notes.  
+Confidence requirement: `precision >= 0.65`, `close enough >= 0.45` for standard ranked display.  
+Rationale: This is the primary decision moment across all user types.
 
 ### DM-2: Prompt refinement
-Status: Open  
-Decision:  
-Inputs available:  
-Output needed:  
-Confidence requirement:  
-Rationale:
+Status: Agreed  
+Decision: Decide whether to adjust prompt wording/constraints before next generation.  
+Inputs available: Prompt improvement suggestions, mismatch/alignment feedback, prior outcomes.  
+Output needed: Actionable prompt edits and expected impact notes.  
+Confidence requirement: Show edits when confidence is below mode threshold or mismatch is identified.  
+Rationale: Prompt refinement is the fastest path to quality improvement when fit is weak.
 
 ### DM-3: Style exploration
-Status: Open  
-Decision:  
-Inputs available:  
-Output needed:  
-Confidence requirement:  
-Rationale:
+Status: Agreed  
+Decision: Decide whether to stay on reliable-fit options or explore alternatives.  
+Inputs available: Near-miss explanations, library browse/filter/compare, exploration suggestions.  
+Output needed: Clearly labeled exploratory options vs reliable-fit options.  
+Confidence requirement: Exploratory suggestions can be shown below standard thresholds but must be labeled with caution.  
+Rationale: Supports creative discovery without conflating exploration and reliability.
 
 ## Precision vs Speed Policy
 
-### Use case matrix (working draft)
+### Use case matrix (agreed)
 
 1. Precision-critical tasks
 - Examples:
-- Acceptable latency:
-- Minimum confidence:
-- Failure cost:
-- Rationale:
+  - strict prompt-fit work
+  - constrained/admin-verified recommendations
+- Acceptable latency: <= 45s target
+- Minimum confidence: >= 0.65 for standard ranked display
+- Failure cost: medium/high
+- Rationale: prioritize recommendation reliability over speed.
 
 2. Close-enough tasks
 - Examples:
-- Acceptable latency:
-- Minimum confidence:
-- Failure cost:
-- Rationale:
+  - fast ideation
+  - rapid style exploration with bounded risk
+- Acceptable latency: <= 20s target
+- Minimum confidence: >= 0.45 for standard ranked display
+- Failure cost: low/medium
+- Rationale: prioritize speed and usability with clear confidence/risk signaling.
 
 ## Input and Output Needs
 
 ### Inputs users can realistically provide
-Status: Open
+Status: Agreed
 
 1. Prompt text only
 2. Prompt + reference images
@@ -397,10 +407,12 @@ Status: Open
 5. Historical analysis results
 
 Context:
+Users provide a mix of prompt-only, prompt+references, and iterative feedback inputs across U1/U2/U3 workflows.
 Rationale:
+These inputs are feasible in normal sessions and sufficient for recommendation + feedback loops.
 
 ### Outputs users find actionable
-Status: Open
+Status: Agreed
 
 1. Ranked profile recommendations
 2. Plain-language "why this fits"
@@ -409,39 +421,44 @@ Status: Open
 5. Confidence signal
 
 Context:
+Users need decision-ready outputs (ranked options, rationale, confidence, risks) rather than raw model output.
 Rationale:
+Actionable outputs reduce trial-and-error and improve trust.
 
 ## Failure and Trust
 
 ### Failure impact categories
 
 1. Low impact
-Context:
-Rationale:
+Context: exploratory sessions where mismatch is acceptable.
+Rationale: user can quickly retry with minimal downside.
 
 2. Medium impact
-Context:
-Rationale:
+Context: normal recommendation sessions with limited iteration budget.
+Rationale: wrong recommendation causes time/cost waste and user friction.
 
 3. High impact
-Context:
-Rationale:
+Context: admin-curated or constraint-heavy recommendations expected to be reliable.
+Rationale: wrong outcomes reduce trust and require governance intervention.
 
 ### Trust requirements
-Status: Open
+Status: Agreed
 
-1. Explainability needed:
-2. Confidence visibility needed:
-3. Reproducibility needed:
-4. Human override needed:
+1. Explainability needed: Yes (always show rationale and risk notes).
+2. Confidence visibility needed: Yes (mode-aware confidence thresholds and low-confidence handling).
+3. Reproducibility needed: Yes (versioned prompts/models/trait schema and auditable runs).
+4. Human override needed: Yes (admin moderation and governance controls).
 Rationale:
+Trust depends on transparent outputs, traceability, and recoverability.
 
-## Open Questions
+## Resolved Questions
 
-1. Which user type is primary for MVP?
-2. Is "close enough" the default mode or optional mode?
-3. What is the minimum acceptable confidence for showing recommendations?
-4. Should we optimize first for learning speed or decision accuracy?
+1. Primary user type for MVP: U3 recommendation consumer (with U1/U2 operational support).
+2. `Close enough` mode: available and optimized for speed; `precision` mode available for stricter fit.
+3. Minimum confidence for standard ranked display:
+- `precision >= 0.65`
+- `close enough >= 0.45`
+4. Optimization strategy: mode-dependent, with reliability priority in precision mode and speed priority in close-enough mode.
 
 ## Completion Criteria (P0 Done)
 
@@ -453,3 +470,11 @@ Mark P0 complete only when all are true:
 4. Input/output requirements are agreed for MVP.
 5. Failure/trust requirements are agreed.
 6. `DECISIONS.md` updated with the completion date and move to P1.
+
+Status check:
+1. Met
+2. Met
+3. Met
+4. Met
+5. Met
+6. Met
