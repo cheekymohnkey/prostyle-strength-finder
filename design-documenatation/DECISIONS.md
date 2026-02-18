@@ -64,6 +64,9 @@ Rationale: Enables consistent low-confidence handling and ranking behavior.
 12. Remaining technical blockers from `design-documenatation/TECHNICAL_DECISIONS.md` are resolved.
 Rationale: Build can proceed without unresolved technical prerequisites.
 
+13. Implementation sequence is documented in `design-documenatation/IMPLEMENTATION_PLAN.md`.
+Rationale: Execution can proceed with an agreed epic/task dependency structure.
+
 ### Open
 
 1. Canonical trait taxonomy.
