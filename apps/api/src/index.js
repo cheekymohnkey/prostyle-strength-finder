@@ -2,6 +2,7 @@ const http = require("http");
 const crypto = require("crypto");
 const { loadConfig } = require("./config");
 const { assertDatabaseReady } = require("../../../scripts/db/runtime");
+const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
 const {
   CONTRACT_VERSION,
   validateAnalysisJobEnvelope,
@@ -241,6 +242,12 @@ async function requestHandler(req, res, config) {
 function main() {
   const config = loadConfig();
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
+  const storageAdapter = createStorageAdapter({
+    appEnv: config.runtime.appEnv,
+    bucket: config.storage.bucket,
+    region: config.storage.region,
+    endpoint: config.storage.endpoint,
+  });
   const server = http.createServer((req, res) => {
     requestHandler(req, res, config).catch((error) => {
       const ctx = createRequestContext(req, config);
@@ -252,14 +259,23 @@ function main() {
     });
   });
 
-  server.listen(config.runtime.port, () => {
-    logJson("info", "api.server.started", {
-      port: config.runtime.port,
-      app_env: config.runtime.appEnv,
-      service: config.observability.serviceName,
-      contract_version: CONTRACT_VERSION,
-      database_path: dbReadiness.dbPath,
+  storageAdapter.healthcheck().then((storageHealth) => {
+    server.listen(config.runtime.port, () => {
+      logJson("info", "api.server.started", {
+        port: config.runtime.port,
+        app_env: config.runtime.appEnv,
+        service: config.observability.serviceName,
+        contract_version: CONTRACT_VERSION,
+        database_path: dbReadiness.dbPath,
+        storage_mode: storageHealth.mode,
+        storage_bucket: storageHealth.bucket,
+      });
     });
+  }).catch((error) => {
+    logJson("error", "api.storage.init_failed", {
+      error: error.message,
+    });
+    process.exitCode = 1;
   });
 }
 

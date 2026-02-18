@@ -40,6 +40,14 @@ Primary design and planning docs:
 7. Run frontend bootstrap check:
    `npm run frontend`
 
+## Storage Smoke Check
+
+With env loaded from `.env.local.example`, run:
+
+`npm run storage:smoke`
+
+This validates storage adapter `put/get/delete` behavior using local pre-prod storage mode.
+
 ## A6 Stub Flow Verification
 
 1. Start API and submit analysis job at `POST /v1/analysis-jobs`.

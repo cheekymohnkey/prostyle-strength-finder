@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { loadConfig } = require("./config");
 const { assertDatabaseReady } = require("../../../scripts/db/runtime");
+const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
 const { LocalQueueAdapter } = require("./queue-adapter");
 const {
   parseAnalysisJobEnvelope,
@@ -171,6 +172,13 @@ async function processMessage(message, queue, config) {
 async function runWorker() {
   const config = loadConfig();
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
+  const storageAdapter = createStorageAdapter({
+    appEnv: config.runtime.appEnv,
+    bucket: config.storage.bucket,
+    region: config.storage.region,
+    endpoint: config.storage.endpoint,
+  });
+  const storageHealth = await storageAdapter.healthcheck();
   const queue = new LocalQueueAdapter(config);
   const runOnce = parseBooleanEnv("WORKER_RUN_ONCE", true);
   const pollIntervalMs = parseIntegerEnv("WORKER_POLL_INTERVAL_MS", 750);
@@ -192,6 +200,8 @@ async function runWorker() {
     dead_letter_url: config.queue.dlqUrl,
     run_once: runOnce,
     database_path: dbReadiness.dbPath,
+    storage_mode: storageHealth.mode,
+    storage_bucket: storageHealth.bucket,
   });
 
   while (!shuttingDown) {

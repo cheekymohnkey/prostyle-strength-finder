@@ -208,7 +208,7 @@ Acceptance criteria:
 2. Known gaps are documented explicitly as Epic B+ follow-ups.
 3. Epic A done checklist is fully satisfied.
 
-## A8. S3 Storage Adapter + Bucket Structure Conventions (Planned)
+## A8. S3 Storage Adapter + Bucket Structure Conventions
 
 Description:
 - Add an S3-backed storage adapter abstraction and define bucket/key conventions for image and artifact storage.
@@ -358,3 +358,34 @@ Known gaps (Epic B+ follow-ups):
 2. Worker queue adapter is local simulation, not yet wired to AWS SQS client implementation.
 3. API auth is JWT shape + issuer/audience scaffold only; signature verification/JWKS integration is pending.
 4. API job state is in-memory and reset on restart; durable run tracking is pending data-layer implementation.
+
+## A8 Implementation Results (2026-02-18)
+
+Implementation summary:
+1. Added shared storage adapter package:
+- `packages/storage-adapter/src/index.js`
+- `packages/storage-adapter/src/local-disk-adapter.js`
+- `packages/storage-adapter/src/s3-adapter.js`
+- `packages/storage-adapter/src/key-conventions.js`
+2. Enforced key prefix contract:
+- `baseline/`
+- `generated/`
+- `reference/`
+- `uploads/`
+- `analysis-artifacts/`
+3. Wired API and worker startup storage readiness checks.
+4. Added local smoke script:
+- `npm run storage:smoke`
+5. Added storage conventions doc:
+- `infra/S3_BUCKET_CONVENTIONS.md`
+
+Acceptance criteria mapping:
+1. Shared adapter interface consumed by API/worker: complete.
+2. Local pre-prod put/get/delete path: complete (`storage:smoke`).
+3. Key naming conventions documented + enforced: complete.
+4. Stable storage error object (`StorageAdapterError`) provided: complete.
+5. Setup and verification docs added: complete.
+
+Known A8 follow-ups (Epic B+):
+1. Real AWS SDK-backed S3 operations for non-local environments are scaffolded but not fully implemented.
+2. Presigned URL cryptographic signing is pending AWS SDK integration.
