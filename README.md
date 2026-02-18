@@ -22,6 +22,7 @@ Primary design and planning docs:
 - `design-documenatation/MVP_PATH.md`
 - `design-documenatation/IMPLEMENTATION_PLAN.md`
 - `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
 - `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 
 ## Environment Set

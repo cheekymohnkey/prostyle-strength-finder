@@ -1,0 +1,259 @@
+# Prostyle Strength Finder - Epic B Implementation Tasks
+
+Status: Draft for execution  
+Date: 2026-02-18  
+Depends on:
+- `design-documenatation/DECISIONS.md`
+- `design-documenatation/ARCHITECTURE_AND_ERD.md`
+- `design-documenatation/TECHNICAL_DECISIONS.md`
+- `design-documenatation/MVP_PATH.md`
+- `design-documenatation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
+
+## Purpose
+
+Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering tasks with clear acceptance criteria, sequencing, and handoff context.
+
+## Epic B - Core Recommendation Flow (MVP-1)
+
+Objective:
+- Deliver prompt-to-recommendation flow with ranked profile/sref combinations, rationale, confidence, risk notes, and prompt improvement guidance.
+
+### Scope
+
+1. Prompt submission and recommendation session model.
+2. Recommendation mode handling (`precision`, `close_enough`) with agreed thresholds.
+3. Style influence retrieval/filtering and ranking.
+4. Confidence/risk formatting and low-confidence labeling.
+5. Prompt improvement suggestion output.
+6. Frontend recommendation page with mode switch and ranked results.
+
+### Out of Scope
+
+1. Post-result feedback upload/alignment logic (Epic C).
+2. Admin moderation/governance workflows (Epic D).
+3. Backup/restore and launch hardening tracks (Epic E).
+4. Render orchestration/integration with external generation platforms.
+
+### Constraints
+
+1. Must use Epic A runtime shape (API enqueue boundary preserved where async is required).
+2. Recommendation thresholds are fixed for MVP:
+- `precision >= 0.65`
+- `close enough >= 0.45`
+3. Every recommendation must include:
+- rationale
+- confidence
+- risk notes
+- prompt improvements
+4. Low-confidence outcomes must be explicitly labeled.
+5. Model family/version resolution and persistence rules from Epic A remain mandatory.
+
+## Task Breakdown
+
+## B1. Recommendation Domain Contracts
+
+Description:
+- Define shared contract shapes for recommendation input/output and session status.
+
+Implementation tasks:
+1. Add shared contracts for:
+- recommendation submit payload
+- recommendation session envelope
+- recommendation item structure
+- confidence/risk block shape
+- low-confidence signaling shape
+2. Add schema/version constants and validation for these contracts.
+3. Ensure API and frontend consume the same contract exports.
+
+Acceptance criteria:
+1. Shared contract package exports recommendation flow contracts.
+2. API and frontend compile against shared contract types/shapes.
+3. Invalid payloads fail with stable `api-error` contract.
+
+## B2. Persistence and Migration for Recommendation Entities
+
+Description:
+- Add relational persistence for prompt/session/recommendation records used by MVP-1.
+
+Implementation tasks:
+1. Add migration(s) for minimum Epic B entities:
+- `prompts` (or equivalent prompt input table)
+- `recommendation_sessions`
+- `recommendations`
+2. Add indexes for hot paths:
+- session lookup by user/time
+- recommendations by session/rank
+3. Add repository access methods for create/list/get flows.
+
+Acceptance criteria:
+1. Migrations apply cleanly from zero state and existing Epic A state.
+2. Session and recommendation records persist and are queryable.
+3. API returns persisted recommendation data after submission.
+
+## B3. Prompt Intake and Normalization
+
+Description:
+- Convert raw prompt submissions into normalized recommendation requests.
+
+Implementation tasks:
+1. Implement request normalization:
+- trim/sanitize prompt text
+- normalize mode values to canonical enum
+- capture optional context/reference fields
+2. Reuse Epic A model resolution rules:
+- respect explicit `--v` and `--niji`
+- apply default standard version when absent
+3. Persist normalized prompt/session metadata.
+
+Acceptance criteria:
+1. Prompt intake validates and normalizes consistently.
+2. Explicit and default model resolution behavior is preserved.
+3. Invalid combinations (for example both `--v` and `--niji`) return clear errors.
+
+## B4. Style Influence Retrieval and Eligibility Filtering
+
+Description:
+- Build candidate retrieval pipeline for ranking.
+
+Implementation tasks:
+1. Load active influences and combinations from persistence layer.
+2. Apply governance eligibility filters (active/enabled only).
+3. Add deterministic fallback behavior when candidate pool is sparse.
+4. Add lightweight caching for read-heavy lookup paths.
+
+Acceptance criteria:
+1. Candidate retrieval excludes disabled/ineligible influences.
+2. Empty/sparse candidate sets return safe, explainable behavior.
+3. Retrieval path is deterministic for same inputs.
+
+## B5. Ranking Engine and Mode Threshold Policy
+
+Description:
+- Implement recommendation scoring/ranking with mode-aware thresholds.
+
+Implementation tasks:
+1. Implement ranking pipeline that outputs ordered candidates.
+2. Enforce threshold rules per mode:
+- `precision >= 0.65`
+- `close_enough >= 0.45`
+3. Label below-threshold results as low-confidence.
+4. Return confidence score per recommendation item.
+
+Acceptance criteria:
+1. Mode thresholds are enforced exactly.
+2. Ranking output is stable and sorted by score/rank rules.
+3. Low-confidence labeling is present and explicit.
+
+## B6. Rationale, Risk Notes, and Prompt Improvements
+
+Description:
+- Generate transparent explanation payloads required for trust and actionability.
+
+Implementation tasks:
+1. Add rationale generation logic per recommendation.
+2. Add risk note generation for likely failure modes/mismatch areas.
+3. Add prompt improvement suggestions tied to each recommendation.
+4. Ensure response contract always includes these fields.
+
+Acceptance criteria:
+1. Each recommendation includes rationale + risk + prompt improvements.
+2. Missing-explanation responses are rejected in API assembly.
+3. Explanations are deterministic for same scoring inputs.
+
+## B7. API Endpoints for Recommendation Flow
+
+Description:
+- Expose recommendation flow through versioned REST endpoints.
+
+Implementation tasks:
+1. Add submit endpoint for recommendation session creation.
+2. Add session detail endpoint for ranked recommendation retrieval.
+3. Add request correlation + structured logs for session operations.
+4. Ensure auth/role checks remain consistent with Epic A middleware.
+
+Acceptance criteria:
+1. Authenticated user can submit prompt and receive session result.
+2. API returns ranked recommendations with required explanation fields.
+3. Logs include `request_id` and recommendation session identifiers.
+
+## B8. Frontend MVP-1 Recommendation Page
+
+Description:
+- Deliver first usable UI for prompt-to-recommendation interaction.
+
+Implementation tasks:
+1. Build page with:
+- prompt input
+- mode switch (`precision`, `close enough`)
+- submit action
+2. Render ranked recommendation cards with:
+- confidence
+- rationale
+- risk notes
+- prompt improvements
+3. Handle empty/low-confidence states explicitly.
+4. Wire to API via agreed frontend data-fetch approach.
+
+Acceptance criteria:
+1. End user can complete flow in one session.
+2. UI clearly surfaces mode and confidence context.
+3. Low-confidence output is visibly distinguished.
+
+## B9. Verification and Handoff
+
+Description:
+- Validate Epic B completion criteria and document residual risks.
+
+Implementation tasks:
+1. Add backend tests for:
+- threshold enforcement
+- ranking ordering
+- low-confidence behavior
+- response-shape guarantees
+2. Add minimal frontend tests for critical form/submit/result path.
+3. Run smoke flow from prompt submit to rendered results.
+4. Document known gaps for Epic C/D/E.
+
+Acceptance criteria:
+1. Epic B done criteria from implementation plan are demonstrably met.
+2. Smoke path is reproducible from clean checkout.
+3. Remaining follow-ups are explicitly documented.
+
+## Epic B Done Checklist
+
+1. User completes recommendation flow in one session.
+2. Recommendations include rationale, confidence, risk notes, and prompt improvements.
+3. Mode thresholds are enforced (`precision >= 0.65`, `close_enough >= 0.45`).
+4. Low-confidence behavior is explicitly labeled in API and UI.
+5. Frontend page supports mode switch and ranked result rendering.
+
+## Suggested Execution Sequence
+
+1. B1 Recommendation Domain Contracts
+2. B2 Persistence and Migration for Recommendation Entities
+3. B3 Prompt Intake and Normalization
+4. B4 Style Influence Retrieval and Eligibility Filtering
+5. B5 Ranking Engine and Mode Threshold Policy
+6. B6 Rationale, Risk Notes, and Prompt Improvements
+7. B7 API Endpoints for Recommendation Flow
+8. B8 Frontend MVP-1 Recommendation Page
+9. B9 Verification and Handoff
+
+## Risks and Controls
+
+1. Risk: Threshold logic drifts from agreed policy.
+Control: encode thresholds as single-source constants + targeted tests.
+
+2. Risk: Candidate scarcity yields unusable output.
+Control: explicit sparse-pool fallback and clear user-facing messaging.
+
+3. Risk: Explanations become inconsistent with scores.
+Control: enforce response assembly contract with validation + tests.
+
+4. Risk: UI presents confidence without sufficient caveats.
+Control: mandatory low-confidence labels and risk-note rendering.
+
+## Next Active Task
+
+1. Start B1 by defining shared recommendation contracts and version exports.
