@@ -22,6 +22,8 @@ Always anchor tasks to:
 4. `design-documenatation/TECHNICAL_DECISIONS.md`
 5. `design-documenatation/MVP_PATH.md`
 6. `design-documenatation/IMPLEMENTATION_PLAN.md`
+7. `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
+8. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
 
 ## New Task Start Template
 
@@ -34,6 +36,8 @@ Use these docs as source of truth:
 - design-documenatation/TECHNICAL_DECISIONS.md
 - design-documenatation/MVP_PATH.md
 - design-documenatation/IMPLEMENTATION_PLAN.md
+- design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md
+- design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md
 
 Task objective:
 <one concrete objective>

@@ -185,14 +185,151 @@ function insertRecommendationExtraction(dbPath, input) {
 }
 
 function markRecommendationExtractionConfirmed(dbPath, extractionId) {
-  const confirmedAt = nowIso();
   exec(
     dbPath,
     `UPDATE recommendation_extractions
-     SET status = 'confirmed', confirmed_at = ${quote(confirmedAt)}
+     SET
+       status = 'confirmed',
+       confirmed_at = COALESCE(confirmed_at, ${quote(nowIso())})
      WHERE extraction_id = ${quote(extractionId)};`
   );
-  return confirmedAt;
+  const extraction = getRecommendationExtractionById(dbPath, extractionId);
+  return extraction ? extraction.confirmed_at : null;
+}
+
+function getPromptByText(dbPath, promptText) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT prompt_id, prompt_text, status, version, curated_flag, created_by, created_at
+     FROM prompts
+     WHERE prompt_text = ${quote(promptText)}
+     ORDER BY created_at ASC
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getPromptById(dbPath, promptId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT prompt_id, prompt_text, status, version, curated_flag, created_by, created_at
+     FROM prompts
+     WHERE prompt_id = ${quote(promptId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertPrompt(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO prompts (
+       prompt_id, prompt_text, status, version, curated_flag, created_by, created_at
+     ) VALUES (
+       ${quote(input.promptId)},
+       ${quote(input.promptText)},
+       ${quote(input.status || "active")},
+       ${quote(input.version || "v1")},
+       ${input.curatedFlag ? 1 : 0},
+       ${quote(input.createdBy || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function ensurePromptByText(dbPath, input) {
+  const existing = getPromptByText(dbPath, input.promptText);
+  if (existing) {
+    return existing;
+  }
+
+  insertPrompt(dbPath, input);
+  return getPromptByText(dbPath, input.promptText);
+}
+
+function getRecommendationSessionByExtractionId(dbPath, extractionId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT session_id, user_id, mode, extraction_id, prompt_id, status, created_at, updated_at
+     FROM recommendation_sessions
+     WHERE extraction_id = ${quote(extractionId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getRecommendationSessionById(dbPath, sessionId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT session_id, user_id, mode, extraction_id, prompt_id, status, created_at, updated_at
+     FROM recommendation_sessions
+     WHERE session_id = ${quote(sessionId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertRecommendationSession(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  const updatedAt = input.updatedAt || createdAt;
+  exec(
+    dbPath,
+    `INSERT INTO recommendation_sessions (
+       session_id, user_id, mode, extraction_id, prompt_id, status, created_at, updated_at
+     ) VALUES (
+       ${quote(input.sessionId)},
+       ${quote(input.userId)},
+       ${quote(input.mode)},
+       ${quote(input.extractionId)},
+       ${quote(input.promptId)},
+       ${quote(input.status || "confirmed")},
+       ${quote(createdAt)},
+       ${quote(updatedAt)}
+     );`
+  );
+}
+
+function ensureRecommendationSession(dbPath, input) {
+  const existing = getRecommendationSessionByExtractionId(dbPath, input.extractionId);
+  if (existing) {
+    return existing;
+  }
+
+  insertRecommendationSession(dbPath, input);
+  return getRecommendationSessionByExtractionId(dbPath, input.extractionId);
+}
+
+function insertRecommendation(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO recommendations (
+       recommendation_id, recommendation_session_id, rank, combination_id,
+       rationale, confidence, risk_notes_json, prompt_improvements_json, created_at
+     ) VALUES (
+       ${quote(input.recommendationId)},
+       ${quote(input.recommendationSessionId)},
+       ${Number(input.rank)},
+       ${quote(input.combinationId)},
+       ${quote(input.rationale)},
+       ${Number(input.confidence)},
+       ${quote(JSON.stringify(input.riskNotes || []))},
+       ${quote(JSON.stringify(input.promptImprovements || []))},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function listRecommendationsBySessionId(dbPath, sessionId) {
+  return queryJson(
+    dbPath,
+    `SELECT recommendation_id, recommendation_session_id, rank, combination_id,
+            rationale, confidence, risk_notes_json, prompt_improvements_json, created_at
+     FROM recommendations
+     WHERE recommendation_session_id = ${quote(sessionId)}
+     ORDER BY rank ASC;`
+  );
 }
 
 module.exports = {
@@ -208,4 +345,14 @@ module.exports = {
   getRecommendationExtractionById,
   insertRecommendationExtraction,
   markRecommendationExtractionConfirmed,
+  getPromptByText,
+  getPromptById,
+  insertPrompt,
+  ensurePromptByText,
+  getRecommendationSessionByExtractionId,
+  getRecommendationSessionById,
+  insertRecommendationSession,
+  ensureRecommendationSession,
+  insertRecommendation,
+  listRecommendationsBySessionId,
 };

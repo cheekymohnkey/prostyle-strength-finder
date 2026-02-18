@@ -76,3 +76,104 @@ This validates storage adapter `put/get/delete` behavior using local pre-prod st
 1. Start API and submit analysis job at `POST /v1/analysis-jobs`.
 2. Capture returned job fields (`jobId`, `idempotencyKey`, `runType`, `imageId`).
 3. Run worker with local queue mode (`QUEUE_ADAPTER_MODE=sqlite`) and verify lifecycle logs: `in_progress` -> `succeeded`.
+
+## Recommendation API Quick Reference
+
+All endpoints below require:
+- `Authorization: Bearer <jwt>`
+
+Full examples and context:
+- `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+
+### 1) Create extraction
+
+- `POST /v1/recommendation-extractions`
+
+Request (example):
+
+```json
+{
+  "metadataFields": [
+    {
+      "key": "Description",
+      "value": "cinematic portrait in rain --ar 3:4 --v 6 Job ID: 123e4567-e89b-12d3-a456-426614174000"
+    }
+  ]
+}
+```
+
+Response (`201`) shape:
+
+```json
+{
+  "extraction": {
+    "extractionId": "rex_<uuid>",
+    "status": "extracted",
+    "prompt": "cinematic portrait in rain --ar 3:4 --v 6"
+  },
+  "requiresConfirmation": true
+}
+```
+
+### 2) Confirm extraction
+
+- `POST /v1/recommendation-extractions/:extractionId/confirm`
+
+Request (example):
+
+```json
+{
+  "confirmed": true,
+  "mode": "precision"
+}
+```
+
+Response (`200`) shape:
+
+```json
+{
+  "session": {
+    "sessionId": "rs_<uuid>",
+    "extractionId": "rex_<uuid>",
+    "mode": "precision",
+    "status": "confirmed"
+  }
+}
+```
+
+### 3) Get extraction
+
+- `GET /v1/recommendation-extractions/:extractionId`
+
+Response (`200`) shape:
+
+```json
+{
+  "extraction": {
+    "extractionId": "rex_<uuid>",
+    "status": "confirmed",
+    "prompt": "<normalized_prompt>"
+  }
+}
+```
+
+### 4) Get recommendation session
+
+- `GET /v1/recommendation-sessions/:sessionId`
+
+Response (`200`) shape:
+
+```json
+{
+  "session": {
+    "sessionId": "rs_<uuid>",
+    "mode": "precision",
+    "status": "confirmed",
+    "prompt": {
+      "promptId": "prm_<uuid>",
+      "promptText": "<normalized_prompt>"
+    },
+    "recommendations": []
+  }
+}
+```

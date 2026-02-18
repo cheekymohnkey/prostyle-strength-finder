@@ -12,6 +12,11 @@ const {
   getRecommendationExtractionById,
   insertRecommendationExtraction,
   markRecommendationExtractionConfirmed,
+  ensurePromptByText,
+  ensureRecommendationSession,
+  getRecommendationSessionById,
+  getPromptById,
+  listRecommendationsBySessionId,
 } = require("../../../scripts/db/repository");
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
@@ -60,6 +65,14 @@ function createRequestContext(req, config) {
     requestId,
     service: config.observability.serviceName,
   };
+}
+
+function resolveAuthenticatedUserId(authClaims) {
+  const candidate = authClaims?.sub || authClaims?.username || authClaims?.client_id;
+  if (typeof candidate === "string" && candidate.trim() !== "") {
+    return candidate.trim();
+  }
+  throw new Error("JWT payload missing subject identifier");
 }
 
 function logJson(level, message, fields) {
@@ -143,8 +156,19 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
     return;
   }
 
+  let authClaims;
   try {
-    await verifyJwt(req.headers.authorization, config);
+    authClaims = await verifyJwt(req.headers.authorization, config);
+  } catch (error) {
+    sendError(res, 401, "UNAUTHORIZED", "Invalid authorization token", ctx, {
+      reason: error.message,
+    });
+    return;
+  }
+
+  let authenticatedUserId;
+  try {
+    authenticatedUserId = resolveAuthenticatedUserId(authClaims);
   } catch (error) {
     sendError(res, 401, "UNAUTHORIZED", "Invalid authorization token", ctx, {
       reason: error.message,
@@ -226,14 +250,32 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
         confirmed: body.confirmed,
       });
       const confirmedAt = markRecommendationExtractionConfirmed(dbPath, extractionId);
+      const prompt = ensurePromptByText(dbPath, {
+        promptId: `prm_${crypto.randomUUID()}`,
+        promptText: extraction.prompt_text,
+        createdBy: authenticatedUserId,
+      });
+      const session = ensureRecommendationSession(dbPath, {
+        sessionId: `rs_${crypto.randomUUID()}`,
+        userId: authenticatedUserId,
+        mode: submitPayload.mode,
+        extractionId: submitPayload.extractionId,
+        promptId: prompt.prompt_id,
+        status: "confirmed",
+      });
       sendJson(
         res,
         200,
         {
-          sessionDraft: {
-            extractionId: submitPayload.extractionId,
-            mode: submitPayload.mode,
-            status: "confirmed",
+          session: {
+            sessionId: session.session_id,
+            extractionId: session.extraction_id,
+            promptId: session.prompt_id,
+            userId: session.user_id,
+            mode: session.mode,
+            status: session.status,
+            createdAt: session.created_at,
+            updatedAt: session.updated_at,
             confirmedAt,
           },
         },
@@ -278,6 +320,61 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
           createdAt: extraction.created_at,
           confirmedAt: extraction.confirmed_at,
           metadataRaw: JSON.parse(extraction.metadata_raw_json || "[]"),
+        },
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/v1/recommendation-sessions/")) {
+    const sessionId = path.slice("/v1/recommendation-sessions/".length);
+    const session = getRecommendationSessionById(dbPath, sessionId);
+
+    if (!session) {
+      sendError(res, 404, "NOT_FOUND", "Recommendation session not found", ctx);
+      return;
+    }
+
+    if (session.user_id !== authenticatedUserId) {
+      sendError(res, 403, "FORBIDDEN", "Recommendation session is not accessible", ctx);
+      return;
+    }
+
+    const prompt = getPromptById(dbPath, session.prompt_id);
+    const recommendationRows = listRecommendationsBySessionId(dbPath, sessionId);
+
+    sendJson(
+      res,
+      200,
+      {
+        session: {
+          sessionId: session.session_id,
+          extractionId: session.extraction_id,
+          promptId: session.prompt_id,
+          mode: session.mode,
+          status: session.status,
+          userId: session.user_id,
+          createdAt: session.created_at,
+          updatedAt: session.updated_at,
+          prompt: prompt ? {
+            promptId: prompt.prompt_id,
+            promptText: prompt.prompt_text,
+            status: prompt.status,
+            version: prompt.version,
+            curated: Boolean(prompt.curated_flag),
+            createdAt: prompt.created_at,
+          } : null,
+          recommendations: recommendationRows.map((row) => ({
+            recommendationId: row.recommendation_id,
+            rank: row.rank,
+            combinationId: row.combination_id,
+            rationale: row.rationale,
+            confidence: row.confidence,
+            riskNotes: JSON.parse(row.risk_notes_json || "[]"),
+            promptImprovements: JSON.parse(row.prompt_improvements_json || "[]"),
+            createdAt: row.created_at,
+          })),
         },
       },
       ctx

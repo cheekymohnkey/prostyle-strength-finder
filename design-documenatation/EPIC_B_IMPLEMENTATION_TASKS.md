@@ -41,6 +41,205 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 4. Recommended next task:
 - Execute B2 next: add recommendation session/recommendation persistence schema and finalize extraction-confirm -> recommendation-session creation flow.
 
+## Current API Examples (Implemented)
+
+Verified against current implementation in:
+- `apps/api/src/index.js`
+- `scripts/db/repository.js`
+
+Auth:
+- All endpoints below require `Authorization: Bearer <jwt>` (except `GET /v1/health`).
+
+### 1) Create recommendation extraction
+
+Endpoint:
+- `POST /v1/recommendation-extractions`
+
+Example request:
+
+```json
+{
+  "metadataFields": [
+    {
+      "key": "Description",
+      "value": "cinematic portrait of a boxer in rain --ar 3:4 --v 6 Job ID: 123e4567-e89b-12d3-a456-426614174000"
+    },
+    {
+      "key": "Author",
+      "value": "ryan@example.com"
+    },
+    {
+      "key": "Creation Time",
+      "value": "2026-02-18T10:22:00Z"
+    }
+  ],
+  "fileName": "midjourney-output.png",
+  "mimeType": "image/png"
+}
+```
+
+Example `201` response:
+
+```json
+{
+  "extraction": {
+    "extractionId": "rex_3f8bb1d5-03a8-4ac3-9e58-cf8508586c49",
+    "status": "extracted",
+    "prompt": "cinematic portrait of a boxer in rain --ar 3:4 --v 6",
+    "author": "ryan@example.com",
+    "creationTime": "2026-02-18T10:22:00Z",
+    "sourceJobId": "123e4567-e89b-12d3-a456-426614174000",
+    "modelFamily": "standard",
+    "modelVersion": "6",
+    "modelSelectionSource": "prompt_flag",
+    "isBaseline": true,
+    "hasProfile": false,
+    "hasSref": false,
+    "parserVersion": "midjourney-metadata-v1"
+  },
+  "requiresConfirmation": true
+}
+```
+
+Example `400` response:
+
+```json
+{
+  "error": {
+    "code": "INVALID_REQUEST",
+    "message": "Extraction parsing failed",
+    "requestId": "9f9f26ea-2d7b-44e5-b0cf-697f7f58c1de",
+    "details": {
+      "reason": "Missing required metadata field: Description"
+    }
+  }
+}
+```
+
+### 2) Confirm extraction and create/reuse recommendation session
+
+Endpoint:
+- `POST /v1/recommendation-extractions/:extractionId/confirm`
+
+Example request:
+
+```json
+{
+  "confirmed": true,
+  "mode": "precision"
+}
+```
+
+Example `200` response:
+
+```json
+{
+  "session": {
+    "sessionId": "rs_6f250fef-707f-4a17-9f0e-f5560f9d790f",
+    "extractionId": "rex_3f8bb1d5-03a8-4ac3-9e58-cf8508586c49",
+    "promptId": "prm_1f357273-3d13-4e9b-87c7-cf643f42d21d",
+    "userId": "user-123",
+    "mode": "precision",
+    "status": "confirmed",
+    "createdAt": "2026-02-18T18:12:44.021Z",
+    "updatedAt": "2026-02-18T18:12:44.021Z",
+    "confirmedAt": "2026-02-18T18:12:43.995Z"
+  }
+}
+```
+
+Example `404` response:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Recommendation extraction not found",
+    "requestId": "2e6550b3-fbdf-4853-ad6f-6e4d9845a571",
+    "details": null
+  }
+}
+```
+
+### 3) Get extraction details
+
+Endpoint:
+- `GET /v1/recommendation-extractions/:extractionId`
+
+Example `200` response:
+
+```json
+{
+  "extraction": {
+    "extractionId": "rex_3f8bb1d5-03a8-4ac3-9e58-cf8508586c49",
+    "status": "confirmed",
+    "prompt": "cinematic portrait of a boxer in rain --ar 3:4 --v 6",
+    "author": "ryan@example.com",
+    "creationTime": "2026-02-18T10:22:00Z",
+    "sourceJobId": "123e4567-e89b-12d3-a456-426614174000",
+    "modelFamily": "standard",
+    "modelVersion": "6",
+    "modelSelectionSource": "prompt_flag",
+    "isBaseline": true,
+    "hasProfile": false,
+    "hasSref": false,
+    "parserVersion": "midjourney-metadata-v1",
+    "createdAt": "2026-02-18T18:11:55.678Z",
+    "confirmedAt": "2026-02-18T18:12:43.995Z",
+    "metadataRaw": [
+      {
+        "key": "Description",
+        "value": "cinematic portrait of a boxer in rain --ar 3:4 --v 6 Job ID: 123e4567-e89b-12d3-a456-426614174000"
+      }
+    ]
+  }
+}
+```
+
+### 4) Get recommendation session details
+
+Endpoint:
+- `GET /v1/recommendation-sessions/:sessionId`
+
+Example `200` response:
+
+```json
+{
+  "session": {
+    "sessionId": "rs_6f250fef-707f-4a17-9f0e-f5560f9d790f",
+    "extractionId": "rex_3f8bb1d5-03a8-4ac3-9e58-cf8508586c49",
+    "promptId": "prm_1f357273-3d13-4e9b-87c7-cf643f42d21d",
+    "mode": "precision",
+    "status": "confirmed",
+    "userId": "user-123",
+    "createdAt": "2026-02-18T18:12:44.021Z",
+    "updatedAt": "2026-02-18T18:12:44.021Z",
+    "prompt": {
+      "promptId": "prm_1f357273-3d13-4e9b-87c7-cf643f42d21d",
+      "promptText": "cinematic portrait of a boxer in rain --ar 3:4 --v 6",
+      "status": "active",
+      "version": "v1",
+      "curated": false,
+      "createdAt": "2026-02-18T18:12:44.010Z"
+    },
+    "recommendations": []
+  }
+}
+```
+
+Example `403` response:
+
+```json
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Recommendation session is not accessible",
+    "requestId": "ceef7654-8f2d-4468-8dd1-4bf1d58987a0",
+    "details": null
+  }
+}
+```
+
 ## Epic B - Core Recommendation Flow (MVP-1)
 
 Objective:
