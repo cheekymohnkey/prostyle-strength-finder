@@ -1,0 +1,64 @@
+# Prostyle Strength Finder - Environment Configuration Contract
+
+Status: Agreed for Epic A baseline  
+Date: 2026-02-18  
+Depends on:
+- `design-documenatation/TECHNICAL_DECISIONS.md`
+- `design-documenatation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/IMPLEMENTATION_TASKS.md`
+
+## Purpose
+
+Define one configuration contract across `local`, `staging`, and `prod` with consistent key names and adapter expectations.
+
+## Parity Rule
+
+1. The same environment variable keys must exist in every environment.
+2. Application components must use the same interface regardless of environment.
+3. Only values change by environment.
+
+## Variable Contract
+
+| Variable | Required | Components | Format | Notes |
+| --- | --- | --- | --- | --- |
+| `NODE_ENV` | Yes | API, Worker | `development|test|production` | Runtime mode for node process behavior. |
+| `APP_ENV` | Yes | API, Worker, Frontend | `local|staging|prod` | Deployment environment selector. |
+| `PORT` | Yes | API | integer | API bind port in each environment. |
+| `DATABASE_URL` | Yes | API, Worker | SQLite DSN/path | MVP uses SQLite path (example: `file:./data/prostyle.db`). |
+| `SQS_QUEUE_URL` | Yes | API, Worker | URL | Primary queue URL. |
+| `SQS_DLQ_URL` | Yes | API, Worker | URL | Dead-letter queue URL. |
+| `SQS_MAX_ATTEMPTS` | Yes | API, Worker | integer | Retry cap before dead-letter. |
+| `SQS_RETRY_BASE_MS` | Yes | API, Worker | integer | Base delay for backoff strategy. |
+| `S3_BUCKET` | Yes | API, Worker | string | Bucket for image/artifact object storage. |
+| `AWS_REGION` | Yes | API, Worker | AWS region | Example: `us-east-1`. |
+| `S3_ENDPOINT_OVERRIDE` | No | API, Worker | URL | Local simulation endpoint (for LocalStack/dev). |
+| `COGNITO_USER_POOL_ID` | Yes | API, Worker | string | Cognito user pool identifier. |
+| `COGNITO_CLIENT_ID` | Yes | API, Worker | string | Cognito app client identifier. |
+| `COGNITO_ISSUER` | Yes | API, Worker | URL | JWT issuer expected by API. |
+| `COGNITO_AUDIENCE` | Yes | API, Worker | string | JWT audience expected by API. |
+| `LOG_LEVEL` | Yes | API, Worker | `debug|info|warn|error` | Structured logging level. |
+| `SERVICE_NAME` | Yes | API, Worker | string | Service identifier in logs. |
+| `LOG_INCLUDE_CORRELATION_IDS` | No | API, Worker | `true|false` | Defaults to `true` when omitted. |
+| `NEXT_PUBLIC_API_BASE_URL` | Yes | Frontend | URL | API base URL exposed to browser runtime. |
+
+## Ownership and Validation
+
+1. API validates all required API keys at startup and exits on missing/invalid values.
+2. Worker validates all required worker keys at startup and exits on missing/invalid values.
+3. Frontend validates `NEXT_PUBLIC_API_BASE_URL` and `APP_ENV`.
+4. Integer keys must be parseable as base-10 integers.
+
+## Local Pre-Prod Defaults
+
+1. `APP_ENV=local`
+2. `NODE_ENV=development`
+3. SQLite DB path points to local file under repository tree.
+4. Queue and object storage endpoints may point to LocalStack or isolated dev AWS resources.
+
+## Environment Template Files
+
+Use these templates as the baseline:
+
+1. `.env.local.example`
+2. `.env.staging.example`
+3. `.env.prod.example`
