@@ -232,6 +232,34 @@ Acceptance criteria:
 1. This task set intentionally excludes deep feature logic from MVP-1/MVP-2/MVP-3.
 2. If any Epic A task implies schema or infrastructure lock-in beyond agreed decisions, update `DECISIONS.md` first before implementation.
 
+## A3 Implementation Results (2026-02-18)
+
+Implementation summary:
+1. SQLite migration framework added under `scripts/db` with commands:
+- `db:migrate`
+- `db:status`
+- `db:create`
+- `db:rollback`
+- `db:reset`
+2. Baseline migration created:
+- `scripts/db/migrations/20260218130000_epic_a_baseline.sql`
+3. Migration state tracking table implemented:
+- `schema_migrations`
+4. API and worker startup DB readiness checks added:
+- verifies DB connectivity
+- fails startup when migrations are pending
+5. Local quickstart updated to include migration application before service startup.
+
+Acceptance criteria mapping:
+1. Zero-state migration application: complete (`npm run db:migrate`).
+2. Deterministic migration state tracking: complete (`npm run db:status`).
+3. API/worker startup DB readiness check: complete.
+4. Baseline migration documented and executable locally: complete.
+
+Known A3 follow-ups (Epic B+):
+1. Migration runner is SQLite-only by design for MVP; Postgres portability layer remains future work.
+2. Rollback safety is migration-author responsibility (`-- migrate:down` content quality).
+
 ## A4 Implementation Results (2026-02-18)
 
 Implementation summary:
@@ -283,7 +311,7 @@ Epic A done checklist status:
 7. Async submission -> worker consumption verifiable via stub flow: complete.
 
 Known gaps (Epic B+ follow-ups):
-1. API and worker currently use local/in-memory scaffolds; no real SQLite persistence integration yet.
+1. API and worker startup now validate SQLite readiness, but job/run writes are still in-memory scaffolds.
 2. Worker queue adapter is local simulation, not yet wired to AWS SQS client implementation.
 3. API auth is JWT shape + issuer/audience scaffold only; signature verification/JWKS integration is pending.
 4. API job state is in-memory and reset on restart; durable run tracking is pending data-layer implementation.

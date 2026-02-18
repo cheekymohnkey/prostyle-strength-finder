@@ -29,13 +29,15 @@ Primary design and planning docs:
 1. Ensure Node.js 20 is installed and on `PATH`.
 2. Export environment variables from local template:
    `set -a && source .env.local.example && set +a`
-3. Run shared-contracts build check:
+3. Apply database migrations:
+   `npm run db:migrate`
+4. Run shared-contracts build check:
    `npm run contracts`
-4. Run API:
+5. Run API:
    `npm run api`
-5. Run worker:
+6. Run worker:
    `npm run worker`
-6. Run frontend bootstrap check:
+7. Run frontend bootstrap check:
    `npm run frontend`
 
 ## A6 Stub Flow Verification

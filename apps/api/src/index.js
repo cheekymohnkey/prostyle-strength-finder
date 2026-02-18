@@ -1,6 +1,7 @@
 const http = require("http");
 const crypto = require("crypto");
 const { loadConfig } = require("./config");
+const { assertDatabaseReady } = require("../../../scripts/db/runtime");
 const {
   CONTRACT_VERSION,
   validateAnalysisJobEnvelope,
@@ -239,6 +240,7 @@ async function requestHandler(req, res, config) {
 
 function main() {
   const config = loadConfig();
+  const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
   const server = http.createServer((req, res) => {
     requestHandler(req, res, config).catch((error) => {
       const ctx = createRequestContext(req, config);
@@ -256,6 +258,7 @@ function main() {
       app_env: config.runtime.appEnv,
       service: config.observability.serviceName,
       contract_version: CONTRACT_VERSION,
+      database_path: dbReadiness.dbPath,
     });
   });
 }
