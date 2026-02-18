@@ -14,6 +14,33 @@ Depends on:
 
 Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering tasks with clear acceptance criteria, sequencing, and handoff context.
 
+## Current Execution Snapshot (2026-02-18 Session Wrap)
+
+1. What was completed:
+- B1 shared contracts scaffold is implemented in `packages/shared-contracts`:
+  - recommendation session contracts
+  - extraction payload/confirmation contracts
+  - confidence/risk + low-confidence signaling validation
+- B3 upload-intake scaffold is implemented:
+  - MidJourney metadata normalization parser (`scripts/ingestion/midjourney-metadata.js`)
+  - extraction persistence migration (`scripts/db/migrations/20260219103000_recommendation_extractions.sql`)
+  - repository methods for extraction insert/get/confirm
+  - API endpoints scaffolded for extract/get/confirm in `apps/api/src/index.js`
+- Contracts build and local migrations passed.
+
+2. Decisions made:
+- MVP-1 intake remains upload-only.
+- Extraction confirmation is required before final submission.
+- Raw extracted metadata is retained for future parser reprocessing.
+
+3. Outstanding risks/issues:
+- PNG binary parsing is not yet wired; current extraction endpoint expects normalized metadata field payload input.
+- Recommendation finalization after confirmation currently returns session draft state; full recommendation session/run orchestration is pending.
+- End-to-end HTTP route smoke test for new extraction endpoints was not completed in this sandbox due process port-binding restriction (`EPERM` on `0.0.0.0:3001`).
+
+4. Recommended next task:
+- Execute B2 next: add recommendation session/recommendation persistence schema and finalize extraction-confirm -> recommendation-session creation flow.
+
 ## Epic B - Core Recommendation Flow (MVP-1)
 
 Objective:

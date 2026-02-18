@@ -24,7 +24,7 @@ Convert agreed design artifacts into executable engineering work with clear sequ
 - S3: put/head/get/delete
 - SQS: send/receive/delete
 4. Recommended active focus for next build session:
-- Begin Epic B execution (MVP-1 Core Recommendation Flow), using First Sprint vertical-slice criteria as the near-term delivery target.
+- Continue Epic B execution (MVP-1 Core Recommendation Flow), starting with B2 persistence and extraction-confirm -> recommendation-session finalization.
 
 ## Delivery Structure
 
