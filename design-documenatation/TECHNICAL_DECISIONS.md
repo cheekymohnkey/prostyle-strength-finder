@@ -31,6 +31,9 @@ Proposed:
 - JSON field for `trait_vector` (with `trait_schema_version`).
 - Explicit data-access abstraction (repository/port layer) to enable later migration to server-based Postgres.
 
+Reference:
+- S3 bucket/key and IAM conventions are documented in `infra/S3_BUCKET_CONVENTIONS.md`.
+
 Why:
 - Near-zero cost and fast local iteration for MVP.
 - Relational model still aligns with current ERD and query needs.
