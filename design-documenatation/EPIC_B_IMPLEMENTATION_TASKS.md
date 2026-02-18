@@ -17,11 +17,12 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 ## Epic B - Core Recommendation Flow (MVP-1)
 
 Objective:
-- Deliver prompt-to-recommendation flow with ranked profile/sref combinations, rationale, confidence, risk notes, and prompt improvement guidance.
+- Deliver upload-to-recommendation flow (MidJourney PNG metadata extraction) with ranked profile/sref combinations, rationale, confidence, risk notes, and prompt improvement guidance.
 
 ### Scope
 
 1. Prompt submission and recommendation session model.
+1. Upload-first recommendation intake and metadata extraction model.
 2. Recommendation mode handling (`precision`, `close_enough`) with agreed thresholds.
 3. Style influence retrieval/filtering and ranking.
 4. Confidence/risk formatting and low-confidence labeling.
@@ -34,6 +35,7 @@ Objective:
 2. Admin moderation/governance workflows (Epic D).
 3. Backup/restore and launch hardening tracks (Epic E).
 4. Render orchestration/integration with external generation platforms.
+5. Manual prompt text entry path for MVP-1.
 
 ### Constraints
 
@@ -48,6 +50,13 @@ Objective:
 - prompt improvements
 4. Low-confidence outcomes must be explicitly labeled.
 5. Model family/version resolution and persistence rules from Epic A remain mandatory.
+6. Intake is upload-only for MVP-1:
+- user provides MidJourney PNG
+- system extracts `Description` prompt and related metadata
+- no manual prompt text entry in MVP-1 flow
+7. Confirmation gate is required:
+- user must confirm extracted metadata before recommendation submission finalization
+8. Raw extracted metadata must be retained for future parser reprocessing.
 
 ## Task Breakdown
 
@@ -91,25 +100,33 @@ Acceptance criteria:
 2. Session and recommendation records persist and are queryable.
 3. API returns persisted recommendation data after submission.
 
-## B3. Prompt Intake and Normalization
+## B3. Upload Intake and Metadata Normalization
 
 Description:
-- Convert raw prompt submissions into normalized recommendation requests.
+- Convert uploaded MidJourney PNG metadata into normalized recommendation requests.
 
 Implementation tasks:
-1. Implement request normalization:
-- trim/sanitize prompt text
-- normalize mode values to canonical enum
-- capture optional context/reference fields
+1. Implement upload intake endpoint and parser flow for PNG metadata extraction.
+2. Parse and normalize metadata fields:
+- `Description` -> prompt text
+- `Author`
+- `Creation Time`
+- `Job ID` (from metadata text/XMP GUID when present)
+3. Classify baseline vs influenced input:
+- baseline when no `--profile` and no `--sref`
+4. Normalize mode values to canonical enum.
 2. Reuse Epic A model resolution rules:
 - respect explicit `--v` and `--niji`
 - apply default standard version when absent
-3. Persist normalized prompt/session metadata.
+5. Persist normalized prompt/session metadata and raw extraction blob for auditability.
+6. Add extraction review payload to support required confirmation step.
 
 Acceptance criteria:
-1. Prompt intake validates and normalizes consistently.
+1. Upload intake validates and normalizes consistently.
 2. Explicit and default model resolution behavior is preserved.
 3. Invalid combinations (for example both `--v` and `--niji`) return clear errors.
+4. Missing/invalid required metadata returns actionable parse errors.
+5. Submission cannot finalize without explicit confirmation flag.
 
 ## B4. Style Influence Retrieval and Eligibility Filtering
 
@@ -167,38 +184,43 @@ Description:
 - Expose recommendation flow through versioned REST endpoints.
 
 Implementation tasks:
-1. Add submit endpoint for recommendation session creation.
-2. Add session detail endpoint for ranked recommendation retrieval.
-3. Add request correlation + structured logs for session operations.
-4. Ensure auth/role checks remain consistent with Epic A middleware.
+1. Add upload submit endpoint for recommendation session creation from extracted metadata.
+2. Add extraction confirmation endpoint/state transition to finalize recommendation submission.
+3. Add session detail endpoint for ranked recommendation retrieval.
+4. Add request correlation + structured logs for session operations.
+5. Ensure auth/role checks remain consistent with Epic A middleware.
 
 Acceptance criteria:
-1. Authenticated user can submit prompt and receive session result.
-2. API returns ranked recommendations with required explanation fields.
-3. Logs include `request_id` and recommendation session identifiers.
+1. Authenticated user can upload MidJourney PNG and receive session result.
+2. Recommendation submission finalizes only after explicit extraction confirmation.
+3. API returns ranked recommendations with required explanation fields.
+4. Logs include `request_id` and recommendation session identifiers.
 
 ## B8. Frontend MVP-1 Recommendation Page
 
 Description:
-- Deliver first usable UI for prompt-to-recommendation interaction.
+- Deliver first usable UI for upload-to-recommendation interaction.
 
 Implementation tasks:
 1. Build page with:
-- prompt input
+- PNG upload input
 - mode switch (`precision`, `close enough`)
 - submit action
-2. Render ranked recommendation cards with:
+2. Add extraction review step showing parsed metadata before final submission.
+3. Require explicit user confirmation action to continue.
+4. Render ranked recommendation cards with:
 - confidence
 - rationale
 - risk notes
 - prompt improvements
-3. Handle empty/low-confidence states explicitly.
-4. Wire to API via agreed frontend data-fetch approach.
+5. Handle empty/low-confidence states explicitly.
+6. Wire to API via agreed frontend data-fetch approach.
 
 Acceptance criteria:
-1. End user can complete flow in one session.
-2. UI clearly surfaces mode and confidence context.
-3. Low-confidence output is visibly distinguished.
+1. End user can complete upload-to-recommendation flow in one session.
+2. UI requires confirmation of extracted metadata before final submission.
+3. UI clearly surfaces mode and confidence context.
+4. Low-confidence output is visibly distinguished.
 
 ## B9. Verification and Handoff
 
@@ -227,6 +249,8 @@ Acceptance criteria:
 3. Mode thresholds are enforced (`precision >= 0.65`, `close_enough >= 0.45`).
 4. Low-confidence behavior is explicitly labeled in API and UI.
 5. Frontend page supports mode switch and ranked result rendering.
+6. Confirmation gate is enforced before recommendation finalization.
+7. Raw extracted metadata is retained and linked to recommendation session.
 
 ## Suggested Execution Sequence
 
@@ -253,6 +277,12 @@ Control: enforce response assembly contract with validation + tests.
 
 4. Risk: UI presents confidence without sufficient caveats.
 Control: mandatory low-confidence labels and risk-note rendering.
+
+5. Risk: Metadata extraction inconsistency across PNG variants.
+Control: deterministic parser rules + fixture coverage for known MidJourney metadata patterns.
+
+6. Risk: Required confirmation adds user friction.
+Control: keep review UI concise, pre-filled, and one-step confirmation.
 
 ## Next Active Task
 

@@ -63,7 +63,7 @@ Objective:
 - Ship prompt-to-recommendation flow with rationale/confidence.
 
 Scope:
-1. Prompt submission endpoint and session model.
+1. Upload-first recommendation submission endpoint and session model (MidJourney PNG metadata extraction).
 2. Recommendation mode handling (`precision`, `close enough`).
 3. Style influence retrieval/filtering and ranking service.
 4. Confidence/risk formatting rules.

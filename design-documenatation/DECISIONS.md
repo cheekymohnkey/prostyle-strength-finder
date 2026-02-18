@@ -76,6 +76,15 @@ Rationale: Non-local S3/SQS prerequisites are now reproducible through IaC and v
 16. Prompt model versioning rules are explicit and persisted per run/job.
 Rationale: MidJourney model families/versions evolve independently; we must capture resolved model family/version deterministically for auditability and reproducibility.
 
+17. MVP-1 recommendation intake path is upload-only.
+Rationale: Minimize manual user input by extracting prompt and run metadata directly from MidJourney PNG metadata fields.
+
+18. MVP-1 requires explicit user confirmation of extracted metadata before recommendation submission is finalized.
+Rationale: Early parser confidence is still maturing; required confirmation reduces silent extraction errors.
+
+19. Raw extracted metadata payloads are retained.
+Rationale: Enables future reprocessing with updated parsing rules without requiring users to re-upload historical files.
+
 ### Open
 
 1. Canonical trait taxonomy.

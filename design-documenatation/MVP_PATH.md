@@ -49,16 +49,18 @@ Objective:
 - Ship the main end-user flow from prompt input to recommended profile/sref output.
 
 Includes:
-1. Prompt input (with optional references).
+1. MidJourney PNG upload input with automatic metadata extraction (prompt and run metadata).
 2. Mode selection (`Precision`, `Close enough`).
 3. Ranked recommendations (top list).
 4. Fit rationale + confidence + risk notes.
 5. Prompt improvement suggestions.
 6. Copyable output for manual generation handoff.
+7. Required extraction confirmation step before recommendation submission finalization.
 
 Exit criteria:
 1. User can complete flow in one session.
 2. Recommendations are understandable without admin help.
+3. Extracted metadata is reviewable and confirmed before submission.
 
 ## MVP-2 Feedback Loop
 
