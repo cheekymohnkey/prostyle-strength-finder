@@ -9,15 +9,22 @@ const {
   getJobByIdempotencyKey,
   insertJob,
   updateJobStatus,
+  getRecommendationExtractionById,
+  insertRecommendationExtraction,
+  markRecommendationExtractionConfirmed,
 } = require("../../../scripts/db/repository");
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
+const { normalizeMidjourneyMetadata } = require("../../../scripts/ingestion/midjourney-metadata");
 const {
   resolveModelSelection,
   setCurrentDefaultModels,
 } = require("../../../scripts/models/model-versioning");
 const {
   CONTRACT_VERSION,
+  validateRecommendationSubmitPayload,
+  validateRecommendationExtractionPayload,
+  validateRecommendationExtractionConfirmPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -142,6 +149,139 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
     sendError(res, 401, "UNAUTHORIZED", "Invalid authorization token", ctx, {
       reason: error.message,
     });
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/recommendation-extractions") {
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateRecommendationExtractionPayload(body);
+      const normalized = normalizeMidjourneyMetadata(payload);
+      const extractionId = `rex_${crypto.randomUUID()}`;
+
+      insertRecommendationExtraction(dbPath, {
+        extractionId,
+        status: "extracted",
+        promptText: normalized.prompt,
+        author: normalized.author,
+        creationTime: normalized.creationTime,
+        sourceJobId: normalized.jobId,
+        modelFamily: normalized.modelFamily,
+        modelVersion: normalized.modelVersion,
+        modelSelectionSource: normalized.modelSelectionSource,
+        isBaseline: normalized.isBaseline,
+        hasProfile: normalized.hasProfile,
+        hasSref: normalized.hasSref,
+        parserVersion: normalized.parserVersion,
+        metadataRaw: normalized.metadataRaw,
+      });
+
+      sendJson(
+        res,
+        201,
+        {
+          extraction: {
+            extractionId,
+            status: "extracted",
+            prompt: normalized.prompt,
+            author: normalized.author,
+            creationTime: normalized.creationTime,
+            sourceJobId: normalized.jobId,
+            modelFamily: normalized.modelFamily,
+            modelVersion: normalized.modelVersion,
+            modelSelectionSource: normalized.modelSelectionSource,
+            isBaseline: normalized.isBaseline,
+            hasProfile: normalized.hasProfile,
+            hasSref: normalized.hasSref,
+            parserVersion: normalized.parserVersion,
+          },
+          requiresConfirmation: true,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Extraction parsing failed", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST" && path.startsWith("/v1/recommendation-extractions/") && path.endsWith("/confirm")) {
+    const extractionId = path.slice("/v1/recommendation-extractions/".length, -"/confirm".length);
+    const extraction = getRecommendationExtractionById(dbPath, extractionId);
+
+    if (!extraction) {
+      sendError(res, 404, "NOT_FOUND", "Recommendation extraction not found", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      validateRecommendationExtractionConfirmPayload(body);
+      const submitPayload = validateRecommendationSubmitPayload({
+        extractionId,
+        mode: body.mode,
+        confirmed: body.confirmed,
+      });
+      const confirmedAt = markRecommendationExtractionConfirmed(dbPath, extractionId);
+      sendJson(
+        res,
+        200,
+        {
+          sessionDraft: {
+            extractionId: submitPayload.extractionId,
+            mode: submitPayload.mode,
+            status: "confirmed",
+            confirmedAt,
+          },
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Confirmation failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path.startsWith("/v1/recommendation-extractions/")) {
+    const extractionId = path.slice("/v1/recommendation-extractions/".length);
+    const extraction = getRecommendationExtractionById(dbPath, extractionId);
+
+    if (!extraction) {
+      sendError(res, 404, "NOT_FOUND", "Recommendation extraction not found", ctx);
+      return;
+    }
+
+    sendJson(
+      res,
+      200,
+      {
+        extraction: {
+          extractionId: extraction.extraction_id,
+          status: extraction.status,
+          prompt: extraction.prompt_text,
+          author: extraction.author,
+          creationTime: extraction.creation_time,
+          sourceJobId: extraction.source_job_id,
+          modelFamily: extraction.model_family,
+          modelVersion: extraction.model_version,
+          modelSelectionSource: extraction.model_selection_source,
+          isBaseline: Boolean(extraction.is_baseline),
+          hasProfile: Boolean(extraction.has_profile),
+          hasSref: Boolean(extraction.has_sref),
+          parserVersion: extraction.parser_version,
+          createdAt: extraction.created_at,
+          confirmedAt: extraction.confirmed_at,
+          metadataRaw: JSON.parse(extraction.metadata_raw_json || "[]"),
+        },
+      },
+      ctx
+    );
     return;
   }
 

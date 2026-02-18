@@ -140,6 +140,61 @@ function updateAnalysisRun(dbPath, analysisRunId, input) {
   );
 }
 
+function getRecommendationExtractionById(dbPath, extractionId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT extraction_id, status, prompt_text, author, creation_time, source_job_id,
+            model_family, model_version, model_selection_source,
+            is_baseline, has_profile, has_sref, parser_version,
+            metadata_raw_json, created_at, confirmed_at
+     FROM recommendation_extractions
+     WHERE extraction_id = ${quote(extractionId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertRecommendationExtraction(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO recommendation_extractions (
+       extraction_id, status, prompt_text, author, creation_time, source_job_id,
+       model_family, model_version, model_selection_source,
+       is_baseline, has_profile, has_sref,
+       parser_version, metadata_raw_json, created_at, confirmed_at
+     ) VALUES (
+       ${quote(input.extractionId)},
+       ${quote(input.status || "extracted")},
+       ${quote(input.promptText)},
+       ${quote(input.author || null)},
+       ${quote(input.creationTime || null)},
+       ${quote(input.sourceJobId || null)},
+       ${quote(input.modelFamily)},
+       ${quote(input.modelVersion)},
+       ${quote(input.modelSelectionSource)},
+       ${input.isBaseline ? 1 : 0},
+       ${input.hasProfile ? 1 : 0},
+       ${input.hasSref ? 1 : 0},
+       ${quote(input.parserVersion)},
+       ${quote(JSON.stringify(input.metadataRaw || []))},
+       ${quote(createdAt)},
+       ${quote(input.confirmedAt || null)}
+     );`
+  );
+}
+
+function markRecommendationExtractionConfirmed(dbPath, extractionId) {
+  const confirmedAt = nowIso();
+  exec(
+    dbPath,
+    `UPDATE recommendation_extractions
+     SET status = 'confirmed', confirmed_at = ${quote(confirmedAt)}
+     WHERE extraction_id = ${quote(extractionId)};`
+  );
+  return confirmedAt;
+}
+
 module.exports = {
   ensureReady,
   getJobById,
@@ -150,4 +205,7 @@ module.exports = {
   getNextAttemptCount,
   insertAnalysisRun,
   updateAnalysisRun,
+  getRecommendationExtractionById,
+  insertRecommendationExtraction,
+  markRecommendationExtractionConfirmed,
 };

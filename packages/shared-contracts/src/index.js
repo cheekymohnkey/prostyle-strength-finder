@@ -6,7 +6,22 @@ const {
   validateAnalysisJobEnvelope,
 } = require("./analysis-job");
 const { ANALYSIS_RUN_QUEUE_STATUSES, createAnalysisRunStatusEvent, isAnalysisRunStatus } = require("./analysis-run");
-const { isRecommendationResult } = require("./recommendation-result");
+const {
+  RECOMMENDATION_MODES,
+  RECOMMENDATION_SESSION_STATUSES,
+  validateRecommendationSubmitPayload,
+  validateRecommendationSessionEnvelope,
+} = require("./recommendation-session");
+const {
+  LOW_CONFIDENCE_REASON_CODES,
+  isLowConfidenceSignal,
+  isConfidenceRiskBlock,
+  isRecommendationResult,
+} = require("./recommendation-result");
+const {
+  validateRecommendationExtractionPayload,
+  validateRecommendationExtractionConfirmPayload,
+} = require("./recommendation-extraction");
 const { createApiErrorResponse } = require("./api-error");
 
 module.exports = {
@@ -19,6 +34,15 @@ module.exports = {
   validateAnalysisJobEnvelope,
   createAnalysisRunStatusEvent,
   isAnalysisRunStatus,
+  RECOMMENDATION_MODES,
+  RECOMMENDATION_SESSION_STATUSES,
+  validateRecommendationSubmitPayload,
+  validateRecommendationSessionEnvelope,
+  LOW_CONFIDENCE_REASON_CODES,
+  isLowConfidenceSignal,
+  isConfidenceRiskBlock,
   isRecommendationResult,
+  validateRecommendationExtractionPayload,
+  validateRecommendationExtractionConfirmPayload,
   createApiErrorResponse,
 };
