@@ -88,7 +88,29 @@ Acceptance criteria:
 2. Worker imports job envelope contract for queue message decode.
 3. Contract package has a clear semantic version field or version constants.
 
-## A3. API Baseline
+## A3. SQLite Setup + Migration Framework
+
+Description:
+- Establish SQLite as MVP system of record with a repeatable migration workflow from zero state.
+
+Implementation tasks:
+1. Define DB location strategy for each environment (`local`, `staging`, `prod`) via `DATABASE_URL`.
+2. Add migration framework scaffolding and command entrypoints:
+- create migration
+- apply migrations
+- rollback last migration (where supported)
+3. Create initial baseline schema migration for Epic A entities needed by API/worker scaffolding.
+4. Add migration-state tracking table/versioning convention.
+5. Add startup safety check to verify DB is reachable and schema version is current.
+6. Add developer reset/bootstrap script for clean local DB initialization.
+
+Acceptance criteria:
+1. New environment can apply migrations from zero state without manual SQL steps.
+2. Migration state is trackable and deterministic across runs.
+3. API and worker can both connect using `DATABASE_URL` with successful startup check.
+4. Baseline migration path is documented and executable locally.
+
+## A4. API Baseline
 
 Description:
 - Scaffold versioned REST API with protected route capability and async analysis submission surface.
@@ -109,7 +131,7 @@ Acceptance criteria:
 3. Protected endpoint path exists and validates token shape (or guarded stub).
 4. Submit/status endpoints compile and use shared contracts.
 
-## A4. Worker Baseline
+## A5. Worker Baseline
 
 Description:
 - Scaffold independent worker process that consumes queue messages and updates run state.
@@ -128,7 +150,7 @@ Acceptance criteria:
 2. Worker can consume test payload and log lifecycle transitions.
 3. Failed job path records retry-relevant metadata.
 
-## A5. Environment Configuration Contract
+## A6. Environment Configuration Contract
 
 Description:
 - Define strict environment-variable contract used consistently by API, worker, frontend across environments.
@@ -169,7 +191,7 @@ Acceptance criteria:
 2. API and worker refuse startup with missing required variables.
 3. Local templates are sufficient to boot all services in local pre-prod mode.
 
-## A6. Verification and Handoff
+## A7. Verification and Handoff
 
 Description:
 - Validate that baseline architecture is operational and ready for Epic B dependencies.
@@ -198,18 +220,51 @@ Acceptance criteria:
 ## Suggested Execution Sequence
 
 1. A1 Repository Skeleton
-2. A5 Environment Configuration Contract (early to prevent drift)
+2. A6 Environment Configuration Contract (early to prevent drift)
 3. A2 Shared Contracts Package
-4. A3 API Baseline
-5. A4 Worker Baseline
-6. A6 Verification and Handoff
+4. A3 SQLite Setup + Migration Framework
+5. A4 API Baseline
+6. A5 Worker Baseline
+7. A7 Verification and Handoff
 
 ## Notes
 
 1. This task set intentionally excludes deep feature logic from MVP-1/MVP-2/MVP-3.
 2. If any Epic A task implies schema or infrastructure lock-in beyond agreed decisions, update `DECISIONS.md` first before implementation.
 
-## A6 Verification Results (2026-02-18)
+## A4 Implementation Results (2026-02-18)
+
+Implementation summary:
+1. API baseline endpoints implemented:
+- `GET /v1/health`
+- `POST /v1/analysis-jobs`
+- `GET /v1/analysis-jobs/:id`
+2. Request correlation handling added:
+- incoming `x-request-id` passthrough or generated UUID
+- response header includes `x-request-id`
+3. Auth skeleton added:
+- bearer token required
+- JWT structure check (`header.payload.signature`)
+- issuer/audience checks against configured Cognito values
+4. Idempotency submission behavior added:
+- duplicate `idempotencyKey` returns existing job (`reused: true`)
+5. Structured JSON logging added for:
+- request receipt
+- enqueue event
+- server startup
+
+Acceptance criteria mapping:
+1. API process runs locally: complete.
+2. Health endpoint responds: complete (`200` observed).
+3. Protected endpoint validates token shape: complete (`401` without valid bearer/JWT shape).
+4. Submit/status compile and use shared contracts: complete (job envelope and API error shape use shared-contracts package).
+
+Known A4 follow-ups (Epic B+):
+1. JWT signature/JWKS verification is not yet implemented.
+2. Job persistence is in-memory and resets on restart.
+3. Queue handoff is scaffolded at API contract level; real SQS integration pending.
+
+## A7 Verification Results (2026-02-18)
 
 Execution summary:
 1. `npm run contracts`: passed.
