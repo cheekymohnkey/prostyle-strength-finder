@@ -389,3 +389,36 @@ Acceptance criteria mapping:
 Known A8 follow-ups (Epic B+):
 1. Real AWS SDK-backed S3 operations for non-local environments are scaffolded but not fully implemented.
 2. Presigned URL cryptographic signing is pending AWS SDK integration.
+
+## Follow-up 1 Completion - Durable Job/Run Persistence (2026-02-18)
+
+Objective:
+- Replace API/worker in-memory job/run state with SQLite-backed persistence.
+
+Implementation summary:
+1. Added DB repository helper:
+- `scripts/db/repository.js`
+2. API job submission/status now use SQLite:
+- idempotency lookup by `idempotency_key`
+- insert into `analysis_jobs`
+- status reads from `analysis_jobs`
+3. Worker lifecycle now persists to SQLite:
+- ensures/reads jobs through DB
+- attempt count derived from `analysis_runs`
+- writes run lifecycle records to `analysis_runs`
+- updates `analysis_jobs.status` on transitions
+4. Duplicate idempotency handling moved from process memory to DB-backed checks.
+
+Verification evidence:
+1. Database reset and migration applied from zero state.
+2. API submit returned queued job (`202`).
+3. Worker processed submitted job and logged lifecycle transitions.
+4. API status lookup after worker run returned persisted `succeeded` state from SQLite.
+
+Impact on previously documented gaps:
+1. Gap resolved:
+- API/worker now use durable SQLite state for jobs/runs.
+2. Remaining follow-ups unchanged:
+- real SQS adapter wiring
+- JWT signature/JWKS verification
+- full AWS SDK-backed S3 operations and signed URLs
