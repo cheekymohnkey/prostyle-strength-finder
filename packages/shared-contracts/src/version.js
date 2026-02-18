@@ -1,0 +1,7 @@
+const CONTRACT_VERSION = "0.1.0";
+const TRAIT_SCHEMA_VERSION = "v1";
+
+module.exports = {
+  CONTRACT_VERSION,
+  TRAIT_SCHEMA_VERSION,
+};
