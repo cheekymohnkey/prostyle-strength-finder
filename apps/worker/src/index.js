@@ -13,6 +13,10 @@ const {
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
 const {
+  resolveModelSelection,
+  setCurrentDefaultModels,
+} = require("../../../scripts/models/model-versioning");
+const {
   parseAnalysisJobEnvelope,
   createAnalysisRunStatusEvent,
 } = require("../../../packages/shared-contracts/src");
@@ -89,6 +93,12 @@ async function processMessage(message, queue, config, dbPath) {
   }
 
   const analysisRunId = `run_${envelope.jobId}_${crypto.randomUUID().slice(0, 8)}`;
+  const modelSelection = resolveModelSelection({
+    promptText: envelope.context?.promptText || envelope.context?.prompt || "",
+    modelFamily: envelope.modelFamily,
+    modelVersion: envelope.modelVersion,
+    modelSelectionSource: envelope.modelSelectionSource,
+  });
   const existingByIdempotency = getJobByIdempotencyKey(dbPath, envelope.idempotencyKey);
   if (existingByIdempotency && existingByIdempotency.job_id !== envelope.jobId) {
     logJson("info", "worker.job.duplicate_skipped", {
@@ -109,6 +119,9 @@ async function processMessage(message, queue, config, dbPath) {
     imageId: envelope.imageId,
     status: "queued",
     submittedAt: envelope.submittedAt,
+    modelFamily: modelSelection.modelFamily,
+    modelVersion: modelSelection.modelVersion,
+    modelSelectionSource: modelSelection.modelSelectionSource,
   });
 
   if (job.status === "succeeded") {
@@ -130,6 +143,8 @@ async function processMessage(message, queue, config, dbPath) {
     status: "in_progress",
     attemptCount: attempt,
     startedAt: new Date().toISOString(),
+    modelFamily: modelSelection.modelFamily,
+    modelVersion: modelSelection.modelVersion,
   });
 
   const inProgressEvent = buildStatusEvent(analysisRunId, envelope.jobId, "in_progress");
@@ -227,6 +242,10 @@ async function processMessage(message, queue, config, dbPath) {
 
 async function runWorker() {
   const config = loadConfig();
+  setCurrentDefaultModels({
+    standard: config.models.defaultStandardVersion,
+    niji: config.models.defaultNijiVersion,
+  });
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
   const dbPath = ensureReady(config.database.databaseUrl);
   const queue = createQueueAdapter(config);

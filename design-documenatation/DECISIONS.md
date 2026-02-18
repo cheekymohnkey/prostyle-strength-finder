@@ -24,8 +24,8 @@ Status date: 2026-02-18
 
 ### Decided
 
-1. We are in design/discovery mode, not implementation-first mode.
-Rationale: Prevent premature commitment and rework.
+1. Design/discovery gate is complete; implementation execution is active.
+Rationale: P0 analysis, architecture, technical decisions, and implementation sequencing are approved and execution is in progress.
 
 2. This project has two distinct problem spaces:
 - Precision prompt-fit analysis.
@@ -66,6 +66,15 @@ Rationale: Build can proceed without unresolved technical prerequisites.
 
 13. Implementation sequence is documented in `design-documenatation/IMPLEMENTATION_PLAN.md`.
 Rationale: Execution can proceed with an agreed epic/task dependency structure.
+
+14. Non-local environment strategy is fixed to exactly two environments for now: `uat` and `prod`.
+Rationale: Keeps operational surface area small while supporting safe pre-production and production separation.
+
+15. AWS storage and queue foundations are provisioned and live-verified via Terraform.
+Rationale: Non-local S3/SQS prerequisites are now reproducible through IaC and validated with live smoke tests.
+
+16. Prompt model versioning rules are explicit and persisted per run/job.
+Rationale: MidJourney model families/versions evolve independently; we must capture resolved model family/version deterministically for auditability and reproducibility.
 
 ### Open
 

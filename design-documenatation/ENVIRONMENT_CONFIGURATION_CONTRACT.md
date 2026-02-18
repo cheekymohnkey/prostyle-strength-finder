@@ -5,7 +5,7 @@ Date: 2026-02-18
 Depends on:
 - `design-documenatation/TECHNICAL_DECISIONS.md`
 - `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/IMPLEMENTATION_TASKS.md`
+- `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
 
 ## Purpose
 
@@ -40,6 +40,8 @@ For the current phase, these are the only supported environments beyond local: `
 | `COGNITO_AUDIENCE` | Yes | API, Worker | string | JWT audience expected by API. |
 | `AUTH_JWT_VERIFICATION_MODE` | No | API | `jwks|insecure` | `jwks` verifies signature against JWKS; `insecure` validates claims only (local dev only). |
 | `AUTH_JWKS_CACHE_TTL_SEC` | No | API | integer | JWKS cache TTL in seconds (default `600`). |
+| `DEFAULT_STANDARD_MODEL_VERSION` | Yes | API, Worker | integer string | Current default MidJourney standard model version used when prompt has no `--v`/`--niji`. |
+| `DEFAULT_NIJI_MODEL_VERSION` | Yes | API, Worker | integer string | Current default niji model version used for default tables and operations that need niji fallback metadata. |
 | `LOG_LEVEL` | Yes | API, Worker | `debug|info|warn|error` | Structured logging level. |
 | `SERVICE_NAME` | Yes | API, Worker | string | Service identifier in logs. |
 | `LOG_INCLUDE_CORRELATION_IDS` | No | API, Worker | `true|false` | Defaults to `true` when omitted. |
@@ -66,3 +68,35 @@ Use these templates as the baseline:
 1. `.env.local.example`
 2. `.env.uat.example`
 3. `.env.prod.example`
+
+## Current Non-Local Provisioned Values (2026-02-18)
+
+Source:
+- Terraform stack outputs from `infra/terraform/envs/uat` and `infra/terraform/envs/prod`.
+
+UAT:
+1. `AWS_REGION=us-east-1`
+2. `S3_BUCKET=prostyle-strength-finder-uat`
+3. `SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-uat`
+4. `SQS_DLQ_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-uat-dlq`
+
+Prod:
+1. `AWS_REGION=us-east-1`
+2. `S3_BUCKET=prostyle-strength-finder-prod`
+3. `SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-prod`
+4. `SQS_DLQ_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-prod-dlq`
+
+## Prompt Model Versioning Rules (2026-02-18)
+
+1. If prompt contains `--niji <version>`:
+- model family = `niji`
+- model version = explicit `<version>`
+- `--niji` without version is rejected.
+2. If prompt contains `--v <version>` and no `--niji`:
+- model family = `standard`
+- model version = explicit `<version>`
+- `--v` without version is rejected.
+3. If prompt contains neither `--v` nor `--niji`:
+- model family = `standard`
+- model version = `DEFAULT_STANDARD_MODEL_VERSION`
+4. Prompt cannot include both `--v` and `--niji` in the same submission.

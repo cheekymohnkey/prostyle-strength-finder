@@ -98,7 +98,7 @@ Approved on: 2026-02-18
 - id, source_type (baseline/generated/reference/upload), storage_uri, uploaded_by, created_at
 
 9. `analysis_runs`
-- id, image_id, analysis_prompt_id, run_type (trait/recommendation/alignment), queue_status, model_name, model_version, attempt_count, max_attempts, started_at, completed_at, last_error_code, last_error_message
+- id, image_id, analysis_prompt_id, run_type (trait/recommendation/alignment), queue_status, model_family (standard|niji), model_version, attempt_count, max_attempts, started_at, completed_at, last_error_code, last_error_message
 
 10. `image_trait_analyses`
 - id, image_id, analysis_run_id, trait_vector, confidence, summary, evidence
@@ -155,6 +155,12 @@ Approved on: 2026-02-18
 4. Queue processing:
 - analysis is processed asynchronously and not owned by UI request threads
 - failed jobs are recoverable via automatic retry and admin requeue paths
+
+5. Prompt model selection:
+- `--niji <n>` selects family `niji` version `<n>`
+- `--v <n>` selects family `standard` version `<n>`
+- if neither is present, persist current default `standard` model version
+- prompts containing both `--v` and `--niji` are invalid
 
 ## Open Design Questions
 

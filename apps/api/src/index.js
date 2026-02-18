@@ -13,6 +13,10 @@ const {
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
 const {
+  resolveModelSelection,
+  setCurrentDefaultModels,
+} = require("../../../scripts/models/model-versioning");
+const {
   CONTRACT_VERSION,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
@@ -81,6 +85,13 @@ function sendError(res, statusCode, code, message, ctx, details) {
 }
 
 function createJobEnvelope(submitBody) {
+  const promptText = typeof submitBody.prompt === "string"
+    ? submitBody.prompt
+    : (typeof submitBody.context?.promptText === "string"
+      ? submitBody.context.promptText
+      : (typeof submitBody.context?.prompt === "string" ? submitBody.context.prompt : ""));
+
+  const modelSelection = resolveModelSelection({ promptText });
   const envelope = {
     schemaVersion: CONTRACT_VERSION,
     jobId: crypto.randomUUID(),
@@ -90,6 +101,9 @@ function createJobEnvelope(submitBody) {
     submittedAt: new Date().toISOString(),
     priority: submitBody.priority || "normal",
     context: submitBody.context || {},
+    modelFamily: modelSelection.modelFamily,
+    modelVersion: modelSelection.modelVersion,
+    modelSelectionSource: modelSelection.modelSelectionSource,
   };
 
   return validateAnalysisJobEnvelope(envelope);
@@ -155,6 +169,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
               imageId: existingJob.image_id,
               idempotencyKey: existingJob.idempotency_key,
               submittedAt: existingJob.submitted_at,
+              modelFamily: existingJob.model_family,
+              modelVersion: existingJob.model_version,
+              modelSelectionSource: existingJob.model_selection_source,
             },
           },
           ctx
@@ -170,6 +187,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
         imageId: envelope.imageId,
         idempotencyKey: envelope.idempotencyKey,
         submittedAt: envelope.submittedAt,
+        modelFamily: envelope.modelFamily,
+        modelVersion: envelope.modelVersion,
+        modelSelectionSource: envelope.modelSelectionSource,
       };
 
       insertJob(dbPath, jobRecord);
@@ -230,6 +250,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
           imageId: job.image_id,
           idempotencyKey: job.idempotency_key,
           submittedAt: job.submitted_at,
+          modelFamily: job.model_family,
+          modelVersion: job.model_version,
+          modelSelectionSource: job.model_selection_source,
         },
       },
       ctx
@@ -242,6 +265,10 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
 
 function main() {
   const config = loadConfig();
+  setCurrentDefaultModels({
+    standard: config.models.defaultStandardVersion,
+    niji: config.models.defaultNijiVersion,
+  });
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
   const dbPath = ensureReady(config.database.databaseUrl);
   const queueAdapter = createQueueAdapter(config);

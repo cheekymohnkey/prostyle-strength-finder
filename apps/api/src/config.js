@@ -13,6 +13,8 @@ const REQUIRED_ENV_KEYS = [
   "COGNITO_CLIENT_ID",
   "COGNITO_ISSUER",
   "COGNITO_AUDIENCE",
+  "DEFAULT_STANDARD_MODEL_VERSION",
+  "DEFAULT_NIJI_MODEL_VERSION",
   "LOG_LEVEL",
   "SERVICE_NAME",
 ];
@@ -65,6 +67,10 @@ function loadConfig() {
       jwtVerificationMode: process.env.AUTH_JWT_VERIFICATION_MODE
         || (requireEnv("APP_ENV") === "local" ? "insecure" : "jwks"),
       jwksCacheTtlSec: parseIntStrict(process.env.AUTH_JWKS_CACHE_TTL_SEC || "600", "AUTH_JWKS_CACHE_TTL_SEC"),
+    },
+    models: {
+      defaultStandardVersion: requireEnv("DEFAULT_STANDARD_MODEL_VERSION"),
+      defaultNijiVersion: requireEnv("DEFAULT_NIJI_MODEL_VERSION"),
     },
     observability: {
       logLevel: requireEnv("LOG_LEVEL"),

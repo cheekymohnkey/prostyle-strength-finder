@@ -1,6 +1,6 @@
-# Prostyle Strength Finder - Implementation Tasks
+# Prostyle Strength Finder - Epic A Implementation Tasks
 
-Status: Draft for execution  
+Status: In execution (Epic A complete; Epic B pending)  
 Date: 2026-02-18  
 Depends on:
 - `design-documenatation/DECISIONS.md`
@@ -12,6 +12,21 @@ Depends on:
 ## Purpose
 
 Translate Implementation Epic A into concrete, executable engineering tasks with acceptance criteria and sequencing.
+
+## Current Execution Snapshot (2026-02-18)
+
+1. Epic A implementation tasks A1-A8 are complete.
+2. Follow-up tasks for persistence, queue adapter integration, JWT JWKS verification, and real S3 operations are complete.
+3. Terraform IaC for non-local storage/queue foundations (`uat`, `prod`) is complete and applied.
+4. Live AWS smoke checks have passed in both non-local environments:
+- S3: put/head/get/delete
+- SQS: send/receive/delete
+5. Environment templates now standardize on:
+- `.env.local.example`
+- `.env.uat.example`
+- `.env.prod.example`
+6. Next execution focus:
+- Epic B (MVP-1 Core Recommendation Flow) and first vertical-slice completion criteria from `design-documenatation/IMPLEMENTATION_PLAN.md`.
 
 ## Epic A - Platform Foundation
 
@@ -472,7 +487,11 @@ Impact on previously documented gaps:
 2. Remaining S3 hardening:
 - validate IAM/credential and bucket policies in UAT/prod with live resources.
 
-## Next Session Task - IaC Provisioning for AWS Storage and Queue Foundations
+## Historical Task - IaC Provisioning for AWS Storage and Queue Foundations
+
+Status:
+- Completed on 2026-02-18. See completion details under `IaC Provisioning Completion - AWS Storage and Queue Foundations (2026-02-18)`.
+- Next active implementation scope is Epic B (MVP-1 Core Recommendation Flow).
 
 Objective:
 - Introduce Infrastructure as Code (IaC) to provision and manage required AWS resources for non-local environments, avoiding manual console setup except bootstrap credentials/authorization.
@@ -564,6 +583,65 @@ Control: start with least-privilege statements aligned to adapter operations onl
 3. Risk: naming collisions across accounts/regions.
 Control: include account/environment suffix strategy in module inputs.
 
+## IaC Provisioning Completion - AWS Storage and Queue Foundations (2026-02-18)
+
+Objective:
+- Provision and validate non-local AWS storage/queue foundations via Terraform for `uat` and `prod`.
+
+Implementation summary:
+1. Added Terraform root under `infra/terraform` with reusable modules:
+- `infra/terraform/modules/s3_bucket`
+- `infra/terraform/modules/sqs_queue`
+2. Added environment stacks:
+- `infra/terraform/envs/uat`
+- `infra/terraform/envs/prod`
+3. Added Terraform execution and output mapping docs:
+- `infra/terraform/README.md`
+- `infra/terraform/ENV_OUTPUT_MAPPING.md`
+4. Added provider lock files per environment:
+- `infra/terraform/envs/uat/.terraform.lock.hcl`
+- `infra/terraform/envs/prod/.terraform.lock.hcl`
+5. Applied Terraform in both environments:
+- `uat`: `7 added, 0 changed, 0 destroyed`
+- `prod`: `7 added, 0 changed, 0 destroyed`
+6. Updated env templates to match provisioned resources:
+- `.env.uat.example` queue/DLQ URLs
+- `.env.prod.example` queue/DLQ URLs
+
+Verification evidence:
+1. Terraform `init`, `validate`, and `plan` completed for both `uat` and `prod`.
+2. Live UAT smoke verification passed:
+- S3 `put/head/get/delete`
+- SQS `send/receive/delete`
+3. Live prod smoke verification passed:
+- S3 `put/head/get/delete`
+- SQS `send/receive/delete`
+
+Provisioned output values:
+1. UAT:
+- `AWS_REGION=us-east-1`
+- `S3_BUCKET=prostyle-strength-finder-uat`
+- `SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-uat`
+- `SQS_DLQ_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-uat-dlq`
+2. Prod:
+- `AWS_REGION=us-east-1`
+- `S3_BUCKET=prostyle-strength-finder-prod`
+- `SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-prod`
+- `SQS_DLQ_URL=https://sqs.us-east-1.amazonaws.com/512927474334/prostyle-analysis-prod-dlq`
+
+Acceptance criteria mapping:
+1. IaC provisions required non-local S3/SQS resources: complete.
+2. No mandatory console steps beyond credential bootstrap: complete.
+3. Plan reproducibility for `uat` and `prod`: complete.
+4. Output-to-env mapping keys (`S3_BUCKET`, `SQS_QUEUE_URL`, `SQS_DLQ_URL`, `AWS_REGION`): complete.
+5. Documentation sufficiency for handoff: complete.
+
+Impact on previously documented gaps:
+1. Gap resolved:
+- UAT/prod IAM + bucket/queue access validation for configured runtime operations is confirmed by live smoke tests.
+2. Remaining infra hardening:
+- least-privilege runtime IAM policy tightening and production observability/alerting remain launch-readiness scope (Epic E).
+
 ## Follow-up 1 Completion - Durable Job/Run Persistence (2026-02-18)
 
 Objective:
@@ -595,4 +673,45 @@ Impact on previously documented gaps:
 2. Remaining follow-ups unchanged:
 - production SQS hardening
 - production JWKS observability and key-rotation playbook validation
-- UAT/prod IAM and bucket-policy rollout validation for S3 paths
+- runtime IAM least-privilege policy refinement and audit for non-local environments
+
+## Follow-up 5 Completion - Prompt Model Version Resolution and Persistence (2026-02-18)
+
+Objective:
+- Persist explicit MidJourney model family/version per job/run and resolve defaults when prompt omits model flags.
+
+Implementation summary:
+1. Added prompt model resolver module:
+- `scripts/models/model-versioning.js`
+2. Added runtime default model setter/getter:
+- `setCurrentDefaultModels(...)`
+- `getCurrentDefaultModels()`
+3. Added prompt parsing and resolution rules:
+- `--niji <n>` => `niji` + `<n>`
+- `--v <n>` (without `--niji`) => `standard` + `<n>`
+- no `--v`/`--niji` => default `standard` model version
+- reject `--niji` without version
+- reject prompts containing both `--v` and `--niji`
+4. Added config keys to API/worker:
+- `DEFAULT_STANDARD_MODEL_VERSION`
+- `DEFAULT_NIJI_MODEL_VERSION`
+5. Extended job envelope + validation with:
+- `modelFamily`
+- `modelVersion`
+- `modelSelectionSource`
+6. Extended persistence:
+- `analysis_jobs`: `model_family`, `model_version`, `model_selection_source`
+- `analysis_runs`: `model_family`, `model_version`
+7. Added migration:
+- `scripts/db/migrations/20260219100000_model_version_defaults.sql`
+
+Verification evidence:
+1. Shared contracts build check passed (`npm run contracts`).
+2. New migration applied successfully in local (`npm run db:migrate`).
+3. API/worker/model-versioning modules pass syntax checks.
+
+Notes:
+1. Current defaults are configured as:
+- standard: `7`
+- niji: `7`
+2. Historical rows are backfilled as `standard` `v7` with source `legacy_default_standard_v7`.

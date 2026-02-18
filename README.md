@@ -21,7 +21,7 @@ Primary design and planning docs:
 - `design-documenatation/TECHNICAL_DECISIONS.md`
 - `design-documenatation/MVP_PATH.md`
 - `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/IMPLEMENTATION_TASKS.md`
+- `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
 - `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 
 ## Environment Set
@@ -33,6 +33,14 @@ Supported environments for the current phase:
 
 Policy:
 - Only two non-local environments are in scope right now: `uat` and `prod`.
+
+## Current Infra State (2026-02-18)
+
+1. Terraform IaC for non-local storage/queue is implemented under `infra/terraform`.
+2. UAT and prod stacks have been applied successfully.
+3. Live AWS smoke checks passed for both environments:
+- S3: put/head/get/delete
+- SQS: send/receive/delete
 
 ## Local Quickstart
 

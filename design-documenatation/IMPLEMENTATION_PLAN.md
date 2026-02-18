@@ -14,6 +14,18 @@ Approved on: 2026-02-18
 
 Convert agreed design artifacts into executable engineering work with clear sequencing, dependencies, and done criteria.
 
+## Current Status Snapshot (2026-02-18)
+
+1. Epic A foundation scope is complete in implementation.
+2. Non-local infrastructure baseline is provisioned via Terraform:
+- UAT S3 + SQS + DLQ
+- Prod S3 + SQS + DLQ
+3. Live non-local smoke verification has passed for both environments:
+- S3: put/head/get/delete
+- SQS: send/receive/delete
+4. Recommended active focus for next build session:
+- Begin Epic B execution (MVP-1 Core Recommendation Flow), using First Sprint vertical-slice criteria as the near-term delivery target.
+
 ## Delivery Structure
 
 1. Epic A: Platform Foundation

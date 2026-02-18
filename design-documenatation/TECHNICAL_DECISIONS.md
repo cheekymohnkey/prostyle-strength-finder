@@ -139,9 +139,22 @@ Why:
 Proposed:
 - Store explicit versions on:
   - `analysis_prompt.version`
-  - `analysis_run.model_version`
+  - `analysis_run.model_family` + `analysis_run.model_version`
   - `image_trait_analyses.trait_schema_version`
 - Track created/updated timestamps on mutable entities.
+
+Prompt-model resolution rule:
+1. `--niji <n>` => family `niji`, version `<n>`.
+2. `--v <n>` (without `--niji`) => family `standard`, version `<n>`.
+3. No `--v`/`--niji` => family `standard`, version from configured current default.
+4. `--niji` without version is invalid.
+5. Prompts containing both `--v` and `--niji` are invalid.
+
+Default model version management:
+1. API/worker load defaults from config:
+- `DEFAULT_STANDARD_MODEL_VERSION`
+- `DEFAULT_NIJI_MODEL_VERSION`
+2. Runtime exposes `setCurrentDefaultModels(...)` to update defaults centrally.
 
 Why:
 - Supports reevaluation when prompts/taxonomy/model behavior change.
@@ -249,6 +262,13 @@ Why:
 
 Required rule:
 - Environment parity by configuration contract (same env var names and service interfaces across local/uat/prod).
+
+Implementation status (2026-02-18):
+1. Terraform IaC scaffold implemented under `infra/terraform` for `uat` and `prod`.
+2. Stacks applied successfully for both non-local environments.
+3. Live smoke checks confirmed runtime access for required operations:
+- S3 `put/get/delete` (with object head verification)
+- SQS `send/receive/delete`
 
 ## Decision 14: Testing Strategy
 

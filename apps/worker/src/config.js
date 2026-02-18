@@ -12,6 +12,8 @@ const REQUIRED_ENV_KEYS = [
   "COGNITO_CLIENT_ID",
   "COGNITO_ISSUER",
   "COGNITO_AUDIENCE",
+  "DEFAULT_STANDARD_MODEL_VERSION",
+  "DEFAULT_NIJI_MODEL_VERSION",
   "LOG_LEVEL",
   "SERVICE_NAME",
 ];
@@ -60,6 +62,10 @@ function loadConfig() {
       clientId: requireEnv("COGNITO_CLIENT_ID"),
       issuer: requireEnv("COGNITO_ISSUER"),
       audience: requireEnv("COGNITO_AUDIENCE"),
+    },
+    models: {
+      defaultStandardVersion: requireEnv("DEFAULT_STANDARD_MODEL_VERSION"),
+      defaultNijiVersion: requireEnv("DEFAULT_NIJI_MODEL_VERSION"),
     },
     observability: {
       logLevel: requireEnv("LOG_LEVEL"),

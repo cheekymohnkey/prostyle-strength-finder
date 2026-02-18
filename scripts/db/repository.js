@@ -33,7 +33,8 @@ function exec(dbPath, sql) {
 function getJobById(dbPath, jobId) {
   const rows = queryJson(
     dbPath,
-    `SELECT job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at
+    `SELECT job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
+            model_family, model_version, model_selection_source
      FROM analysis_jobs
      WHERE job_id = ${quote(jobId)}
      LIMIT 1;`
@@ -44,7 +45,8 @@ function getJobById(dbPath, jobId) {
 function getJobByIdempotencyKey(dbPath, idempotencyKey) {
   const rows = queryJson(
     dbPath,
-    `SELECT job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at
+    `SELECT job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
+            model_family, model_version, model_selection_source
      FROM analysis_jobs
      WHERE idempotency_key = ${quote(idempotencyKey)}
      LIMIT 1;`
@@ -57,7 +59,10 @@ function insertJob(dbPath, input) {
   const updatedAt = input.updatedAt || submittedAt;
   exec(
     dbPath,
-    `INSERT INTO analysis_jobs (job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at)
+    `INSERT INTO analysis_jobs (
+       job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
+       model_family, model_version, model_selection_source
+     )
      VALUES (
        ${quote(input.jobId)},
        ${quote(input.idempotencyKey)},
@@ -65,7 +70,10 @@ function insertJob(dbPath, input) {
        ${quote(input.imageId)},
        ${quote(input.status || "queued")},
        ${quote(submittedAt)},
-       ${quote(updatedAt)}
+       ${quote(updatedAt)},
+       ${quote(input.modelFamily)},
+       ${quote(input.modelVersion)},
+       ${quote(input.modelSelectionSource)}
      );`
   );
 }
@@ -102,7 +110,8 @@ function insertAnalysisRun(dbPath, input) {
   exec(
     dbPath,
     `INSERT INTO analysis_runs (
-       analysis_run_id, job_id, status, attempt_count, started_at, completed_at, last_error_code, last_error_message
+       analysis_run_id, job_id, status, attempt_count, started_at, completed_at,
+       last_error_code, last_error_message, model_family, model_version
      ) VALUES (
        ${quote(input.analysisRunId)},
        ${quote(input.jobId)},
@@ -111,7 +120,9 @@ function insertAnalysisRun(dbPath, input) {
        ${quote(input.startedAt || nowIso())},
        ${quote(input.completedAt || null)},
        ${quote(input.lastErrorCode || null)},
-       ${quote(input.lastErrorMessage || null)}
+       ${quote(input.lastErrorMessage || null)},
+       ${quote(input.modelFamily || null)},
+       ${quote(input.modelVersion || null)}
      );`
   );
 }

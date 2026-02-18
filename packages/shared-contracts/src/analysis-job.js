@@ -1,4 +1,5 @@
 const ANALYSIS_RUN_TYPES = ["trait", "recommendation", "alignment"];
+const MODEL_FAMILIES = ["standard", "niji"];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -21,9 +22,20 @@ function validateAnalysisJobEnvelope(value) {
   assertString(value.runType, "runType");
   assertString(value.imageId, "imageId");
   assertString(value.submittedAt, "submittedAt");
+  assertString(value.modelFamily, "modelFamily");
+  assertString(value.modelVersion, "modelVersion");
+  assertString(value.modelSelectionSource, "modelSelectionSource");
 
   if (!ANALYSIS_RUN_TYPES.includes(value.runType)) {
     throw new Error(`Invalid runType: ${value.runType}`);
+  }
+
+  if (!MODEL_FAMILIES.includes(value.modelFamily)) {
+    throw new Error(`Invalid modelFamily: ${value.modelFamily}`);
+  }
+
+  if (!/^\d+$/.test(value.modelVersion)) {
+    throw new Error(`Invalid modelVersion: ${value.modelVersion}`);
   }
 
   if (value.priority !== undefined && !["low", "normal", "high"].includes(value.priority)) {
@@ -44,6 +56,7 @@ function parseAnalysisJobEnvelope(input) {
 
 module.exports = {
   ANALYSIS_RUN_TYPES,
+  MODEL_FAMILIES,
   parseAnalysisJobEnvelope,
   validateAnalysisJobEnvelope,
 };
