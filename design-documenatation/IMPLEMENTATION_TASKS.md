@@ -354,10 +354,9 @@ Epic A done checklist status:
 7. Async submission -> worker consumption verifiable via stub flow: complete.
 
 Known gaps (Epic B+ follow-ups):
-1. API and worker startup now validate SQLite readiness, but job/run writes are still in-memory scaffolds.
-2. Worker queue adapter is local simulation, not yet wired to AWS SQS client implementation.
-3. API auth is JWT shape + issuer/audience scaffold only; signature verification/JWKS integration is pending.
-4. API job state is in-memory and reset on restart; durable run tracking is pending data-layer implementation.
+1. Queue adapter integration exists (sqlite local + SQS mode), but production-hardening for SQS operational concerns is still pending.
+2. API auth is JWT shape + issuer/audience scaffold only; signature verification/JWKS integration is pending.
+3. Real AWS SDK-backed S3 operations/presigned URLs remain pending (current S3 mode is scaffold-level for non-local env).
 
 ## A8 Implementation Results (2026-02-18)
 
@@ -389,6 +388,36 @@ Acceptance criteria mapping:
 Known A8 follow-ups (Epic B+):
 1. Real AWS SDK-backed S3 operations for non-local environments are scaffolded but not fully implemented.
 2. Presigned URL cryptographic signing is pending AWS SDK integration.
+
+## Follow-up 2 Completion - Queue Adapter Integration (2026-02-18)
+
+Objective:
+- Replace process-local queue simulation with shared adapter wiring between API enqueue and worker consumption.
+
+Implementation summary:
+1. Added queue adapter module:
+- `scripts/queue/adapter.js`
+2. Added queue backend migration for local durable queue:
+- `scripts/db/migrations/20260218133000_queue_messages.sql`
+3. API now enqueues submitted jobs through shared queue adapter.
+4. Worker now polls/acks/requeues/dead-letters through shared queue adapter.
+5. Queue adapter modes:
+- `sqlite` for local reproducible execution
+- `sqs` using AWS CLI-backed SQS operations for non-local integration path
+6. Added environment control:
+- `QUEUE_ADAPTER_MODE`
+
+Verification evidence:
+1. DB reset applied both baseline + queue migrations.
+2. API job submission enqueued successfully (`202`).
+3. Worker consumed queued message and persisted run lifecycle.
+4. API status reflected post-worker persisted `succeeded` state.
+
+Impact on previously documented gaps:
+1. Gap resolved:
+- API and worker are now wired through one queue adapter abstraction, with local durable queue and SQS mode support.
+2. Remaining queue-related follow-up:
+- production SQS hardening (credentials strategy, telemetry, and failure-playbook coverage) remains for launch readiness.
 
 ## Follow-up 1 Completion - Durable Job/Run Persistence (2026-02-18)
 

@@ -29,6 +29,7 @@ Define one configuration contract across `local`, `staging`, and `prod` with con
 | `SQS_DLQ_URL` | Yes | API, Worker | URL | Dead-letter queue URL. |
 | `SQS_MAX_ATTEMPTS` | Yes | API, Worker | integer | Retry cap before dead-letter. |
 | `SQS_RETRY_BASE_MS` | Yes | API, Worker | integer | Base delay for backoff strategy. |
+| `QUEUE_ADAPTER_MODE` | No | API, Worker | `sqlite|sqs` | Defaults to `sqlite` in `local`, `sqs` otherwise. |
 | `S3_BUCKET` | Yes | API, Worker | string | Bucket for image/artifact object storage. |
 | `AWS_REGION` | Yes | API, Worker | AWS region | Example: `us-east-1`. |
 | `S3_ENDPOINT_OVERRIDE` | No | API, Worker | URL | Local simulation endpoint (for LocalStack/dev). |

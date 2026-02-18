@@ -10,8 +10,8 @@ const {
   insertAnalysisRun,
   updateAnalysisRun,
 } = require("../../../scripts/db/repository");
+const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
-const { LocalQueueAdapter } = require("./queue-adapter");
 const {
   parseAnalysisJobEnvelope,
   createAnalysisRunStatusEvent,
@@ -229,6 +229,8 @@ async function runWorker() {
   const config = loadConfig();
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
   const dbPath = ensureReady(config.database.databaseUrl);
+  const queue = createQueueAdapter(config);
+  const queueHealth = await Promise.resolve(queue.healthcheck());
   const storageAdapter = createStorageAdapter({
     appEnv: config.runtime.appEnv,
     bucket: config.storage.bucket,
@@ -236,7 +238,6 @@ async function runWorker() {
     endpoint: config.storage.endpoint,
   });
   const storageHealth = await storageAdapter.healthcheck();
-  const queue = new LocalQueueAdapter(config);
   const runOnce = parseBooleanEnv("WORKER_RUN_ONCE", true);
   const pollIntervalMs = parseIntegerEnv("WORKER_POLL_INTERVAL_MS", 750);
   let shuttingDown = false;
@@ -259,6 +260,8 @@ async function runWorker() {
     database_path: dbReadiness.dbPath,
     storage_mode: storageHealth.mode,
     storage_bucket: storageHealth.bucket,
+    queue_mode: queueHealth.mode,
+    queue_url: queueHealth.queueUrl,
   });
 
   while (!shuttingDown) {

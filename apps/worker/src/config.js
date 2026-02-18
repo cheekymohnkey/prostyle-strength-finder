@@ -48,6 +48,7 @@ function loadConfig() {
       dlqUrl: requireEnv("SQS_DLQ_URL"),
       maxAttempts: parseIntStrict(requireEnv("SQS_MAX_ATTEMPTS"), "SQS_MAX_ATTEMPTS"),
       retryBaseMs: parseIntStrict(requireEnv("SQS_RETRY_BASE_MS"), "SQS_RETRY_BASE_MS"),
+      adapterMode: process.env.QUEUE_ADAPTER_MODE || null,
     },
     storage: {
       bucket: requireEnv("S3_BUCKET"),

@@ -7,7 +7,9 @@ const {
   getJobById,
   getJobByIdempotencyKey,
   insertJob,
+  updateJobStatus,
 } = require("../../../scripts/db/repository");
+const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
 const {
   CONTRACT_VERSION,
@@ -121,7 +123,7 @@ function createJobEnvelope(submitBody) {
   return validateAnalysisJobEnvelope(envelope);
 }
 
-async function requestHandler(req, res, config, dbPath) {
+async function requestHandler(req, res, config, dbPath, queueAdapter) {
   const ctx = createRequestContext(req, config);
   const url = new URL(req.url, "http://localhost");
   const method = req.method || "GET";
@@ -198,6 +200,17 @@ async function requestHandler(req, res, config, dbPath) {
       };
 
       insertJob(dbPath, jobRecord);
+      try {
+        queueAdapter.enqueue({
+          body: JSON.stringify(envelope),
+        });
+      } catch (error) {
+        updateJobStatus(dbPath, jobRecord.jobId, "failed");
+        sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue analysis job", ctx, {
+          reason: error.message,
+        });
+        return;
+      }
 
       logJson("info", "analysis.job.enqueued", {
         request_id: ctx.requestId,
@@ -258,6 +271,7 @@ function main() {
   const config = loadConfig();
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
   const dbPath = ensureReady(config.database.databaseUrl);
+  const queueAdapter = createQueueAdapter(config);
   const storageAdapter = createStorageAdapter({
     appEnv: config.runtime.appEnv,
     bucket: config.storage.bucket,
@@ -265,7 +279,7 @@ function main() {
     endpoint: config.storage.endpoint,
   });
   const server = http.createServer((req, res) => {
-    requestHandler(req, res, config, dbPath).catch((error) => {
+    requestHandler(req, res, config, dbPath, queueAdapter).catch((error) => {
       const ctx = createRequestContext(req, config);
       logJson("error", "api.request.unhandled_error", {
         request_id: ctx.requestId,
@@ -275,7 +289,7 @@ function main() {
     });
   });
 
-  storageAdapter.healthcheck().then((storageHealth) => {
+  Promise.all([storageAdapter.healthcheck(), Promise.resolve(queueAdapter.healthcheck())]).then(([storageHealth, queueHealth]) => {
     server.listen(config.runtime.port, () => {
       logJson("info", "api.server.started", {
         port: config.runtime.port,
@@ -285,6 +299,8 @@ function main() {
         database_path: dbReadiness.dbPath,
         storage_mode: storageHealth.mode,
         storage_bucket: storageHealth.bucket,
+        queue_mode: queueHealth.mode,
+        queue_url: queueHealth.queueUrl,
       });
     });
   }).catch((error) => {

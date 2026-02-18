@@ -52,5 +52,4 @@ This validates storage adapter `put/get/delete` behavior using local pre-prod st
 
 1. Start API and submit analysis job at `POST /v1/analysis-jobs`.
 2. Capture returned job fields (`jobId`, `idempotencyKey`, `runType`, `imageId`).
-3. Pass those values into worker sample queue payload using `WORKER_SAMPLE_MESSAGES`.
-4. Run worker and verify lifecycle logs: `in_progress` -> `succeeded`.
+3. Run worker with local queue mode (`QUEUE_ADAPTER_MODE=sqlite`) and verify lifecycle logs: `in_progress` -> `succeeded`.
