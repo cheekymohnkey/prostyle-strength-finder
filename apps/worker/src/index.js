@@ -1,15 +1,21 @@
 const crypto = require("crypto");
 const { loadConfig } = require("./config");
 const { assertDatabaseReady } = require("../../../scripts/db/runtime");
+const {
+  ensureReady,
+  ensureJob,
+  getJobByIdempotencyKey,
+  updateJobStatus,
+  getNextAttemptCount,
+  insertAnalysisRun,
+  updateAnalysisRun,
+} = require("../../../scripts/db/repository");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
 const { LocalQueueAdapter } = require("./queue-adapter");
 const {
   parseAnalysisJobEnvelope,
   createAnalysisRunStatusEvent,
 } = require("../../../packages/shared-contracts/src");
-
-const processedByIdempotencyKey = new Map();
-const attemptsByJobId = new Map();
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,13 +52,6 @@ function logJson(level, message, fields) {
   );
 }
 
-function nextAttempt(jobId) {
-  const current = attemptsByJobId.get(jobId) || 0;
-  const next = current + 1;
-  attemptsByJobId.set(jobId, next);
-  return next;
-}
-
 function buildStatusEvent(analysisRunId, jobId, status, error) {
   return createAnalysisRunStatusEvent({
     analysisRunId,
@@ -74,7 +73,7 @@ function shouldFailForAttempt(envelope, attempt) {
   return false;
 }
 
-async function processMessage(message, queue, config) {
+async function processMessage(message, queue, config, dbPath) {
   let envelope;
   try {
     envelope = parseAnalysisJobEnvelope(message.body);
@@ -90,19 +89,49 @@ async function processMessage(message, queue, config) {
   }
 
   const analysisRunId = `run_${envelope.jobId}_${crypto.randomUUID().slice(0, 8)}`;
-
-  if (processedByIdempotencyKey.has(envelope.idempotencyKey)) {
+  const existingByIdempotency = getJobByIdempotencyKey(dbPath, envelope.idempotencyKey);
+  if (existingByIdempotency && existingByIdempotency.job_id !== envelope.jobId) {
     logJson("info", "worker.job.duplicate_skipped", {
       job_id: envelope.jobId,
       analysis_run_id: analysisRunId,
       idempotency_key: envelope.idempotencyKey,
-      original_job_id: processedByIdempotencyKey.get(envelope.idempotencyKey),
+      original_job_id: existingByIdempotency.job_id,
+      reason: "idempotency key already tracked by another job",
     });
     await queue.ack(message);
     return;
   }
 
-  const attempt = nextAttempt(envelope.jobId);
+  const job = ensureJob(dbPath, {
+    jobId: envelope.jobId,
+    idempotencyKey: envelope.idempotencyKey,
+    runType: envelope.runType,
+    imageId: envelope.imageId,
+    status: "queued",
+    submittedAt: envelope.submittedAt,
+  });
+
+  if (job.status === "succeeded") {
+    logJson("info", "worker.job.duplicate_skipped", {
+      job_id: envelope.jobId,
+      analysis_run_id: analysisRunId,
+      idempotency_key: envelope.idempotencyKey,
+      reason: "job already succeeded",
+    });
+    await queue.ack(message);
+    return;
+  }
+
+  const attempt = getNextAttemptCount(dbPath, envelope.jobId);
+  updateJobStatus(dbPath, envelope.jobId, "in_progress");
+  insertAnalysisRun(dbPath, {
+    analysisRunId,
+    jobId: envelope.jobId,
+    status: "in_progress",
+    attemptCount: attempt,
+    startedAt: new Date().toISOString(),
+  });
+
   const inProgressEvent = buildStatusEvent(analysisRunId, envelope.jobId, "in_progress");
   logJson("info", "worker.job.lifecycle", {
     job_id: envelope.jobId,
@@ -127,6 +156,13 @@ async function processMessage(message, queue, config) {
       max_attempts: config.queue.maxAttempts,
     });
 
+    updateAnalysisRun(dbPath, analysisRunId, {
+      status: "failed",
+      completedAt: new Date().toISOString(),
+      lastErrorCode: processingError.code,
+      lastErrorMessage: processingError.message,
+    });
+
     if (attempt < config.queue.maxAttempts) {
       const retryDelayMs = config.queue.retryBaseMs * 2 ** (attempt - 1);
       const retryingEvent = buildStatusEvent(analysisRunId, envelope.jobId, "retrying", processingError);
@@ -138,6 +174,13 @@ async function processMessage(message, queue, config) {
         max_attempts: config.queue.maxAttempts,
         retry_delay_ms: retryDelayMs,
       });
+      updateAnalysisRun(dbPath, analysisRunId, {
+        status: "retrying",
+        completedAt: new Date().toISOString(),
+        lastErrorCode: processingError.code,
+        lastErrorMessage: processingError.message,
+      });
+      updateJobStatus(dbPath, envelope.jobId, "retrying");
       await queue.requeue(message, retryDelayMs);
       return;
     }
@@ -151,12 +194,25 @@ async function processMessage(message, queue, config) {
       max_attempts: config.queue.maxAttempts,
       dead_letter_url: config.queue.dlqUrl,
     });
+    updateAnalysisRun(dbPath, analysisRunId, {
+      status: "dead_letter",
+      completedAt: new Date().toISOString(),
+      lastErrorCode: processingError.code,
+      lastErrorMessage: processingError.message,
+    });
+    updateJobStatus(dbPath, envelope.jobId, "dead_letter");
     await queue.deadLetter(message, processingError.message);
     return;
   }
 
   const succeededEvent = buildStatusEvent(analysisRunId, envelope.jobId, "succeeded");
-  processedByIdempotencyKey.set(envelope.idempotencyKey, envelope.jobId);
+  updateAnalysisRun(dbPath, analysisRunId, {
+    status: "succeeded",
+    completedAt: new Date().toISOString(),
+    lastErrorCode: null,
+    lastErrorMessage: null,
+  });
+  updateJobStatus(dbPath, envelope.jobId, "succeeded");
 
   logJson("info", "worker.job.lifecycle", {
     job_id: envelope.jobId,
@@ -172,6 +228,7 @@ async function processMessage(message, queue, config) {
 async function runWorker() {
   const config = loadConfig();
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
+  const dbPath = ensureReady(config.database.databaseUrl);
   const storageAdapter = createStorageAdapter({
     appEnv: config.runtime.appEnv,
     bucket: config.storage.bucket,
@@ -214,7 +271,7 @@ async function runWorker() {
       continue;
     }
 
-    await processMessage(message, queue, config);
+    await processMessage(message, queue, config, dbPath);
   }
 
   logJson("info", "worker.stopped", {

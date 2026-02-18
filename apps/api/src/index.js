@@ -2,15 +2,18 @@ const http = require("http");
 const crypto = require("crypto");
 const { loadConfig } = require("./config");
 const { assertDatabaseReady } = require("../../../scripts/db/runtime");
+const {
+  ensureReady,
+  getJobById,
+  getJobByIdempotencyKey,
+  insertJob,
+} = require("../../../scripts/db/repository");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
 const {
   CONTRACT_VERSION,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
-
-const jobsById = new Map();
-const jobIdByIdempotencyKey = new Map();
 
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -118,7 +121,7 @@ function createJobEnvelope(submitBody) {
   return validateAnalysisJobEnvelope(envelope);
 }
 
-async function requestHandler(req, res, config) {
+async function requestHandler(req, res, config, dbPath) {
   const ctx = createRequestContext(req, config);
   const url = new URL(req.url, "http://localhost");
   const method = req.method || "GET";
@@ -163,15 +166,21 @@ async function requestHandler(req, res, config) {
         return;
       }
 
-      const existingJobId = jobIdByIdempotencyKey.get(body.idempotencyKey);
-      if (existingJobId) {
-        const existingJob = jobsById.get(existingJobId);
+      const existingJob = getJobByIdempotencyKey(dbPath, body.idempotencyKey);
+      if (existingJob) {
         sendJson(
           res,
           200,
           {
             reused: true,
-            job: existingJob,
+            job: {
+              jobId: existingJob.job_id,
+              status: existingJob.status,
+              runType: existingJob.run_type,
+              imageId: existingJob.image_id,
+              idempotencyKey: existingJob.idempotency_key,
+              submittedAt: existingJob.submitted_at,
+            },
           },
           ctx
         );
@@ -188,8 +197,7 @@ async function requestHandler(req, res, config) {
         submittedAt: envelope.submittedAt,
       };
 
-      jobsById.set(jobRecord.jobId, jobRecord);
-      jobIdByIdempotencyKey.set(jobRecord.idempotencyKey, jobRecord.jobId);
+      insertJob(dbPath, jobRecord);
 
       logJson("info", "analysis.job.enqueued", {
         request_id: ctx.requestId,
@@ -218,7 +226,7 @@ async function requestHandler(req, res, config) {
 
   if (method === "GET" && path.startsWith("/v1/analysis-jobs/")) {
     const jobId = path.slice("/v1/analysis-jobs/".length);
-    const job = jobsById.get(jobId);
+    const job = getJobById(dbPath, jobId);
 
     if (!job) {
       sendError(res, 404, "NOT_FOUND", "Analysis job not found", ctx);
@@ -229,7 +237,14 @@ async function requestHandler(req, res, config) {
       res,
       200,
       {
-        job,
+        job: {
+          jobId: job.job_id,
+          status: job.status,
+          runType: job.run_type,
+          imageId: job.image_id,
+          idempotencyKey: job.idempotency_key,
+          submittedAt: job.submitted_at,
+        },
       },
       ctx
     );
@@ -242,6 +257,7 @@ async function requestHandler(req, res, config) {
 function main() {
   const config = loadConfig();
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
+  const dbPath = ensureReady(config.database.databaseUrl);
   const storageAdapter = createStorageAdapter({
     appEnv: config.runtime.appEnv,
     bucket: config.storage.bucket,
@@ -249,7 +265,7 @@ function main() {
     endpoint: config.storage.endpoint,
   });
   const server = http.createServer((req, res) => {
-    requestHandler(req, res, config).catch((error) => {
+    requestHandler(req, res, config, dbPath).catch((error) => {
       const ctx = createRequestContext(req, config);
       logJson("error", "api.request.unhandled_error", {
         request_id: ctx.requestId,
