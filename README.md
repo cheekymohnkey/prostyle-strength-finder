@@ -23,3 +23,24 @@ Primary design and planning docs:
 - `design-documenatation/IMPLEMENTATION_PLAN.md`
 - `design-documenatation/IMPLEMENTATION_TASKS.md`
 - `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
+
+## Local Quickstart
+
+1. Ensure Node.js 20 is installed and on `PATH`.
+2. Export environment variables from local template:
+   `set -a && source .env.local.example && set +a`
+3. Run shared-contracts build check:
+   `npm run contracts`
+4. Run API:
+   `npm run api`
+5. Run worker:
+   `npm run worker`
+6. Run frontend bootstrap check:
+   `npm run frontend`
+
+## A6 Stub Flow Verification
+
+1. Start API and submit analysis job at `POST /v1/analysis-jobs`.
+2. Capture returned job fields (`jobId`, `idempotencyKey`, `runType`, `imageId`).
+3. Pass those values into worker sample queue payload using `WORKER_SAMPLE_MESSAGES`.
+4. Run worker and verify lifecycle logs: `in_progress` -> `succeeded`.

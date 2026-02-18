@@ -208,3 +208,27 @@ Acceptance criteria:
 
 1. This task set intentionally excludes deep feature logic from MVP-1/MVP-2/MVP-3.
 2. If any Epic A task implies schema or infrastructure lock-in beyond agreed decisions, update `DECISIONS.md` first before implementation.
+
+## A6 Verification Results (2026-02-18)
+
+Execution summary:
+1. `npm run contracts`: passed.
+2. `npm run api`: passed (server startup + endpoint checks).
+3. `npm run worker`: passed (independent startup/shutdown and lifecycle logging).
+4. `npm run frontend`: passed (config mapping and contract usage check).
+5. Stubbed API enqueue -> worker consume path: passed.
+
+Epic A done checklist status:
+1. Repository baseline structure: complete.
+2. Environment contract document: complete.
+3. Env templates (`local`, `staging`, `prod`): complete.
+4. API + worker local boot with validated config: complete.
+5. Frontend bootstrap + configured API URL: complete.
+6. Shared contracts consumed across components: complete.
+7. Async submission -> worker consumption verifiable via stub flow: complete.
+
+Known gaps (Epic B+ follow-ups):
+1. API and worker currently use local/in-memory scaffolds; no real SQLite persistence integration yet.
+2. Worker queue adapter is local simulation, not yet wired to AWS SQS client implementation.
+3. API auth is JWT shape + issuer/audience scaffold only; signature verification/JWKS integration is pending.
+4. API job state is in-memory and reset on restart; durable run tracking is pending data-layer implementation.
