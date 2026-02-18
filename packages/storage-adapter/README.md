@@ -7,4 +7,4 @@ Responsibility:
 
 Current implementation:
 - `LocalDiskStorageAdapter` for local pre-prod execution.
-- `S3StorageAdapter` scaffold placeholder for non-local environments.
+- `S3StorageAdapter` with real `put/get/delete` operations and signed URL generation via AWS CLI.

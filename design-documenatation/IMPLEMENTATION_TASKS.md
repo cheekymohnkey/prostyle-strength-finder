@@ -220,7 +220,7 @@ Implementation tasks:
 - `deleteObject`
 - `getSignedUploadUrl` (if needed by frontend upload flow)
 - `getSignedReadUrl` (if needed for controlled retrieval)
-2. Implement `S3StorageAdapter` using AWS SDK with environment-driven config:
+2. Implement `S3StorageAdapter` with real AWS-backed operations and environment-driven config:
 - bucket name from `S3_BUCKET`
 - region from `AWS_REGION`
 - optional endpoint override for local simulation via `S3_ENDPOINT_OVERRIDE`
@@ -355,7 +355,6 @@ Epic A done checklist status:
 
 Known gaps (Epic B+ follow-ups):
 1. Queue adapter integration exists (sqlite local + SQS mode), but production-hardening for SQS operational concerns is still pending.
-2. Real AWS SDK-backed S3 operations/presigned URLs remain pending (current S3 mode is scaffold-level for non-local env).
 
 ## A8 Implementation Results (2026-02-18)
 
@@ -385,8 +384,8 @@ Acceptance criteria mapping:
 5. Setup and verification docs added: complete.
 
 Known A8 follow-ups (Epic B+):
-1. Real AWS SDK-backed S3 operations for non-local environments are scaffolded but not fully implemented.
-2. Presigned URL cryptographic signing is pending AWS SDK integration.
+1. Production credentialing and bucket-policy rollout validation is required before launch.
+2. Optional future optimization: move from AWS CLI-backed adapter to direct AWS SDK integration if/when needed.
 
 ## Follow-up 2 Completion - Queue Adapter Integration (2026-02-18)
 
@@ -445,6 +444,34 @@ Impact on previously documented gaps:
 2. Remaining auth follow-up:
 - production JWKS observability/alerting and key-rotation playbook validation remain hardening tasks.
 
+## Follow-up 4 Completion - Real S3 Operations and Signed URLs (2026-02-18)
+
+Objective:
+- Replace non-local S3 scaffold behavior with real object operations and real cryptographic signed URL generation.
+
+Implementation summary:
+1. Replaced scaffold methods in `packages/storage-adapter/src/s3-adapter.js` with real operations:
+- `putObject` via `aws s3api put-object`
+- `getObject` via `aws s3api get-object`
+- `deleteObject` via `aws s3api delete-object`
+2. Implemented signed URL generation:
+- `getSignedUploadUrl` via `aws s3 presign ... --http-method PUT`
+- `getSignedReadUrl` via `aws s3 presign ... --http-method GET`
+3. Added S3 healthcheck validation:
+- `aws s3api head-bucket`
+4. Added stable storage error mapping for AWS command failures (`S3_OPERATION_FAILED`).
+
+Verification evidence:
+1. Adapter module syntax and runtime checks pass in local environment.
+2. Local pre-prod storage smoke path remains green (`npm run storage:smoke`) for `local_disk` mode.
+3. Non-local S3 command execution path implemented and ready, pending environment credentials and bucket access.
+
+Impact on previously documented gaps:
+1. Gap resolved:
+- S3 operations and presigned URL signing are no longer scaffold-only for non-local mode.
+2. Remaining S3 hardening:
+- validate IAM/credential and bucket policies in staging/prod with live resources.
+
 ## Follow-up 1 Completion - Durable Job/Run Persistence (2026-02-18)
 
 Objective:
@@ -474,6 +501,6 @@ Impact on previously documented gaps:
 1. Gap resolved:
 - API/worker now use durable SQLite state for jobs/runs.
 2. Remaining follow-ups unchanged:
-- real SQS adapter wiring
-- JWT signature/JWKS verification
-- full AWS SDK-backed S3 operations and signed URLs
+- production SQS hardening
+- production JWKS observability and key-rotation playbook validation
+- staging/prod IAM and bucket-policy rollout validation for S3 paths

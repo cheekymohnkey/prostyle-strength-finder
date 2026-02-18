@@ -34,6 +34,10 @@ Minimum policy expectations:
 - environment-scoped principals
 - no wildcard write access across environments
 
+Execution note:
+- Current non-local adapter mode uses AWS CLI credentials/region resolution from runtime environment.
+- Verify role/profile/session configuration before staging/prod smoke tests.
+
 ## Lifecycle Defaults
 
 Suggested lifecycle baseline:
