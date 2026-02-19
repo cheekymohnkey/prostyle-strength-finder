@@ -21,12 +21,27 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
   - recommendation session contracts
   - extraction payload/confirmation contracts
   - confidence/risk + low-confidence signaling validation
+- B2 persistence and migration scope is implemented:
+  - recommendation persistence migration (`scripts/db/migrations/20260219113000_recommendation_sessions.sql`)
+  - style influence catalog migration (`scripts/db/migrations/20260219123000_style_influence_catalog.sql`)
+  - repository create/get/list methods for prompt/session/recommendation and active combination retrieval
 - B3 upload-intake scaffold is implemented:
   - MidJourney metadata normalization parser (`scripts/ingestion/midjourney-metadata.js`)
   - extraction persistence migration (`scripts/db/migrations/20260219103000_recommendation_extractions.sql`)
   - repository methods for extraction insert/get/confirm
-  - API endpoints scaffolded for extract/get/confirm in `apps/api/src/index.js`
-- Contracts build and local migrations passed.
+  - API endpoints for extract/get/confirm/session retrieval in `apps/api/src/index.js`
+- B5 threshold policy + deterministic ranking scaffold is implemented in API:
+  - mode thresholds enforced (`precision >= 0.65`, `close_enough >= 0.45`)
+  - explicit low-confidence fallback labeling when below threshold
+- B6 explanation payload generation is implemented:
+  - rationale/risk/prompt-improvement rules generated from scoring breakdown
+  - explanation payload guard enforced before recommendation persistence
+- B8 frontend MVP-1 flow page is implemented:
+  - extraction review -> explicit confirm -> session result rendering
+  - same-origin frontend proxy routes for recommendation endpoints
+- Reproducible smoke verification is documented and runnable:
+  - `npm run recommendation:smoke` validates threshold behavior, low-confidence labeling, ordering, explanation presence, and confirm idempotency
+  - runbook documented in `README.md` under `Reproducible Smoke Runbook`
 
 2. Decisions made:
 - MVP-1 intake remains upload-only.
