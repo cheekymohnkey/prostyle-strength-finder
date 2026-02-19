@@ -1,36 +1,545 @@
+const http = require("http");
 const { loadFrontendConfig } = require("./config");
-const {
-  CONTRACT_VERSION,
-  isRecommendationResult,
-} = require("../../../packages/shared-contracts/src");
+
+function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+    req.on("end", () => {
+      if (!body) {
+        resolve({});
+        return;
+      }
+      try {
+        resolve(JSON.parse(body));
+      } catch (_error) {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    "content-type": "application/json",
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function sendHtml(res, statusCode, html) {
+  res.writeHead(statusCode, {
+    "content-type": "text/html; charset=utf-8",
+  });
+  res.end(html);
+}
+
+function htmlPage(config) {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prostyle Recommendation Flow</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --surface: #ffffff;
+      --ink: #17212f;
+      --muted: #5f6f84;
+      --line: #d7dfeb;
+      --primary: #005f73;
+      --primary-strong: #0a9396;
+      --warn: #9b2226;
+      --ok: #2a9d8f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Avenir Next", "Helvetica Neue", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -20%, #d7eff6 0%, transparent 70%),
+        radial-gradient(900px 500px at 100% 0%, #ffe8d6 0%, transparent 65%),
+        var(--bg);
+    }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+    .hero { margin-bottom: 18px; }
+    .hero h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+    .hero p { margin: 8px 0 0; color: var(--muted); }
+    .grid { display: grid; gap: 16px; }
+    @media (min-width: 900px) {
+      .grid { grid-template-columns: 1fr 1fr; align-items: start; }
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(20, 40, 70, 0.06);
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 17px;
+    }
+    .row { display: grid; gap: 8px; margin-bottom: 10px; }
+    label { font-size: 12px; color: var(--muted); }
+    input, select, textarea, button {
+      font: inherit;
+    }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px 10px;
+      background: #fff;
+      color: var(--ink);
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    button {
+      border: 1px solid transparent;
+      border-radius: 10px;
+      padding: 9px 12px;
+      cursor: pointer;
+      background: var(--primary);
+      color: #fff;
+      transition: background 120ms ease;
+    }
+    button:hover { background: var(--primary-strong); }
+    button.secondary {
+      background: #fff;
+      color: var(--ink);
+      border-color: var(--line);
+    }
+    button.secondary:hover { background: #f4f7fb; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .meta {
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fbfdff;
+      font-size: 13px;
+    }
+    .status { font-size: 13px; color: var(--muted); }
+    .status.error { color: var(--warn); }
+    .status.ok { color: var(--ok); }
+    .result-list { display: grid; gap: 10px; margin-top: 10px; }
+    .rec {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+    .rec-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      border: 1px solid var(--line);
+      background: #f6f9fc;
+    }
+    .badge.warn {
+      background: #fff3f3;
+      border-color: #f3c3c4;
+      color: #8f1f24;
+    }
+    ul {
+      margin: 6px 0 0 18px;
+      padding: 0;
+    }
+    code.inline {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      background: #eef3f8;
+      border-radius: 6px;
+      padding: 2px 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>Recommendation Flow (MVP-1)</h1>
+      <p>Extraction review -> explicit confirm -> ranked results. Frontend proxies API calls to avoid CORS issues.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h2>Connection</h2>
+      <div class="row">
+        <label for="authToken">Bearer token</label>
+        <input id="authToken" placeholder="Paste JWT bearer token" />
+      </div>
+      <div class="actions">
+        <button id="btnToken" class="secondary" type="button">Generate Local Token</button>
+        <span class="status">APP_ENV: <code class="inline">${config.appEnv}</code> | API: <code class="inline">${config.apiBaseUrl}</code></span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>1) Create Extraction</h2>
+        <div class="row">
+          <label for="description">Description (required)</label>
+          <textarea id="description">cinematic portrait of a boxer in rain --ar 3:4 --v 6 Job ID: 123e4567-e89b-12d3-a456-426614174000</textarea>
+        </div>
+        <div class="row">
+          <label for="author">Author</label>
+          <input id="author" value="local-user" />
+        </div>
+        <div class="row">
+          <label for="creationTime">Creation Time</label>
+          <input id="creationTime" value="${new Date().toISOString()}" />
+        </div>
+        <div class="actions">
+          <button id="btnExtract" type="button">Create Extraction</button>
+        </div>
+        <p id="extractStatus" class="status"></p>
+        <div id="extractionMeta" class="meta" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2>2) Confirm + Retrieve Session</h2>
+        <div class="row">
+          <label for="mode">Mode</label>
+          <select id="mode">
+            <option value="precision">precision</option>
+            <option value="close_enough">close_enough</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button id="btnConfirm" type="button" disabled>Confirm Extraction</button>
+          <button id="btnFetchSession" type="button" class="secondary" disabled>Fetch Session</button>
+        </div>
+        <p id="confirmStatus" class="status"></p>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>3) Session Results</h2>
+      <div id="sessionMeta" class="meta" hidden></div>
+      <div id="results" class="result-list"></div>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      extractionId: null,
+      sessionId: null,
+    };
+
+    const authTokenEl = document.getElementById("authToken");
+    const extractStatusEl = document.getElementById("extractStatus");
+    const confirmStatusEl = document.getElementById("confirmStatus");
+    const extractionMetaEl = document.getElementById("extractionMeta");
+    const sessionMetaEl = document.getElementById("sessionMeta");
+    const resultsEl = document.getElementById("results");
+    const confirmBtn = document.getElementById("btnConfirm");
+    const fetchSessionBtn = document.getElementById("btnFetchSession");
+
+    function setStatus(el, message, tone) {
+      el.textContent = message || "";
+      el.className = "status" + (tone ? " " + tone : "");
+    }
+
+    function generateLocalToken() {
+      const header = btoa(JSON.stringify({ alg: "none", typ: "JWT" })).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+      const payload = btoa(JSON.stringify({
+        iss: "${process.env.COGNITO_ISSUER || ""}",
+        aud: "${process.env.COGNITO_AUDIENCE || ""}",
+        sub: "frontend-local-user",
+        exp: Math.floor(Date.now() / 1000) + 3600
+      })).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+      authTokenEl.value = header + "." + payload + ".sig";
+    }
+
+    async function apiRequest(path, options) {
+      const token = authTokenEl.value.trim();
+      if (!token) {
+        throw new Error("Bearer token is required");
+      }
+
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          "content-type": "application/json",
+          "x-auth-token": token,
+          ...(options && options.headers ? options.headers : {}),
+        },
+      });
+
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const reason = json && json.error ? (json.error.message + (json.error.details && json.error.details.reason ? ": " + json.error.details.reason : "")) : ("HTTP " + response.status);
+        throw new Error(reason);
+      }
+      return json;
+    }
+
+    function renderExtraction(extraction) {
+      extractionMetaEl.hidden = false;
+      extractionMetaEl.innerHTML =
+        "<div><strong>Extraction:</strong> " + extraction.extractionId + "</div>" +
+        "<div><strong>Status:</strong> " + extraction.status + "</div>" +
+        "<div><strong>Prompt:</strong> " + extraction.prompt + "</div>" +
+        "<div><strong>Model:</strong> " + extraction.modelFamily + " " + extraction.modelVersion + "</div>" +
+        "<div><strong>Flags:</strong> baseline=" + extraction.isBaseline + ", profile=" + extraction.hasProfile + ", sref=" + extraction.hasSref + "</div>";
+    }
+
+    function renderSession(session) {
+      sessionMetaEl.hidden = false;
+      sessionMetaEl.innerHTML =
+        "<div><strong>Session:</strong> " + session.sessionId + "</div>" +
+        "<div><strong>Status:</strong> " + session.status + "</div>" +
+        "<div><strong>Mode:</strong> " + session.mode + "</div>" +
+        "<div><strong>Prompt:</strong> " + (session.prompt ? session.prompt.promptText : "n/a") + "</div>";
+
+      resultsEl.innerHTML = "";
+      const recommendations = Array.isArray(session.recommendations) ? session.recommendations : [];
+      if (recommendations.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "status";
+        empty.textContent = "No recommendations available for this session yet.";
+        resultsEl.appendChild(empty);
+        return;
+      }
+
+      for (const rec of recommendations) {
+        const card = document.createElement("article");
+        card.className = "rec";
+        const low = rec.lowConfidence && rec.lowConfidence.isLowConfidence === true;
+        const riskList = Array.isArray(rec.riskNotes) ? rec.riskNotes : [];
+        const improveList = Array.isArray(rec.promptImprovements) ? rec.promptImprovements : [];
+        card.innerHTML = \`
+          <div class="rec-head">
+            <strong>#\${rec.rank} - \${rec.combinationId}</strong>
+            <span class="badge \${low ? "warn" : ""}">confidence \${rec.confidence}\${low ? " (low-confidence)" : ""}</span>
+          </div>
+          <div><strong>Rationale:</strong> \${rec.rationale}</div>
+          <div style="margin-top:6px;"><strong>Risk Notes:</strong>\${riskList.length ? "<ul>" + riskList.map((x) => "<li>" + x + "</li>").join("") + "</ul>" : " none"}</div>
+          <div style="margin-top:6px;"><strong>Prompt Improvements:</strong>\${improveList.length ? "<ul>" + improveList.map((x) => "<li>" + x + "</li>").join("") + "</ul>" : " none"}</div>
+        \`;
+        resultsEl.appendChild(card);
+      }
+    }
+
+    async function onCreateExtraction() {
+      setStatus(extractStatusEl, "Creating extraction...", "");
+      try {
+        const description = document.getElementById("description").value.trim();
+        const author = document.getElementById("author").value.trim();
+        const creationTime = document.getElementById("creationTime").value.trim();
+        const payload = {
+          metadataFields: [
+            { key: "Description", value: description },
+            { key: "Author", value: author },
+            { key: "Creation Time", value: creationTime },
+          ],
+          fileName: "browser-metadata-stub.png",
+          mimeType: "image/png",
+        };
+        const json = await apiRequest("/api/recommendation-extractions", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        state.extractionId = json.extraction.extractionId;
+        state.sessionId = null;
+        confirmBtn.disabled = false;
+        fetchSessionBtn.disabled = true;
+        renderExtraction(json.extraction);
+        sessionMetaEl.hidden = true;
+        resultsEl.innerHTML = "";
+        setStatus(extractStatusEl, "Extraction created. Review and confirm to continue.", "ok");
+      } catch (error) {
+        setStatus(extractStatusEl, error.message, "error");
+      }
+    }
+
+    async function onConfirm() {
+      if (!state.extractionId) {
+        setStatus(confirmStatusEl, "Create extraction first.", "error");
+        return;
+      }
+      setStatus(confirmStatusEl, "Confirming extraction and generating recommendations...", "");
+      try {
+        const mode = document.getElementById("mode").value;
+        const json = await apiRequest("/api/recommendation-extractions/" + encodeURIComponent(state.extractionId) + "/confirm", {
+          method: "POST",
+          body: JSON.stringify({
+            confirmed: true,
+            mode,
+          }),
+        });
+        state.sessionId = json.session.sessionId;
+        fetchSessionBtn.disabled = false;
+        setStatus(confirmStatusEl, "Confirmed. Session " + state.sessionId + " is ready.", "ok");
+        await onFetchSession();
+      } catch (error) {
+        setStatus(confirmStatusEl, error.message, "error");
+      }
+    }
+
+    async function onFetchSession() {
+      if (!state.sessionId) {
+        setStatus(confirmStatusEl, "No session yet. Confirm extraction first.", "error");
+        return;
+      }
+      setStatus(confirmStatusEl, "Loading session...", "");
+      try {
+        const json = await apiRequest("/api/recommendation-sessions/" + encodeURIComponent(state.sessionId), {
+          method: "GET",
+        });
+        renderSession(json.session);
+        setStatus(confirmStatusEl, "Session loaded.", "ok");
+      } catch (error) {
+        setStatus(confirmStatusEl, error.message, "error");
+      }
+    }
+
+    document.getElementById("btnToken").addEventListener("click", generateLocalToken);
+    document.getElementById("btnExtract").addEventListener("click", onCreateExtraction);
+    document.getElementById("btnConfirm").addEventListener("click", onConfirm);
+    document.getElementById("btnFetchSession").addEventListener("click", onFetchSession);
+  </script>
+</body>
+</html>`;
+}
+
+async function proxyRequest(config, req, res, targetPath) {
+  const token = req.headers["x-auth-token"];
+  if (!token || typeof token !== "string" || token.trim() === "") {
+    sendJson(res, 401, {
+      error: {
+        code: "UNAUTHORIZED",
+        message: "x-auth-token header is required",
+      },
+    });
+    return;
+  }
+
+  let body = undefined;
+  if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
+    try {
+      const parsed = await parseJsonBody(req);
+      body = JSON.stringify(parsed);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: {
+          code: "INVALID_REQUEST",
+          message: error.message,
+        },
+      });
+      return;
+    }
+  }
+
+  const targetUrl = `${config.apiBaseUrl}${targetPath}`;
+  const response = await fetch(targetUrl, {
+    method: req.method,
+    headers: {
+      authorization: `Bearer ${token.trim()}`,
+      "content-type": "application/json",
+    },
+    body,
+  });
+
+  const responseJson = await response.json().catch(() => ({}));
+  sendJson(res, response.status, responseJson);
+}
+
+async function requestHandler(config, req, res) {
+  const url = new URL(req.url, "http://localhost");
+  const path = url.pathname;
+  const method = req.method || "GET";
+
+  if (method === "GET" && path === "/") {
+    sendHtml(res, 200, htmlPage(config));
+    return;
+  }
+
+  if (method === "POST" && path === "/api/recommendation-extractions") {
+    await proxyRequest(config, req, res, "/recommendation-extractions");
+    return;
+  }
+
+  if (method === "POST" && path.startsWith("/api/recommendation-extractions/") && path.endsWith("/confirm")) {
+    const extractionId = path.slice("/api/recommendation-extractions/".length, -"/confirm".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/recommendation-extractions/${encodeURIComponent(extractionId)}/confirm`
+    );
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/api/recommendation-extractions/")) {
+    const extractionId = path.slice("/api/recommendation-extractions/".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/recommendation-extractions/${encodeURIComponent(extractionId)}`
+    );
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/api/recommendation-sessions/")) {
+    const sessionId = path.slice("/api/recommendation-sessions/".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/recommendation-sessions/${encodeURIComponent(sessionId)}`
+    );
+    return;
+  }
+
+  sendJson(res, 404, {
+    error: {
+      code: "NOT_FOUND",
+      message: "Route not found",
+    },
+  });
+}
 
 function main() {
   const config = loadFrontendConfig();
-  const sampleRecommendationPayload = {
-    sessionId: "session_epic_a_001",
-    recommendations: [
-      {
-        rank: 1,
-        combinationId: "combination_001",
-        rationale: "Best fit for requested style intent",
-        confidence: 0.72,
-      },
-    ],
-  };
+  const server = http.createServer((req, res) => {
+    requestHandler(config, req, res).catch((error) => {
+      sendJson(res, 500, {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: error.message,
+        },
+      });
+    });
+  });
 
-  console.log(
-    JSON.stringify(
-      {
-        message: "Frontend configuration loaded",
-        app_env: config.appEnv,
-        api_base_url: config.apiBaseUrl,
-        contract_version: CONTRACT_VERSION,
-        recommendation_contract_valid: isRecommendationResult(sampleRecommendationPayload),
-      },
-      null,
-      2
-    )
-  );
+  server.listen(config.frontendPort, () => {
+    console.log(
+      JSON.stringify(
+        {
+          message: "Frontend server started",
+          app_env: config.appEnv,
+          frontend_url: `http://127.0.0.1:${config.frontendPort}`,
+          api_base_url: config.apiBaseUrl,
+        },
+        null,
+        2
+      )
+    );
+  });
 }
 
 main();

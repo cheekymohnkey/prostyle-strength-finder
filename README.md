@@ -56,8 +56,10 @@ Policy:
    `npm run api`
 6. Run worker:
    `npm run worker`
-7. Run frontend bootstrap check:
+7. Run frontend server:
    `npm run frontend`
+8. Open frontend flow page:
+   `http://127.0.0.1:3000`
 
 Local auth note:
 - `.env.local.example` uses `AUTH_JWT_VERIFICATION_MODE=insecure` for local token testing only.
