@@ -73,6 +73,24 @@ With env loaded from `.env.local.example`, run:
 
 This validates storage adapter `put/get/delete` behavior using local pre-prod storage mode.
 
+## Reproducible Smoke Runbook
+
+Use this sequence for a repeatable local pre-prod verification.
+
+1. Load local env:
+   `set -a && source .env.local.example && set +a`
+2. Reset DB to a known state:
+   `npm run db:reset`
+3. Run recommendation backend smoke (seeds data and validates extraction -> confirm -> session):
+   `npm run recommendation:smoke`
+
+For manual UI verification of the same flow:
+
+1. Terminal A: `npm run api`
+2. Terminal B: `npm run worker`
+3. Terminal C: `npm run frontend`
+4. Open `http://127.0.0.1:3000` and execute extraction -> confirm -> session retrieval in the page.
+
 ## A6 Stub Flow Verification
 
 1. Start API and submit analysis job at `POST /v1/analysis-jobs`.

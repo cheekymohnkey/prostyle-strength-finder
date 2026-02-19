@@ -41,6 +41,9 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 4. Recommended next task:
 - Execute B2 next: add recommendation session/recommendation persistence schema and finalize extraction-confirm -> recommendation-session creation flow.
 
+Smoke runbook reference:
+- Local reproducible smoke commands are documented in `README.md` under `Reproducible Smoke Runbook`.
+
 ## Current API Examples (Implemented)
 
 Verified against current implementation in:
