@@ -1,6 +1,10 @@
 const { spawn } = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { parseDatabaseUrl, ensureDbParentDir, ensureMigrationsTable, runSql } = require("../db/lib");
 const { assertDatabaseReady } = require("../db/runtime");
+const { extractMidjourneyFieldsFromPngBuffer } = require("../ingestion/png-metadata");
 
 function quote(value) {
   if (value === null || value === undefined) {
@@ -41,6 +45,77 @@ function assertCondition(condition, message) {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+function createChunk(type, data) {
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const chunkType = Buffer.from(type, "ascii");
+  // CRC is not validated by local parser; placeholder keeps chunk layout valid.
+  const crc = Buffer.alloc(4);
+  return Buffer.concat([length, chunkType, data, crc]);
+}
+
+function createTextChunk(key, value) {
+  const data = Buffer.concat([
+    Buffer.from(String(key), "latin1"),
+    Buffer.from([0x00]),
+    Buffer.from(String(value), "utf8"),
+  ]);
+  return createChunk("tEXt", data);
+}
+
+function createPngFixtureWithMetadata() {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdrData = Buffer.alloc(13);
+  ihdrData.writeUInt32BE(1, 0); // width
+  ihdrData.writeUInt32BE(1, 4); // height
+  ihdrData[8] = 8; // bit depth
+  ihdrData[9] = 6; // color type RGBA
+  ihdrData[10] = 0; // compression
+  ihdrData[11] = 0; // filter
+  ihdrData[12] = 0; // interlace
+
+  const description = "cinematic portrait of a boxer in rain --ar 3:4 --v 6 Job ID: 123e4567-e89b-12d3-a456-426614174000";
+  const author = "smoke-user";
+  const creationTime = "2026-02-19T12:00:00Z";
+
+  const fixture = Buffer.concat([
+    signature,
+    createChunk("IHDR", ihdrData),
+    createTextChunk("Description", description),
+    createTextChunk("Author", author),
+    createTextChunk("Creation Time", creationTime),
+    createChunk("IEND", Buffer.alloc(0)),
+  ]);
+
+  const fixturePath = path.join(os.tmpdir(), "prostyle-recommendation-smoke-midjourney.png");
+  fs.writeFileSync(fixturePath, fixture);
+  return fixturePath;
+}
+
+function createPngFixtureWithoutDescription() {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdrData = Buffer.alloc(13);
+  ihdrData.writeUInt32BE(1, 0); // width
+  ihdrData.writeUInt32BE(1, 4); // height
+  ihdrData[8] = 8; // bit depth
+  ihdrData[9] = 6; // color type RGBA
+  ihdrData[10] = 0; // compression
+  ihdrData[11] = 0; // filter
+  ihdrData[12] = 0; // interlace
+
+  const fixture = Buffer.concat([
+    signature,
+    createChunk("IHDR", ihdrData),
+    createTextChunk("Author", "smoke-user"),
+    createTextChunk("Creation Time", "2026-02-19T12:00:00Z"),
+    createChunk("IEND", Buffer.alloc(0)),
+  ]);
+
+  const fixturePath = path.join(os.tmpdir(), "prostyle-recommendation-smoke-no-description.png");
+  fs.writeFileSync(fixturePath, fixture);
+  return fixturePath;
 }
 
 function seedSmokeData(dbPath) {
@@ -232,6 +307,28 @@ async function main() {
   const token = buildLocalToken();
   const baseUrl = `http://127.0.0.1:${smokePort}/v1`;
 
+  const pngFixturePath = createPngFixtureWithMetadata();
+  const extractedFixtureFields = extractMidjourneyFieldsFromPngBuffer(fs.readFileSync(pngFixturePath));
+  assertCondition(
+    extractedFixtureFields.metadataFields.some((entry) => entry.key === "Description" && entry.value.includes("--v 6")),
+    "PNG fixture parsing failed to produce Description metadata"
+  );
+  assertCondition(
+    extractedFixtureFields.metadataFields.some((entry) => entry.key === "Author" && entry.value === "smoke-user"),
+    "PNG fixture parsing failed to produce Author metadata"
+  );
+  const badPngFixturePath = createPngFixtureWithoutDescription();
+  let parseFailureObserved = false;
+  try {
+    extractMidjourneyFieldsFromPngBuffer(fs.readFileSync(badPngFixturePath));
+  } catch (error) {
+    parseFailureObserved = String(error.message || "").includes("Missing required metadata field: Description");
+  }
+  assertCondition(
+    parseFailureObserved,
+    "PNG parse-failure regression check failed: missing Description did not return expected error"
+  );
+
   const {
     highConfidenceExtractionId,
     lowConfidenceExtractionId,
@@ -409,6 +506,42 @@ async function main() {
       lowRecommendations.every((item) => Array.isArray(item.promptImprovements) && item.promptImprovements.length > 0),
       "Low-confidence recommendations must still include prompt improvements"
     );
+    const repeatedLowConfirmResponse = await fetch(
+      `${baseUrl}/recommendation-extractions/${lowConfidenceExtractionId}/confirm`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          confirmed: true,
+          mode: "precision",
+        }),
+      }
+    );
+    const repeatedLowConfirmJson = await repeatedLowConfirmResponse.json();
+    if (!repeatedLowConfirmResponse.ok) {
+      throw new Error(`Repeated low-confidence confirm failed (${repeatedLowConfirmResponse.status}): ${JSON.stringify(repeatedLowConfirmJson)}`);
+    }
+    assertCondition(
+      repeatedLowConfirmJson?.session?.sessionId === lowSessionId,
+      "Low-confidence idempotency failed: repeated confirm returned different sessionId"
+    );
+    const repeatedLowSessionResponse = await fetch(`${baseUrl}/recommendation-sessions/${lowSessionId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const repeatedLowSessionJson = await repeatedLowSessionResponse.json();
+    if (!repeatedLowSessionResponse.ok) {
+      throw new Error(`Repeated low-confidence session fetch failed (${repeatedLowSessionResponse.status}): ${JSON.stringify(repeatedLowSessionJson)}`);
+    }
+    const repeatedLowRecommendations = repeatedLowSessionJson?.session?.recommendations || [];
+    assertCondition(
+      repeatedLowRecommendations.some((item) => item.lowConfidence?.isLowConfidence === true),
+      "Low-confidence label did not persist after repeated confirm"
+    );
 
     console.log(
       JSON.stringify(
@@ -439,6 +572,11 @@ async function main() {
           },
           idempotency: {
             repeatedConfirmSessionId: confirmAgainJson.session.sessionId,
+          },
+          pngFixture: {
+            path: pngFixturePath,
+            metadataFieldCount: extractedFixtureFields.metadataFields.length,
+            parseFailureFixturePath: badPngFixturePath,
           },
           port: smokePort,
           previousPort: originalPort,

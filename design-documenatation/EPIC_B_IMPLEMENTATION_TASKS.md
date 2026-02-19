@@ -1,7 +1,7 @@
 # Prostyle Strength Finder - Epic B Implementation Tasks
 
-Status: Draft for execution  
-Date: 2026-02-18  
+Status: In progress (Step 1-3 completed; Epic B verification active)  
+Date: 2026-02-19  
 Depends on:
 - `design-documenatation/DECISIONS.md`
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
@@ -14,7 +14,7 @@ Depends on:
 
 Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering tasks with clear acceptance criteria, sequencing, and handoff context.
 
-## Current Execution Snapshot (2026-02-18 Session Wrap)
+## Current Execution Snapshot (2026-02-19 Session Wrap)
 
 1. What was completed:
 - B1 shared contracts scaffold is implemented in `packages/shared-contracts`:
@@ -42,6 +42,12 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 - Reproducible smoke verification is documented and runnable:
   - `npm run recommendation:smoke` validates threshold behavior, low-confidence labeling, ordering, explanation presence, and confirm idempotency
   - runbook documented in `README.md` under `Reproducible Smoke Runbook`
+- Step 2 upload-path closure is implemented:
+  - frontend PNG upload route (`POST /api/recommendation-extractions/upload`) parses PNG metadata and forwards normalized fields to API extraction endpoint
+  - manual metadata text stub path is removed from frontend happy path
+- Step 3 regression hardening is implemented:
+  - PNG parse-failure regression check for missing `Description`
+  - repeated low-confidence confirm/session retrieval check for low-confidence label persistence
 
 2. Decisions made:
 - MVP-1 intake remains upload-only.
@@ -49,15 +55,11 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 - Raw extracted metadata is retained for future parser reprocessing.
 
 3. Outstanding risks/issues:
-- PNG binary parsing is not yet wired; current extraction endpoint expects normalized metadata field payload input.
 - Current ranking is deterministic scaffold logic (rule-based heuristic), not final domain scoring.
-- Frontend flow currently uses metadata-field input stub, not browser PNG metadata extraction.
+- PNG metadata extraction relies on readable PNG text/XMP chunks; files without `Description` still fail validation and require troubleshooting guidance.
 
 4. Recommended next task:
-- Execute B9 verification/handoff closure:
-  - add explicit acceptance-check matrix for implemented B tasks (B1/B2/B3 scaffold/B5/B6/B8)
-  - list checks run and residual gaps
-  - confirm recommended next implementation slice after B9 closure (PNG binary extraction path)
+- Begin Epic C planning and first implementation slice selection (feedback-loop scope), using this document's completed Epic B verification record as handoff evidence.
 
 Smoke runbook reference:
 - Local reproducible smoke commands are documented in `README.md` under `Reproducible Smoke Runbook`.
@@ -512,6 +514,44 @@ Acceptance criteria:
 2. Smoke path is reproducible from clean checkout.
 3. Remaining follow-ups are explicitly documented.
 
+### B9 Acceptance Matrix (2026-02-19)
+
+| Scope Item | Status | Evidence (file + command/output) | Gaps / Remediation |
+| --- | --- | --- | --- |
+| B1 contracts | `pass` | `packages/shared-contracts/src/recommendation-session.js`, `packages/shared-contracts/src/recommendation-result.js`; verified with `rg -n "RECOMMENDATION_MODES|below_mode_threshold|riskNotes|lowConfidence" packages/shared-contracts/src` | No blocking gaps for MVP-1 scaffold. |
+| B2 persistence/migrations | `pass` | `scripts/db/migrations/20260219103000_recommendation_extractions.sql`, `scripts/db/migrations/20260219113000_recommendation_sessions.sql`, `scripts/db/migrations/20260219123000_style_influence_catalog.sql`; verified by `npm run db:reset` output listing applied migrations. | No blocking gaps for current flow. |
+| B3 metadata extraction scaffold | `pass` | `scripts/ingestion/midjourney-metadata.js`, `scripts/ingestion/png-metadata.js`, `apps/frontend/src/index.js`; verified by frontend upload integration check (`POST /api/recommendation-extractions/upload` -> `201`) and smoke `pngFixture.path` output. | Parser still depends on available PNG text/XMP metadata; keep troubleshooting guidance current. |
+| B5 thresholds/ranking scaffold | `pass` | `apps/api/src/index.js`, `scripts/recommendation/smoke.js`; smoke output shows high-confidence top rec (`0.825`) and low-confidence fallback (`0.379`) with `reasonCode: "below_mode_threshold"` and threshold `0.65`. | Deterministic scaffold is in place; model-quality tuning remains future work. |
+| B6 explanation generation | `pass` | `apps/api/src/index.js`; `rg -n "riskNotes|promptImprovements|Recommendation explanation missing" apps/api/src/index.js`; smoke assertions in `scripts/recommendation/smoke.js` validate explanation fields are present. | No blocking gaps for MVP-1 explanation contract. |
+| B7/B8 API + frontend flow | `pass` | `apps/api/src/index.js`, `apps/frontend/src/index.js`; smoke command `set -a; source .env.local.example; set +a; npm run db:reset; npm run recommendation:smoke` returned `{ "ok": true }`; additional integration check for `POST /api/recommendation-extractions/upload` returned `201` with extraction payload. | No blocking gaps for MVP-1 flow closure. |
+
+### B9 Smoke Verification Record (2026-02-19)
+
+Command path executed:
+1. `set -a; source .env.local.example; set +a`
+2. `npm run db:reset`
+3. `npm run recommendation:smoke`
+
+Result:
+1. `db:reset` succeeded and applied migrations through `20260219123000_style_influence_catalog.sql`.
+2. `recommendation:smoke` succeeded with `{ "ok": true }`.
+3. Verified:
+- threshold behavior for high/low-confidence cases
+- low-confidence labeling with `below_mode_threshold`
+- recommendation ordering and explanation payload presence
+- confirm endpoint idempotency (same `sessionId` on repeated confirm)
+- PNG fixture parse path (positive and negative metadata cases)
+- low-confidence label persistence after repeated confirm/session retrieval
+
+### Residual Gaps (Prioritized)
+
+1. P1: Deterministic ranking remains scaffold logic and needs model-quality iteration in post-MVP tuning.
+2. P2: Expand fixture diversity for PNG metadata variants beyond current known MidJourney text/XMP patterns.
+
+### Recommended Next Implementation Slice
+
+Proceed to Epic C kickoff (MVP-2 feedback loop) with Epic B verification artifacts as baseline.
+
 ## Epic B Done Checklist
 
 1. User completes recommendation flow in one session.
@@ -554,6 +594,35 @@ Control: deterministic parser rules + fixture coverage for known MidJourney meta
 6. Risk: Required confirmation adds user friction.
 Control: keep review UI concise, pre-filled, and one-step confirmation.
 
-## Next Active Task
+## Execution History (Step 1-3 Completed on 2026-02-19)
 
-1. Start B1 by defining shared recommendation contracts and version exports.
+### Step 1 Completion Record
+
+Outcome:
+1. B9 acceptance matrix was added with status/evidence/gaps for B1/B2/B3/B5/B6/B7/B8.
+2. Reproducible smoke path was recorded and validated.
+
+### Step 2 Completion Record
+
+Outcome:
+1. PNG binary metadata extraction path replaced frontend metadata-field stub.
+2. Frontend upload flow now parses PNG metadata and forwards normalized extraction payload.
+3. Documentation includes upload request path and troubleshooting notes.
+
+### Step 3 Completion Record
+
+Outcome:
+1. Added focused regression checks in `scripts/recommendation/smoke.js` for:
+- PNG parse failure when `Description` metadata is missing.
+- Low-confidence label persistence after repeated confirm/session retrieval.
+2. Refreshed stale snapshot/next-task sections in this document.
+3. Latest smoke run (`2026-02-19`) passed with `{ "ok": true }` including PNG fixture and parse-failure fixture validation.
+
+### Execution Notes
+
+1. Keep task slices narrow (one endpoint/flow segment per session where possible).
+2. Stop and re-scope if >5 files change unexpectedly or architecture changes are needed.
+3. Maintain source-of-truth linkage in all handoffs:
+- `design-documenatation/DECISIONS.md`
+- `design-documenatation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`

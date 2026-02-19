@@ -89,7 +89,17 @@ For manual UI verification of the same flow:
 1. Terminal A: `npm run api`
 2. Terminal B: `npm run worker`
 3. Terminal C: `npm run frontend`
-4. Open `http://127.0.0.1:3000` and execute extraction -> confirm -> session retrieval in the page.
+4. Open `http://127.0.0.1:3000`, upload a MidJourney PNG, then execute extraction -> confirm -> session retrieval.
+
+Frontend upload note:
+- The page now sends `POST /api/recommendation-extractions/upload` with `{ fileName, mimeType, fileBase64 }`.
+- Frontend server parses PNG metadata into normalized `metadataFields` and forwards to `POST /v1/recommendation-extractions`.
+- Required normalized field remains `Description`; optional fields are `Author`, `Creation Time`, and `Job ID`.
+
+Troubleshooting:
+1. If extraction fails with `Missing required metadata field: Description`, the PNG likely lacks readable MidJourney prompt metadata chunks (`tEXt`, `zTXt`, `iTXt`, or XMP payload).
+2. If upload fails with `Uploaded file is not a PNG`, verify extension and binary type match (`image/png`).
+3. Re-run `npm run recommendation:smoke` to verify parser + threshold/flow behavior (output includes `pngFixture.path`).
 
 ## A6 Stub Flow Verification
 

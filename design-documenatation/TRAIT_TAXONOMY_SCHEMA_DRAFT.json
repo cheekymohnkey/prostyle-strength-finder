@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prostyle.local/schemas/trait-taxonomy-v1-draft.json",
+  "title": "Trait Taxonomy Draft Schema",
+  "description": "Draft schema for canonical trait registry and trait alias mapping used by synonym squashing policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "traitSchemaVersion",
+    "canonicalTraits",
+    "traitAliases"
+  ],
+  "properties": {
+    "traitSchemaVersion": {
+      "type": "string",
+      "pattern": "^v[0-9]+(\\.[0-9]+)?$",
+      "description": "Taxonomy version that all records in this payload conform to."
+    },
+    "canonicalTraits": {
+      "type": "array",
+      "description": "Registry of canonical trait definitions.",
+      "items": {
+        "$ref": "#/$defs/canonicalTrait"
+      }
+    },
+    "traitAliases": {
+      "type": "array",
+      "description": "Alias-to-canonical mappings used in synonym squashing and discovery promotion.",
+      "items": {
+        "$ref": "#/$defs/traitAlias"
+      }
+    }
+  },
+  "$defs": {
+    "canonicalTrait": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "canonicalTraitId",
+        "traitSchemaVersion",
+        "displayLabel",
+        "family",
+        "definition",
+        "scoreType",
+        "status",
+        "createdAt",
+        "createdBy"
+      ],
+      "properties": {
+        "canonicalTraitId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]{2,63}$",
+          "description": "Stable ID, e.g. color.temperature_bias or surface.mark_making."
+        },
+        "traitSchemaVersion": {
+          "type": "string",
+          "pattern": "^v[0-9]+(\\.[0-9]+)?$"
+        },
+        "displayLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "family": {
+          "type": "string",
+          "enum": [
+            "composition",
+            "value_illumination_logic",
+            "color",
+            "surface_mark_making",
+            "form_language",
+            "spatial_construction",
+            "mood_atmosphere",
+            "finish_material_treatment",
+            "photo_specific",
+            "traditional_2d_specific",
+            "cross_medium"
+          ]
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "scoreType": {
+          "type": "string",
+          "enum": [
+            "continuous_0_1",
+            "ordinal_0_3",
+            "categorical"
+          ]
+        },
+        "applicableMediums": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "photo",
+              "traditional_2d",
+              "digital_illustration",
+              "mixed_or_uncertain"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "allowedCategories": {
+          "type": "array",
+          "description": "Only used when scoreType=categorical.",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "deprecated"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deprecatedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "scoreType": {
+                "const": "categorical"
+              }
+            },
+            "required": [
+              "scoreType"
+            ]
+          },
+          "then": {
+            "required": [
+              "allowedCategories"
+            ]
+          }
+        }
+      ]
+    },
+    "traitAlias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "aliasId",
+        "aliasText",
+        "normalizedAlias",
+        "canonicalTraitId",
+        "traitSchemaVersion",
+        "source",
+        "mergeMethod",
+        "status",
+        "createdAt",
+        "createdBy"
+      ],
+      "properties": {
+        "aliasId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.:-]{5,120}$",
+          "description": "Stable alias record ID."
+        },
+        "aliasText": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "normalizedAlias": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Alias after lowercase/trim/punctuation normalization pipeline."
+        },
+        "canonicalTraitId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]{2,63}$"
+        },
+        "traitSchemaVersion": {
+          "type": "string",
+          "pattern": "^v[0-9]+(\\.[0-9]+)?$"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "manual_review",
+            "discovery_auto_merge",
+            "discovery_manual_merge",
+            "import",
+            "migration"
+          ]
+        },
+        "mergeMethod": {
+          "type": "string",
+          "enum": [
+            "exact_canonical",
+            "exact_alias",
+            "normalized_match",
+            "lexical_semantic_auto",
+            "manual_review"
+          ]
+        },
+        "lexicalSimilarity": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "semanticSimilarity": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ambiguityFlag": {
+          "type": "boolean",
+          "default": false
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "deprecated"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deprecatedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "reviewTicket": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Optional reference to a manual review decision."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mergeMethod": {
+                "const": "lexical_semantic_auto"
+              }
+            },
+            "required": [
+              "mergeMethod"
+            ]
+          },
+          "then": {
+            "required": [
+              "lexicalSimilarity",
+              "semanticSimilarity"
+            ],
+            "properties": {
+              "lexicalSimilarity": {
+                "type": "number",
+                "minimum": 0.7,
+                "maximum": 1
+              },
+              "semanticSimilarity": {
+                "type": "number",
+                "minimum": 0.88,
+                "maximum": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "examples": [
+    {
+      "traitSchemaVersion": "v1",
+      "canonicalTraits": [
+        {
+          "canonicalTraitId": "color.temperature_bias",
+          "traitSchemaVersion": "v1",
+          "displayLabel": "Temperature Bias",
+          "family": "color",
+          "definition": "Dominant warm/cool tendency of the image palette.",
+          "scoreType": "categorical",
+          "allowedCategories": [
+            "warm",
+            "cool",
+            "neutral"
+          ],
+          "status": "active",
+          "createdAt": "2026-02-19T00:00:00Z",
+          "createdBy": "taxonomy-board"
+        }
+      ],
+      "traitAliases": [
+        {
+          "aliasId": "alias:cool-toned",
+          "aliasText": "cool-toned",
+          "normalizedAlias": "cool toned",
+          "canonicalTraitId": "color.temperature_bias",
+          "traitSchemaVersion": "v1",
+          "source": "discovery_auto_merge",
+          "mergeMethod": "lexical_semantic_auto",
+          "lexicalSimilarity": 0.82,
+          "semanticSimilarity": 0.93,
+          "ambiguityFlag": false,
+          "status": "active",
+          "createdAt": "2026-02-19T00:00:00Z",
+          "createdBy": "taxonomy-pipeline"
+        }
+      ]
+    }
+  ]
+}

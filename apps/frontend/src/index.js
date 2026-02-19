@@ -1,5 +1,6 @@
 const http = require("http");
 const { loadFrontendConfig } = require("./config");
+const { extractMidjourneyFieldsFromPngBuffer } = require("../../../scripts/ingestion/png-metadata");
 
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -190,17 +191,10 @@ function htmlPage(config) {
       <section class="card">
         <h2>1) Create Extraction</h2>
         <div class="row">
-          <label for="description">Description (required)</label>
-          <textarea id="description">cinematic portrait of a boxer in rain --ar 3:4 --v 6 Job ID: 123e4567-e89b-12d3-a456-426614174000</textarea>
+          <label for="pngFile">MidJourney PNG (required)</label>
+          <input id="pngFile" type="file" accept="image/png" />
         </div>
-        <div class="row">
-          <label for="author">Author</label>
-          <input id="author" value="local-user" />
-        </div>
-        <div class="row">
-          <label for="creationTime">Creation Time</label>
-          <input id="creationTime" value="${new Date().toISOString()}" />
-        </div>
+        <p class="status">The frontend parses PNG metadata and sends normalized fields to the API extraction endpoint.</p>
         <div class="actions">
           <button id="btnExtract" type="button">Create Extraction</button>
         </div>
@@ -286,6 +280,26 @@ function htmlPage(config) {
       return json;
     }
 
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const value = String(reader.result || "");
+          const marker = ";base64,";
+          const idx = value.indexOf(marker);
+          if (idx < 0) {
+            reject(new Error("Failed to encode PNG as base64 payload"));
+            return;
+          }
+          resolve(value.slice(idx + marker.length));
+        };
+        reader.onerror = () => {
+          reject(new Error("Failed reading PNG file"));
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     function renderExtraction(extraction) {
       extractionMetaEl.hidden = false;
       extractionMetaEl.innerHTML =
@@ -336,19 +350,18 @@ function htmlPage(config) {
     async function onCreateExtraction() {
       setStatus(extractStatusEl, "Creating extraction...", "");
       try {
-        const description = document.getElementById("description").value.trim();
-        const author = document.getElementById("author").value.trim();
-        const creationTime = document.getElementById("creationTime").value.trim();
+        const fileInput = document.getElementById("pngFile");
+        const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+        if (!file) {
+          throw new Error("Select a MidJourney PNG file first");
+        }
+        const fileBase64 = await readFileAsBase64(file);
         const payload = {
-          metadataFields: [
-            { key: "Description", value: description },
-            { key: "Author", value: author },
-            { key: "Creation Time", value: creationTime },
-          ],
-          fileName: "browser-metadata-stub.png",
-          mimeType: "image/png",
+          fileName: file.name || "upload.png",
+          mimeType: file.type || "image/png",
+          fileBase64,
         };
-        const json = await apiRequest("/api/recommendation-extractions", {
+        const json = await apiRequest("/api/recommendation-extractions/upload", {
           method: "POST",
           body: JSON.stringify(payload),
         });
@@ -359,7 +372,7 @@ function htmlPage(config) {
         renderExtraction(json.extraction);
         sessionMetaEl.hidden = true;
         resultsEl.innerHTML = "";
-        setStatus(extractStatusEl, "Extraction created. Review and confirm to continue.", "ok");
+        setStatus(extractStatusEl, "PNG metadata extracted. Review and confirm to continue.", "ok");
       } catch (error) {
         setStatus(extractStatusEl, error.message, "error");
       }
@@ -469,6 +482,92 @@ async function requestHandler(config, req, res) {
 
   if (method === "POST" && path === "/api/recommendation-extractions") {
     await proxyRequest(config, req, res, "/recommendation-extractions");
+    return;
+  }
+
+  if (method === "POST" && path === "/api/recommendation-extractions/upload") {
+    const token = req.headers["x-auth-token"];
+    if (!token || typeof token !== "string" || token.trim() === "") {
+      sendJson(res, 401, {
+        error: {
+          code: "UNAUTHORIZED",
+          message: "x-auth-token header is required",
+        },
+      });
+      return;
+    }
+
+    let uploadBody;
+    try {
+      uploadBody = await parseJsonBody(req);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: {
+          code: "INVALID_REQUEST",
+          message: error.message,
+        },
+      });
+      return;
+    }
+
+    const fileName = String(uploadBody.fileName || "upload.png");
+    const mimeType = String(uploadBody.mimeType || "image/png");
+    const fileBase64 = String(uploadBody.fileBase64 || "").trim();
+    if (!fileBase64) {
+      sendJson(res, 400, {
+        error: {
+          code: "INVALID_REQUEST",
+          message: "fileBase64 is required",
+        },
+      });
+      return;
+    }
+
+    let pngBytes;
+    try {
+      pngBytes = Buffer.from(fileBase64, "base64");
+    } catch (_error) {
+      sendJson(res, 400, {
+        error: {
+          code: "INVALID_REQUEST",
+          message: "fileBase64 must be valid base64",
+        },
+      });
+      return;
+    }
+
+    let extracted;
+    try {
+      extracted = extractMidjourneyFieldsFromPngBuffer(pngBytes);
+    } catch (error) {
+      sendJson(res, 400, {
+        error: {
+          code: "INVALID_REQUEST",
+          message: "PNG metadata extraction failed",
+          details: {
+            reason: error.message,
+          },
+        },
+      });
+      return;
+    }
+
+    const targetUrl = `${config.apiBaseUrl}/recommendation-extractions`;
+    const response = await fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token.trim()}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        metadataFields: extracted.metadataFields,
+        fileName,
+        mimeType,
+      }),
+    });
+
+    const responseJson = await response.json().catch(() => ({}));
+    sendJson(res, response.status, responseJson);
     return;
   }
 

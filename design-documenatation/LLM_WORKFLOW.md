@@ -24,6 +24,7 @@ Always anchor tasks to:
 6. `design-documenatation/IMPLEMENTATION_PLAN.md`
 7. `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
 8. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+9. `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
 
 ## New Task Start Template
 
@@ -117,3 +118,58 @@ Pause and re-scope when:
 1. Predictable task execution with low drift.
 2. Minimal context-window degradation effects.
 3. Clean handoffs between chats with no decision loss.
+
+## Trait Synonym Squashing Policy
+
+Use this policy for trait taxonomy analysis/discovery so labels stay stable over time.
+Reference schema draft:
+- `design-documenatation/TRAIT_TAXONOMY_SCHEMA_DRAFT.json`
+- `design-documenatation/TRAIT_TAXONOMY_SQL_DRAFT.sql`
+
+1. Canonical-first registry:
+- Every trait maps to one `canonical_trait_id` and one display label.
+- All variants map through `trait_aliases` -> `canonical_trait_id`.
+
+2. Normalize before lookup:
+- lowercase
+- trim whitespace
+- convert hyphen/underscore to spaces
+- collapse repeated spaces
+- singularize simple plurals where safe
+
+3. Alias resolution order:
+- exact canonical label match
+- exact alias match
+- normalized string match
+- embedding-assisted candidate merge (see thresholds below)
+
+4. Auto-merge thresholds (both required):
+- lexical similarity threshold: Jaccard token similarity `>= 0.70`
+- semantic similarity threshold: embedding cosine similarity `>= 0.88`
+
+5. Manual-review gate:
+- If either threshold fails, do not auto-merge.
+- If term is semantically close but definition intent differs, do not merge; route to review.
+
+6. Ambiguity denylist:
+- Reject vague labels such as `style`, `quality`, `nice lighting`, `good colors`.
+- Require concrete remap to approved trait family/definition.
+
+7. Versioning and audit:
+- Persist alias decisions with `taxonomy_version`, timestamp, and reviewer/source.
+- Never hard-delete aliases; mark deprecated when replaced.
+- Re-analysis/replay should use the taxonomy version active at original scoring time.
+
+8. Discovery-mode boundary:
+- Open-trait discovery may propose candidates, but production scoring must use canonical traits only until approved.
+
+### Synonym Examples
+
+1. Merge to `color.temperature_bias`:
+- `cool palette`, `cool-toned`, `cold color cast`
+
+2. Merge to `color.saturation_level`:
+- `muted color`, `low saturation`, `desaturated look`
+
+3. Do not auto-merge:
+- `cinematic` -> could map to mood, lighting, grade, or composition; requires manual review.
