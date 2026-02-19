@@ -17,6 +17,9 @@
     "db:rollback": "node scripts/db/migrate.js rollback",
     "db:reset": "node scripts/db/migrate.js reset",
     "storage:smoke": "node scripts/storage/smoke.js",
-    "recommendation:smoke": "node scripts/recommendation/smoke.js"
+    "recommendation:smoke": "node scripts/recommendation/smoke.js",
+    "feedback:foundation-check": "node scripts/feedback/foundation-check.js",
+    "feedback:service-smoke": "node scripts/feedback/service-smoke.js",
+    "feedback:frontend-proxy-smoke": "node scripts/feedback/frontend-proxy-smoke.js"
   }
 }

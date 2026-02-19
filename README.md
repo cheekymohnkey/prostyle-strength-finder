@@ -217,3 +217,100 @@ Response (`200`) shape:
   }
 }
 ```
+
+## Feedback API Quick Reference (Epic C Step 2)
+
+All endpoints below require:
+- `Authorization: Bearer <jwt>`
+
+### 1) Upload generated image
+
+- `POST /v1/generated-images`
+
+Request (example):
+
+```json
+{
+  "recommendationSessionId": "rs_<uuid>",
+  "fileName": "my-result.png",
+  "mimeType": "image/png",
+  "fileBase64": "<base64-image-bytes>"
+}
+```
+
+Response (`201`) shape:
+
+```json
+{
+  "generatedImage": {
+    "generatedImageId": "img_<uuid>",
+    "recommendationSessionId": "rs_<uuid>",
+    "storageUri": "local://...",
+    "mimeType": "image/png",
+    "sizeBytes": 12345
+  }
+}
+```
+
+### 2) Submit post-result feedback + alignment
+
+- `POST /v1/post-result-feedback`
+
+Request (image + emoji example):
+
+```json
+{
+  "recommendationSessionId": "rs_<uuid>",
+  "recommendationId": "rec_<uuid>",
+  "generatedImageId": "img_<uuid>",
+  "emojiRating": "🙂",
+  "usefulFlag": true,
+  "comments": "Strong match to expected mood."
+}
+```
+
+### 3) Get one feedback record + alignment
+
+- `GET /v1/post-result-feedback/:feedbackId`
+
+### 4) List session feedback records
+
+- `GET /v1/recommendation-sessions/:sessionId/post-result-feedback`
+
+Response (`201`) shape:
+
+```json
+{
+  "feedback": {
+    "feedbackId": "fb_<uuid>",
+    "evidenceStrength": "normal"
+  },
+  "alignment": {
+    "alignmentEvaluationId": "ae_<uuid>",
+    "alignmentScore": 0.85,
+    "confidenceDelta": 0.12
+  }
+}
+```
+
+## Feedback Service Smoke
+
+Use this sequence for reproducible Epic C Step 2 verification:
+
+1. `set -a && source .env.local.example && set +a`
+2. `npm run db:reset`
+3. `npm run feedback:service-smoke`
+
+Expected signal:
+- `image + emoji` yields `evidenceStrength: "normal"` with larger bounded delta.
+- `emoji-only` yields `evidenceStrength: "minor"` with smaller bounded delta.
+
+## Frontend Feedback Proxy Smoke
+
+Use this sequence to validate frontend -> API feedback proxy routes:
+
+1. `set -a && source .env.local.example && set +a`
+2. `npm run feedback:frontend-proxy-smoke`
+
+Expected signal:
+- smoke returns `ok: true` with generated-image upload, feedback submit, and feedback retrieval/list via frontend `/api/*` proxy routes.

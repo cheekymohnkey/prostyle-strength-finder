@@ -19,6 +19,14 @@ const {
   listRecommendationsBySessionId,
   insertRecommendation,
   getRecommendationCountBySessionId,
+  getRecommendationById,
+  insertGeneratedImage,
+  getGeneratedImageById,
+  insertPostResultFeedback,
+  getPostResultFeedbackById,
+  listPostResultFeedbackBySessionId,
+  insertAlignmentEvaluation,
+  getAlignmentEvaluationByFeedbackId,
   listActiveStyleInfluenceCombinations,
   updateRecommendationSessionStatus,
 } = require("../../../scripts/db/repository");
@@ -34,6 +42,8 @@ const {
   validateRecommendationSubmitPayload,
   validateRecommendationExtractionPayload,
   validateRecommendationExtractionConfirmPayload,
+  validateGeneratedImageUploadPayload,
+  validateFeedbackEvaluationPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -336,6 +346,137 @@ function logJson(level, message, fields) {
   );
 }
 
+function extensionForMimeType(mimeType) {
+  if (mimeType === "image/png") {
+    return "png";
+  }
+  if (mimeType === "image/jpeg") {
+    return "jpg";
+  }
+  if (mimeType === "image/webp") {
+    return "webp";
+  }
+  return "bin";
+}
+
+function emojiToScore(emojiRating) {
+  if (emojiRating === "🙂") {
+    return 1;
+  }
+  if (emojiRating === "☹️") {
+    return -1;
+  }
+  return null;
+}
+
+function usefulToScore(usefulFlag) {
+  if (usefulFlag === true) {
+    return 1;
+  }
+  if (usefulFlag === false) {
+    return -1;
+  }
+  return null;
+}
+
+function computeEvidenceStrength(input) {
+  const hasImage = typeof input.generatedImageId === "string" && input.generatedImageId.trim() !== "";
+  const hasEmoji = typeof input.emojiRating === "string" && input.emojiRating.trim() !== "";
+  if (hasImage && hasEmoji) {
+    return "normal";
+  }
+  if (hasEmoji) {
+    return "minor";
+  }
+  if (hasImage) {
+    return "normal";
+  }
+  return "minor";
+}
+
+function evaluateFeedbackAlignment(input) {
+  const signals = [];
+  const emojiSignal = emojiToScore(input.emojiRating);
+  if (emojiSignal !== null) {
+    signals.push(emojiSignal);
+  }
+  const usefulSignal = usefulToScore(input.usefulFlag);
+  if (usefulSignal !== null) {
+    signals.push(usefulSignal);
+  }
+  const sentiment = signals.length === 0
+    ? 0
+    : (signals.reduce((sum, value) => sum + value, 0) / signals.length);
+
+  const evidenceStrength = computeEvidenceStrength(input);
+  const baseImpact = evidenceStrength === "normal" ? 0.12 : 0.03;
+  const confidenceDelta = Number(clamp(sentiment * baseImpact, -0.25, 0.25).toFixed(3));
+
+  const hasImage = typeof input.generatedImageId === "string" && input.generatedImageId.trim() !== "";
+  const baseline = hasImage ? 0.64 : 0.52;
+  const alignmentScore = Number(clamp(baseline + (confidenceDelta * 1.8), 0, 1).toFixed(3));
+
+  let mismatchSummary = "Result aligns with expected visual intent.";
+  if (confidenceDelta < 0) {
+    mismatchSummary = hasImage
+      ? "Observed output diverges from expected composition/tone in the provided image."
+      : "Feedback indicates mismatch risk, but confidence impact remains minor without image evidence.";
+  } else if (confidenceDelta === 0) {
+    mismatchSummary = hasImage
+      ? "Partial alignment; keep current direction and refine one control at a time."
+      : "Neutral feedback signal; additional evidentiary image would improve alignment confidence.";
+  }
+
+  const suggestedPromptAdjustments = confidenceDelta < 0
+    ? [
+      "Add explicit lighting and composition constraints in the prompt.",
+      "Reduce ambiguity by specifying subject priority and mood directly.",
+    ]
+    : [
+      "Keep current prompt structure and iterate with one targeted modifier.",
+    ];
+
+  return {
+    evidenceStrength,
+    alignmentScore,
+    confidenceDelta,
+    mismatchSummary,
+    suggestedPromptAdjustments,
+  };
+}
+
+function mapFeedbackRow(row) {
+  return {
+    feedbackId: row.feedback_id,
+    recommendationSessionId: row.recommendation_session_id,
+    recommendationId: row.recommendation_id,
+    generatedImageId: row.generated_image_id,
+    emojiRating: row.emoji_rating,
+    usefulFlag: row.useful_flag === null ? null : Boolean(row.useful_flag),
+    comments: row.comments,
+    evidenceStrength: row.evidence_strength,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapAlignmentRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    alignmentEvaluationId: row.alignment_evaluation_id,
+    feedbackId: row.feedback_id,
+    alignmentScore: row.alignment_score,
+    mismatchSummary: row.mismatch_summary,
+    suggestedPromptAdjustments: JSON.parse(row.suggested_prompt_adjustments_json || "[]"),
+    alternativeCombinationIds: JSON.parse(row.alternative_combination_ids_json || "[]"),
+    confidenceDelta: row.confidence_delta,
+    createdAt: row.created_at,
+  };
+}
+
 function sendJson(res, statusCode, payload, ctx) {
   res.writeHead(statusCode, {
     "content-type": "application/json",
@@ -379,7 +520,7 @@ function createJobEnvelope(submitBody) {
   return validateAnalysisJobEnvelope(envelope);
 }
 
-async function requestHandler(req, res, config, dbPath, queueAdapter) {
+async function requestHandler(req, res, config, dbPath, queueAdapter, storageAdapter) {
   const ctx = createRequestContext(req, config);
   const url = new URL(req.url, "http://localhost");
   const method = req.method || "GET";
@@ -618,7 +759,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
     return;
   }
 
-  if (method === "GET" && path.startsWith("/v1/recommendation-sessions/")) {
+  if (method === "GET"
+    && path.startsWith("/v1/recommendation-sessions/")
+    && !path.endsWith("/post-result-feedback")) {
     const sessionId = path.slice("/v1/recommendation-sessions/".length);
     const session = getRecommendationSessionById(dbPath, sessionId);
 
@@ -688,6 +831,231 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
             };
           }),
         },
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/generated-images") {
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateGeneratedImageUploadPayload(body);
+      const session = getRecommendationSessionById(dbPath, payload.recommendationSessionId);
+      if (!session) {
+        sendError(res, 404, "NOT_FOUND", "Recommendation session not found", ctx);
+        return;
+      }
+      if (session.user_id !== authenticatedUserId) {
+        sendError(res, 403, "FORBIDDEN", "Recommendation session is not accessible", ctx);
+        return;
+      }
+
+      const buffer = Buffer.from(payload.fileBase64, "base64");
+      if (!buffer || buffer.length === 0) {
+        sendError(res, 400, "INVALID_REQUEST", "Generated image upload failed validation", ctx, {
+          reason: "fileBase64 decoded to empty payload",
+        });
+        return;
+      }
+      if (buffer.length > 8_000_000) {
+        sendError(res, 400, "INVALID_REQUEST", "Generated image upload failed validation", ctx, {
+          reason: "decoded image exceeds 8MB limit",
+        });
+        return;
+      }
+
+      const generatedImageId = `img_${crypto.randomUUID()}`;
+      const ext = extensionForMimeType(payload.mimeType);
+      const key = `generated/${session.session_id}/${generatedImageId}.${ext}`;
+      const put = await storageAdapter.putObject({
+        key,
+        body: buffer,
+        contentType: payload.mimeType,
+        metadata: {
+          recommendation_session_id: session.session_id,
+          uploaded_by: authenticatedUserId,
+          created_at: new Date().toISOString(),
+        },
+      });
+
+      insertGeneratedImage(dbPath, {
+        generatedImageId,
+        recommendationSessionId: session.session_id,
+        sourceType: "generated",
+        storageKey: put.key,
+        storageUri: put.storageUri,
+        mimeType: payload.mimeType,
+        fileName: payload.fileName,
+        sizeBytes: put.sizeBytes,
+        uploadedBy: authenticatedUserId,
+      });
+
+      sendJson(
+        res,
+        201,
+        {
+          generatedImage: {
+            generatedImageId,
+            recommendationSessionId: session.session_id,
+            storageKey: put.key,
+            storageUri: put.storageUri,
+            mimeType: payload.mimeType,
+            fileName: payload.fileName,
+            sizeBytes: put.sizeBytes,
+          },
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Generated image upload failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST" && path === "/v1/post-result-feedback") {
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateFeedbackEvaluationPayload(body);
+      const session = getRecommendationSessionById(dbPath, payload.recommendationSessionId);
+      if (!session) {
+        sendError(res, 404, "NOT_FOUND", "Recommendation session not found", ctx);
+        return;
+      }
+      if (session.user_id !== authenticatedUserId) {
+        sendError(res, 403, "FORBIDDEN", "Recommendation session is not accessible", ctx);
+        return;
+      }
+
+      const recommendation = getRecommendationById(dbPath, payload.recommendationId);
+      if (!recommendation || recommendation.recommendation_session_id !== session.session_id) {
+        sendError(res, 400, "INVALID_REQUEST", "Feedback recommendation linkage is invalid", ctx, {
+          reason: "recommendationId does not belong to recommendationSessionId",
+        });
+        return;
+      }
+
+      if (payload.generatedImageId) {
+        const generatedImage = getGeneratedImageById(dbPath, payload.generatedImageId);
+        if (!generatedImage || generatedImage.recommendation_session_id !== session.session_id) {
+          sendError(res, 400, "INVALID_REQUEST", "Feedback generated image linkage is invalid", ctx, {
+            reason: "generatedImageId does not belong to recommendationSessionId",
+          });
+          return;
+        }
+      }
+
+      const feedbackId = `fb_${crypto.randomUUID()}`;
+      const alignmentEvaluationId = `ae_${crypto.randomUUID()}`;
+      const evaluation = evaluateFeedbackAlignment(payload);
+
+      insertPostResultFeedback(dbPath, {
+        feedbackId,
+        recommendationSessionId: payload.recommendationSessionId,
+        recommendationId: payload.recommendationId,
+        generatedImageId: payload.generatedImageId,
+        emojiRating: payload.emojiRating,
+        usefulFlag: payload.usefulFlag,
+        comments: payload.comments,
+        evidenceStrength: evaluation.evidenceStrength,
+        createdBy: authenticatedUserId,
+      });
+      insertAlignmentEvaluation(dbPath, {
+        alignmentEvaluationId,
+        feedbackId,
+        alignmentScore: evaluation.alignmentScore,
+        mismatchSummary: evaluation.mismatchSummary,
+        suggestedPromptAdjustments: evaluation.suggestedPromptAdjustments,
+        alternativeCombinationIds: evaluation.confidenceDelta < 0
+          ? [recommendation.combination_id]
+          : [],
+        confidenceDelta: evaluation.confidenceDelta,
+      });
+
+      const storedFeedback = getPostResultFeedbackById(dbPath, feedbackId);
+      sendJson(
+        res,
+        201,
+        {
+          feedback: mapFeedbackRow(storedFeedback),
+          alignment: {
+            alignmentEvaluationId,
+            feedbackId,
+            alignmentScore: evaluation.alignmentScore,
+            mismatchSummary: evaluation.mismatchSummary,
+            suggestedPromptAdjustments: evaluation.suggestedPromptAdjustments,
+            alternativeCombinationIds: evaluation.confidenceDelta < 0 ? [recommendation.combination_id] : [],
+            confidenceDelta: evaluation.confidenceDelta,
+          },
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Post-result feedback failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path.startsWith("/v1/post-result-feedback/")) {
+    const feedbackId = path.slice("/v1/post-result-feedback/".length);
+    const feedback = getPostResultFeedbackById(dbPath, feedbackId);
+    if (!feedback) {
+      sendError(res, 404, "NOT_FOUND", "Post-result feedback not found", ctx);
+      return;
+    }
+
+    const session = getRecommendationSessionById(dbPath, feedback.recommendation_session_id);
+    if (!session || session.user_id !== authenticatedUserId) {
+      sendError(res, 403, "FORBIDDEN", "Post-result feedback is not accessible", ctx);
+      return;
+    }
+
+    const alignment = getAlignmentEvaluationByFeedbackId(dbPath, feedbackId);
+    sendJson(
+      res,
+      200,
+      {
+        feedback: mapFeedbackRow(feedback),
+        alignment: mapAlignmentRow(alignment),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/v1/recommendation-sessions/") && path.endsWith("/post-result-feedback")) {
+    const sessionId = path.slice("/v1/recommendation-sessions/".length, -"/post-result-feedback".length);
+    const session = getRecommendationSessionById(dbPath, sessionId);
+    if (!session) {
+      sendError(res, 404, "NOT_FOUND", "Recommendation session not found", ctx);
+      return;
+    }
+    if (session.user_id !== authenticatedUserId) {
+      sendError(res, 403, "FORBIDDEN", "Recommendation session is not accessible", ctx);
+      return;
+    }
+
+    const feedbackRows = listPostResultFeedbackBySessionId(dbPath, sessionId);
+    const feedback = feedbackRows.map((row) => {
+      const alignment = getAlignmentEvaluationByFeedbackId(dbPath, row.feedback_id);
+      return {
+        ...mapFeedbackRow(row),
+        alignment: mapAlignmentRow(alignment),
+      };
+    });
+
+    sendJson(
+      res,
+      200,
+      {
+        recommendationSessionId: sessionId,
+        feedback,
       },
       ctx
     );
@@ -828,7 +1196,7 @@ function main() {
     endpoint: config.storage.endpoint,
   });
   const server = http.createServer((req, res) => {
-    requestHandler(req, res, config, dbPath, queueAdapter).catch((error) => {
+    requestHandler(req, res, config, dbPath, queueAdapter, storageAdapter).catch((error) => {
       const ctx = createRequestContext(req, config);
       logJson("error", "api.request.unhandled_error", {
         request_id: ctx.requestId,

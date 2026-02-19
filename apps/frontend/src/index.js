@@ -171,8 +171,8 @@ function htmlPage(config) {
 <body>
   <div class="wrap">
     <div class="hero">
-      <h1>Recommendation Flow (MVP-1)</h1>
-      <p>Extraction review -> explicit confirm -> ranked results. Frontend proxies API calls to avoid CORS issues.</p>
+      <h1>Recommendation + Feedback Flow (MVP-1/2)</h1>
+      <p>Extraction review -> confirm -> ranked results -> optional post-result feedback. Frontend proxies API calls to avoid CORS issues.</p>
     </div>
 
     <div class="card" style="margin-bottom:16px;">
@@ -224,12 +224,52 @@ function htmlPage(config) {
       <div id="sessionMeta" class="meta" hidden></div>
       <div id="results" class="result-list"></div>
     </section>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>4) Post-Result Feedback</h2>
+      <div class="row">
+        <label for="feedbackRecommendation">Recommendation</label>
+        <select id="feedbackRecommendation"></select>
+      </div>
+      <div class="row">
+        <label for="generatedImageFile">Generated Image (optional)</label>
+        <input id="generatedImageFile" type="file" accept="image/png,image/jpeg,image/webp" />
+      </div>
+      <div class="row">
+        <label for="emojiRating">Emoji Rating (optional)</label>
+        <select id="emojiRating">
+          <option value="">(none)</option>
+          <option value="🙂">🙂</option>
+          <option value="☹️">☹️</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="usefulFlag">Useful? (optional)</label>
+        <select id="usefulFlag">
+          <option value="">(none)</option>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="feedbackComments">Comments (optional)</label>
+        <textarea id="feedbackComments" placeholder="What matched or missed?"></textarea>
+      </div>
+      <div class="actions">
+        <button id="btnSubmitFeedback" type="button" disabled>Submit Feedback</button>
+        <button id="btnFetchFeedback" type="button" class="secondary" disabled>Fetch Feedback</button>
+      </div>
+      <p id="feedbackStatus" class="status"></p>
+      <div id="feedbackMeta" class="meta" hidden></div>
+      <div id="feedbackList" class="result-list"></div>
+    </section>
   </div>
 
   <script>
     const state = {
       extractionId: null,
       sessionId: null,
+      recommendationIds: [],
     };
 
     const authTokenEl = document.getElementById("authToken");
@@ -240,6 +280,11 @@ function htmlPage(config) {
     const resultsEl = document.getElementById("results");
     const confirmBtn = document.getElementById("btnConfirm");
     const fetchSessionBtn = document.getElementById("btnFetchSession");
+    const submitFeedbackBtn = document.getElementById("btnSubmitFeedback");
+    const fetchFeedbackBtn = document.getElementById("btnFetchFeedback");
+    const feedbackStatusEl = document.getElementById("feedbackStatus");
+    const feedbackMetaEl = document.getElementById("feedbackMeta");
+    const feedbackListEl = document.getElementById("feedbackList");
 
     function setStatus(el, message, tone) {
       el.textContent = message || "";
@@ -280,7 +325,7 @@ function htmlPage(config) {
       return json;
     }
 
-    function readFileAsBase64(file) {
+    function readFileAsBase64(file, contextLabel) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
@@ -288,13 +333,13 @@ function htmlPage(config) {
           const marker = ";base64,";
           const idx = value.indexOf(marker);
           if (idx < 0) {
-            reject(new Error("Failed to encode PNG as base64 payload"));
+            reject(new Error("Failed to encode " + contextLabel + " as base64 payload"));
             return;
           }
           resolve(value.slice(idx + marker.length));
         };
         reader.onerror = () => {
-          reject(new Error("Failed reading PNG file"));
+          reject(new Error("Failed reading " + contextLabel + " file"));
         };
         reader.readAsDataURL(file);
       });
@@ -320,6 +365,18 @@ function htmlPage(config) {
 
       resultsEl.innerHTML = "";
       const recommendations = Array.isArray(session.recommendations) ? session.recommendations : [];
+      state.recommendationIds = recommendations.map((rec) => rec.recommendationId).filter(Boolean);
+      const feedbackRecommendationEl = document.getElementById("feedbackRecommendation");
+      feedbackRecommendationEl.innerHTML = "";
+      for (const rec of recommendations) {
+        const option = document.createElement("option");
+        option.value = rec.recommendationId;
+        option.textContent = "#" + rec.rank + " - " + rec.combinationId + " (" + rec.recommendationId + ")";
+        feedbackRecommendationEl.appendChild(option);
+      }
+      submitFeedbackBtn.disabled = recommendations.length === 0;
+      fetchFeedbackBtn.disabled = recommendations.length === 0;
+
       if (recommendations.length === 0) {
         const empty = document.createElement("div");
         empty.className = "status";
@@ -347,6 +404,36 @@ function htmlPage(config) {
       }
     }
 
+    function renderFeedbackCollection(items) {
+      feedbackListEl.innerHTML = "";
+      const list = Array.isArray(items) ? items : [];
+      if (list.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "status";
+        empty.textContent = "No feedback submitted for this session yet.";
+        feedbackListEl.appendChild(empty);
+        return;
+      }
+      for (const item of list) {
+        const card = document.createElement("article");
+        card.className = "rec";
+        const alignment = item.alignment || {};
+        const suggestions = Array.isArray(alignment.suggestedPromptAdjustments) ? alignment.suggestedPromptAdjustments : [];
+        card.innerHTML = \`
+          <div class="rec-head">
+            <strong>Feedback \${item.feedbackId}</strong>
+            <span class="badge">\${item.evidenceStrength || "minor"}</span>
+          </div>
+          <div><strong>Emoji:</strong> \${item.emojiRating || "(none)"} | <strong>Useful:</strong> \${item.usefulFlag === null ? "(none)" : item.usefulFlag}</div>
+          <div><strong>Comments:</strong> \${item.comments || "(none)"}</div>
+          <div style="margin-top:6px;"><strong>Alignment Score:</strong> \${alignment.alignmentScore ?? "n/a"} | <strong>Delta:</strong> \${alignment.confidenceDelta ?? "n/a"}</div>
+          <div style="margin-top:6px;"><strong>Mismatch:</strong> \${alignment.mismatchSummary || "n/a"}</div>
+          <div style="margin-top:6px;"><strong>Prompt Adjustments:</strong>\${suggestions.length ? "<ul>" + suggestions.map((x) => "<li>" + x + "</li>").join("") + "</ul>" : " none"}</div>
+        \`;
+        feedbackListEl.appendChild(card);
+      }
+    }
+
     async function onCreateExtraction() {
       setStatus(extractStatusEl, "Creating extraction...", "");
       try {
@@ -355,7 +442,7 @@ function htmlPage(config) {
         if (!file) {
           throw new Error("Select a MidJourney PNG file first");
         }
-        const fileBase64 = await readFileAsBase64(file);
+        const fileBase64 = await readFileAsBase64(file, "PNG");
         const payload = {
           fileName: file.name || "upload.png",
           mimeType: file.type || "image/png",
@@ -375,6 +462,83 @@ function htmlPage(config) {
         setStatus(extractStatusEl, "PNG metadata extracted. Review and confirm to continue.", "ok");
       } catch (error) {
         setStatus(extractStatusEl, error.message, "error");
+      }
+    }
+
+    async function onSubmitFeedback() {
+      if (!state.sessionId) {
+        setStatus(feedbackStatusEl, "Load a recommendation session first.", "error");
+        return;
+      }
+
+      setStatus(feedbackStatusEl, "Submitting feedback...", "");
+      try {
+        const recommendationId = document.getElementById("feedbackRecommendation").value;
+        if (!recommendationId) {
+          throw new Error("Select a recommendation first");
+        }
+
+        const generatedImageInput = document.getElementById("generatedImageFile");
+        const generatedImage = generatedImageInput && generatedImageInput.files ? generatedImageInput.files[0] : null;
+        let generatedImageId = null;
+        if (generatedImage) {
+          const imageBase64 = await readFileAsBase64(generatedImage, "generated image");
+          const uploadJson = await apiRequest("/api/generated-images", {
+            method: "POST",
+            body: JSON.stringify({
+              recommendationSessionId: state.sessionId,
+              fileName: generatedImage.name || "generated.png",
+              mimeType: generatedImage.type || "image/png",
+              fileBase64: imageBase64,
+            }),
+          });
+          generatedImageId = uploadJson.generatedImage.generatedImageId;
+        }
+
+        const emojiRating = document.getElementById("emojiRating").value || null;
+        const usefulRaw = document.getElementById("usefulFlag").value;
+        const usefulFlag = usefulRaw === "" ? null : usefulRaw === "true";
+        const comments = document.getElementById("feedbackComments").value.trim() || null;
+
+        const payload = {
+          recommendationSessionId: state.sessionId,
+          recommendationId,
+          generatedImageId,
+          emojiRating,
+          usefulFlag,
+          comments,
+        };
+
+        const json = await apiRequest("/api/post-result-feedback", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        feedbackMetaEl.hidden = false;
+        feedbackMetaEl.innerHTML =
+          "<div><strong>Feedback:</strong> " + json.feedback.feedbackId + "</div>" +
+          "<div><strong>Evidence Strength:</strong> " + json.feedback.evidenceStrength + "</div>" +
+          "<div><strong>Alignment:</strong> " + json.alignment.alignmentScore + " (delta " + json.alignment.confidenceDelta + ")</div>";
+        setStatus(feedbackStatusEl, "Feedback submitted.", "ok");
+        await onFetchFeedback();
+      } catch (error) {
+        setStatus(feedbackStatusEl, error.message, "error");
+      }
+    }
+
+    async function onFetchFeedback() {
+      if (!state.sessionId) {
+        setStatus(feedbackStatusEl, "Load a recommendation session first.", "error");
+        return;
+      }
+      setStatus(feedbackStatusEl, "Loading feedback...", "");
+      try {
+        const json = await apiRequest("/api/recommendation-sessions/" + encodeURIComponent(state.sessionId) + "/post-result-feedback", {
+          method: "GET",
+        });
+        renderFeedbackCollection(json.feedback || []);
+        setStatus(feedbackStatusEl, "Feedback loaded.", "ok");
+      } catch (error) {
+        setStatus(feedbackStatusEl, error.message, "error");
       }
     }
 
@@ -423,6 +587,8 @@ function htmlPage(config) {
     document.getElementById("btnExtract").addEventListener("click", onCreateExtraction);
     document.getElementById("btnConfirm").addEventListener("click", onConfirm);
     document.getElementById("btnFetchSession").addEventListener("click", onFetchSession);
+    document.getElementById("btnSubmitFeedback").addEventListener("click", onSubmitFeedback);
+    document.getElementById("btnFetchFeedback").addEventListener("click", onFetchFeedback);
   </script>
 </body>
 </html>`;
@@ -594,12 +760,44 @@ async function requestHandler(config, req, res) {
   }
 
   if (method === "GET" && path.startsWith("/api/recommendation-sessions/")) {
+    if (path.endsWith("/post-result-feedback")) {
+      const sessionId = path.slice("/api/recommendation-sessions/".length, -"/post-result-feedback".length);
+      await proxyRequest(
+        config,
+        req,
+        res,
+        `/recommendation-sessions/${encodeURIComponent(sessionId)}/post-result-feedback`
+      );
+      return;
+    }
+
     const sessionId = path.slice("/api/recommendation-sessions/".length);
     await proxyRequest(
       config,
       req,
       res,
       `/recommendation-sessions/${encodeURIComponent(sessionId)}`
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/api/generated-images") {
+    await proxyRequest(config, req, res, "/generated-images");
+    return;
+  }
+
+  if (method === "POST" && path === "/api/post-result-feedback") {
+    await proxyRequest(config, req, res, "/post-result-feedback");
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/api/post-result-feedback/")) {
+    const feedbackId = path.slice("/api/post-result-feedback/".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/post-result-feedback/${encodeURIComponent(feedbackId)}`
     );
     return;
   }

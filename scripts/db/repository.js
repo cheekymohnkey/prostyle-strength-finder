@@ -353,6 +353,131 @@ function getRecommendationCountBySessionId(dbPath, sessionId) {
   return Number(rows[0]?.recommendation_count || 0);
 }
 
+function getRecommendationById(dbPath, recommendationId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT recommendation_id, recommendation_session_id, rank, combination_id,
+            rationale, confidence, risk_notes_json, prompt_improvements_json, created_at
+     FROM recommendations
+     WHERE recommendation_id = ${quote(recommendationId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertGeneratedImage(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO generated_images (
+       generated_image_id, recommendation_session_id, source_type, storage_key,
+       storage_uri, mime_type, file_name, size_bytes, uploaded_by, created_at
+     ) VALUES (
+       ${quote(input.generatedImageId)},
+       ${quote(input.recommendationSessionId)},
+       ${quote(input.sourceType || "generated")},
+       ${quote(input.storageKey)},
+       ${quote(input.storageUri)},
+       ${quote(input.mimeType)},
+       ${quote(input.fileName)},
+       ${Number(input.sizeBytes)},
+       ${quote(input.uploadedBy)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function getGeneratedImageById(dbPath, generatedImageId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT generated_image_id, recommendation_session_id, source_type, storage_key,
+            storage_uri, mime_type, file_name, size_bytes, uploaded_by, created_at
+     FROM generated_images
+     WHERE generated_image_id = ${quote(generatedImageId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertPostResultFeedback(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  const updatedAt = input.updatedAt || createdAt;
+  exec(
+    dbPath,
+    `INSERT INTO post_result_feedback (
+       feedback_id, recommendation_session_id, recommendation_id, generated_image_id,
+       emoji_rating, useful_flag, comments, evidence_strength, created_by, created_at, updated_at
+     ) VALUES (
+       ${quote(input.feedbackId)},
+       ${quote(input.recommendationSessionId)},
+       ${quote(input.recommendationId)},
+       ${quote(input.generatedImageId || null)},
+       ${quote(input.emojiRating || null)},
+       ${input.usefulFlag === null || input.usefulFlag === undefined ? "NULL" : (input.usefulFlag ? 1 : 0)},
+       ${quote(input.comments || null)},
+       ${quote(input.evidenceStrength || "minor")},
+       ${quote(input.createdBy || null)},
+       ${quote(createdAt)},
+       ${quote(updatedAt)}
+     );`
+  );
+}
+
+function getPostResultFeedbackById(dbPath, feedbackId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT feedback_id, recommendation_session_id, recommendation_id, generated_image_id,
+            emoji_rating, useful_flag, comments, evidence_strength, created_by, created_at, updated_at
+     FROM post_result_feedback
+     WHERE feedback_id = ${quote(feedbackId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listPostResultFeedbackBySessionId(dbPath, sessionId) {
+  return queryJson(
+    dbPath,
+    `SELECT feedback_id, recommendation_session_id, recommendation_id, generated_image_id,
+            emoji_rating, useful_flag, comments, evidence_strength, created_by, created_at, updated_at
+     FROM post_result_feedback
+     WHERE recommendation_session_id = ${quote(sessionId)}
+     ORDER BY created_at DESC;`
+  );
+}
+
+function insertAlignmentEvaluation(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO alignment_evaluations (
+       alignment_evaluation_id, feedback_id, alignment_score, mismatch_summary,
+       suggested_prompt_adjustments_json, alternative_combination_ids_json, confidence_delta, created_at
+     ) VALUES (
+       ${quote(input.alignmentEvaluationId)},
+       ${quote(input.feedbackId)},
+       ${Number(input.alignmentScore)},
+       ${quote(input.mismatchSummary)},
+       ${quote(JSON.stringify(input.suggestedPromptAdjustments || []))},
+       ${quote(JSON.stringify(input.alternativeCombinationIds || []))},
+       ${Number(input.confidenceDelta || 0)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function getAlignmentEvaluationByFeedbackId(dbPath, feedbackId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT alignment_evaluation_id, feedback_id, alignment_score, mismatch_summary,
+            suggested_prompt_adjustments_json, alternative_combination_ids_json, confidence_delta, created_at
+     FROM alignment_evaluations
+     WHERE feedback_id = ${quote(feedbackId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
 function listActiveStyleInfluenceCombinations(dbPath) {
   return queryJson(
     dbPath,
@@ -404,5 +529,13 @@ module.exports = {
   insertRecommendation,
   listRecommendationsBySessionId,
   getRecommendationCountBySessionId,
+  getRecommendationById,
+  insertGeneratedImage,
+  getGeneratedImageById,
+  insertPostResultFeedback,
+  getPostResultFeedbackById,
+  listPostResultFeedbackBySessionId,
+  insertAlignmentEvaluation,
+  getAlignmentEvaluationByFeedbackId,
   listActiveStyleInfluenceCombinations,
 };

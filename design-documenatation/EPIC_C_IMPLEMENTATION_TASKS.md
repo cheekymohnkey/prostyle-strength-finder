@@ -1,6 +1,6 @@
 # Prostyle Strength Finder - Epic C Implementation Tasks
 
-Status: Draft for execution  
+Status: In progress (Step 1-3 completed; verification/handoff active)  
 Date: 2026-02-19  
 Depends on:
 - `design-documenatation/DECISIONS.md`
@@ -20,6 +20,119 @@ Translate Epic C (MVP-2 Feedback Loop) into executable engineering tasks with cl
 2. Recommendation sessions and recommendation records are persisted and queryable.
 3. Frontend flow supports upload -> extraction -> confirm -> session retrieval.
 4. Epic C work should now add post-result feedback capabilities without regressing Epic B behavior.
+
+## Current Execution Snapshot (2026-02-19 Step 1 Wrap)
+
+1. What was completed:
+- C1 feedback/alignment contract validators are implemented in `packages/shared-contracts/src/post-result-feedback.js` and exported via `packages/shared-contracts/src/index.js`.
+- C2 persistence migration is implemented in `scripts/db/migrations/20260219133000_feedback_loop_entities.sql`:
+  - `post_result_feedback`
+  - `alignment_evaluations`
+- C2 repository methods are implemented in `scripts/db/repository.js`:
+  - `insertPostResultFeedback`
+  - `getPostResultFeedbackById`
+  - `listPostResultFeedbackBySessionId`
+  - `insertAlignmentEvaluation`
+  - `getAlignmentEvaluationByFeedbackId`
+- Reproducible foundation check script is implemented:
+  - `scripts/feedback/foundation-check.js`
+  - `npm run feedback:foundation-check`
+
+2. Verification run:
+- `set -a; source .env.local.example; set +a`
+- `npm run db:reset`
+- `npm run feedback:foundation-check`
+- Result: `ok: true` with persisted feedback + alignment retrieval.
+
+3. Outstanding risks/issues:
+- Image upload and storage linkage for generated output is not yet implemented (C3).
+- Alignment evaluation logic is still pending scaffold implementation (C4/C5).
+
+4. Recommended next task:
+- Execute Step 2 (`C3 + C4 + C5 Service Slice`).
+
+## Current Execution Snapshot (2026-02-19 Step 2 Wrap)
+
+1. What was completed:
+- C3 generated-image upload intake is implemented:
+  - migration `scripts/db/migrations/20260219143000_generated_images.sql`
+  - repository methods `insertGeneratedImage`/`getGeneratedImageById`
+  - API endpoint `POST /v1/generated-images` persists binary via storage adapter and metadata in DB
+- C4 deterministic alignment evaluation scaffold is implemented in API:
+  - alignment score generation
+  - mismatch summary generation
+  - prompt-adjustment suggestion generation
+  - bounded confidence delta (`[-0.25, 0.25]`)
+- C5 emoji weighting policy is implemented:
+  - `image + emoji` -> `normal` evidence strength
+  - `emoji-only` -> `minor` evidence strength
+  - confidence impact scaling reflects evidence strength and remains bounded
+- Shared contracts expanded for Step 2 payload validation:
+  - `validateGeneratedImageUploadPayload`
+  - `validateFeedbackEvaluationPayload`
+  - allowed generated-image mime-type constraints
+
+2. Verification run:
+- `set -a; source .env.local.example; set +a`
+- `npm run db:reset`
+- `npm run feedback:service-smoke`
+- Result: `ok: true`, with:
+  - `normalImpact.confidenceDelta = 0.12` (`image + emoji`)
+  - `minorImpact.confidenceDelta = -0.03` (`emoji-only`)
+
+3. Outstanding risks/issues:
+- Feedback/alignment retrieval endpoints for standalone read paths are not yet implemented.
+- Frontend feedback panel UX is not yet implemented.
+
+4. Recommended next task:
+- Execute Step 3 (`C6 + C7 + C8 End-to-End Closure`).
+
+## Current Execution Snapshot (2026-02-19 Step 3 Wrap)
+
+1. What was completed:
+- C6 feedback API endpoint set now includes:
+  - `POST /v1/post-result-feedback`
+  - `GET /v1/post-result-feedback/:feedbackId`
+  - `GET /v1/recommendation-sessions/:sessionId/post-result-feedback`
+- Ownership enforcement is validated for feedback retrieval routes.
+- C7 frontend feedback panel is implemented in `apps/frontend/src/index.js`:
+  - recommendation selector
+  - optional generated-image upload
+  - emoji/useful/comments inputs
+  - submit feedback action + feedback list retrieval/rendering
+- Frontend proxy routes for feedback endpoints are implemented and validated.
+- C8 verification smoke coverage is expanded:
+  - API service smoke: `npm run feedback:service-smoke`
+  - frontend proxy smoke: `npm run feedback:frontend-proxy-smoke`
+
+2. Verification run:
+- `set -a; source .env.local.example; set +a`
+- `npm run db:reset`
+- `npm run feedback:service-smoke`
+- `npm run feedback:frontend-proxy-smoke`
+- Result:
+  - API smoke `ok: true` including retrieval and ownership checks (`forbiddenStatus: 403`)
+  - frontend proxy smoke `ok: true` for submit + retrieval paths
+
+### Epic C Acceptance Matrix (2026-02-19)
+
+| Scope Item | Status | Evidence (file + command/output) | Gaps / Remediation |
+| --- | --- | --- | --- |
+| C1 contracts | `pass` | `packages/shared-contracts/src/post-result-feedback.js`, `packages/shared-contracts/src/index.js`; `npm run contracts` passed | No blocking gap |
+| C2 persistence/migrations | `pass` | `scripts/db/migrations/20260219133000_feedback_loop_entities.sql`, `scripts/db/repository.js`; `npm run feedback:foundation-check` passed | No blocking gap |
+| C3 image upload intake | `pass` | `scripts/db/migrations/20260219143000_generated_images.sql`, `apps/api/src/index.js` (`POST /v1/generated-images`) | No blocking gap |
+| C4 alignment scaffold | `pass` | deterministic evaluator in `apps/api/src/index.js`; `npm run feedback:service-smoke` output includes alignment payloads | Model-quality tuning deferred |
+| C5 emoji weighting policy | `pass` | `apps/api/src/index.js` weighting logic; smoke output confirms normal (`0.12`) vs minor (`-0.03`) bounded deltas | Continue monitoring weighting calibration |
+| C6 API linkage + auth | `pass` | `apps/api/src/index.js` retrieval endpoints + ownership checks; service smoke verifies `forbiddenStatus: 403` | No blocking gap |
+| C7 frontend feedback panel | `pass` | `apps/frontend/src/index.js`; `npm run feedback:frontend-proxy-smoke` passes through `/api/*` feedback routes | Visual polish optional |
+| C8 verification/handoff | `pass` | Smoke commands documented and passing in `README.md`; Epic C matrix + snapshot updated | Prepare Epic D kickoff handoff |
+
+3. Outstanding risks/issues:
+- Alignment logic is deterministic scaffold, not final learned evaluation model.
+- Feedback weighting constants may need calibration after first real usage telemetry.
+
+4. Recommended next task:
+- Begin Epic D planning and first implementation slice selection (admin + contributor essentials).
 
 ## Epic C - Feedback Loop (MVP-2)
 
@@ -233,54 +346,30 @@ Control: strict auth + ownership checks on feedback and retrieval routes.
 5. Risk: Epic C changes regress Epic B recommendation flow.  
 Control: keep Epic B smoke in pre-merge verification and isolate Epic C routes.
 
-## Detailed What's Next Instructions
+## Execution History (Step 1-3 Completed on 2026-02-19)
 
-Use this section as the execution handoff for next sessions.
+### Step 1 Completion Record
 
-### Step 1: Implement C1 + C2 Foundation
+Outcome:
+1. C1 shared contracts were added for feedback submit and alignment envelopes.
+2. C2 migrations/repository methods were added for feedback and alignment persistence.
+3. Foundation verification (`npm run feedback:foundation-check`) passed.
 
-Objective:
-- Establish contracts and persistence foundation before endpoint/UI work.
+### Step 2 Completion Record
 
-In scope:
-1. Add shared feedback/alignment contracts and validation.
-2. Add feedback/alignment migrations and repository methods.
-3. Add initial acceptance-check matrix entries for C1/C2.
+Outcome:
+1. C3 generated-image upload intake was added with storage adapter persistence.
+2. C4 deterministic alignment scaffold was implemented with bounded confidence deltas.
+3. C5 emoji weighting policy was enforced (`image+emoji` normal, `emoji-only` minor).
+4. Service verification (`npm run feedback:service-smoke`) passed.
 
-Definition of done:
-1. Contracts compile and are consumed by API layer.
-2. DB reset/migrate includes Epic C tables and indexes.
-3. Basic repository insert/get paths are testable from local scripts.
+### Step 3 Completion Record
 
-### Step 2: Implement C3 + C4 + C5 Service Slice
-
-Objective:
-- Deliver upload + alignment + weighting core service behavior.
-
-In scope:
-1. Add generated-image upload intake and storage metadata persistence.
-2. Implement deterministic alignment evaluation scaffold.
-3. Implement and enforce emoji weighting rules with bounded effects.
-
-Definition of done:
-1. Feedback submission supports both image-backed and emoji-only paths.
-2. Alignment response shape is stable and non-empty where required.
-3. Weighting behavior is verifiable via deterministic checks.
-
-### Step 3: Implement C6 + C7 + C8 End-to-End Closure
-
-Objective:
-- Expose API/UI and complete reproducible verification/handoff.
-
-In scope:
-1. Add feedback and alignment endpoints with auth/ownership enforcement.
-2. Add frontend feedback panel submission + response rendering.
-3. Add smoke runbook and Epic C acceptance matrix with evidence.
-
-Definition of done:
-1. User can complete recommendation -> feedback -> alignment flow in one session.
-2. Smoke runbook passes from clean local env.
-3. Residual gaps are listed and prioritized for Epic D/E.
+Outcome:
+1. C6 retrieval endpoints with ownership checks were added.
+2. C7 frontend feedback panel + proxy routes were implemented.
+3. C8 verification/handoff evidence was added to this document.
+4. Frontend proxy verification (`npm run feedback:frontend-proxy-smoke`) passed.
 
 ### Execution Notes
 

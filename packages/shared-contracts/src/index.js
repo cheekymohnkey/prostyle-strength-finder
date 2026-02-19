@@ -22,6 +22,14 @@ const {
   validateRecommendationExtractionPayload,
   validateRecommendationExtractionConfirmPayload,
 } = require("./recommendation-extraction");
+const {
+  FEEDBACK_EMOJI_RATINGS,
+  ALLOWED_GENERATED_IMAGE_MIME_TYPES,
+  validatePostResultFeedbackSubmitPayload,
+  validateAlignmentEvaluationEnvelope,
+  validateGeneratedImageUploadPayload,
+  validateFeedbackEvaluationPayload,
+} = require("./post-result-feedback");
 const { createApiErrorResponse } = require("./api-error");
 
 module.exports = {
@@ -44,5 +52,11 @@ module.exports = {
   isRecommendationResult,
   validateRecommendationExtractionPayload,
   validateRecommendationExtractionConfirmPayload,
+  FEEDBACK_EMOJI_RATINGS,
+  ALLOWED_GENERATED_IMAGE_MIME_TYPES,
+  validatePostResultFeedbackSubmitPayload,
+  validateAlignmentEvaluationEnvelope,
+  validateGeneratedImageUploadPayload,
+  validateFeedbackEvaluationPayload,
   createApiErrorResponse,
 };
