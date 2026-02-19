@@ -20,4 +20,4 @@ Guidelines:
 
 ## Recommendation Scripts
 
-- `npm run recommendation:smoke`: Seed minimal style-influence data and verify extraction confirm -> session retrieval returns non-empty persisted recommendations.
+- `npm run recommendation:smoke`: Seed minimal style-influence data and verify extraction confirm -> session retrieval. Includes checks for threshold policy, deterministic ordering, low-confidence labeling, and confirm idempotency.

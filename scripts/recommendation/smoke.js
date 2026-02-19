@@ -37,9 +37,16 @@ function requireEnv(key) {
   return value.trim();
 }
 
+function assertCondition(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
 function seedSmokeData(dbPath) {
   const now = new Date().toISOString();
-  const extractionId = `rex_smoke_${Date.now()}`;
+  const highConfidenceExtractionId = `rex_smoke_high_${Date.now()}`;
+  const lowConfidenceExtractionId = `rex_smoke_low_${Date.now()}`;
 
   runSql(
     dbPath,
@@ -111,6 +118,17 @@ function seedSmokeData(dbPath) {
     ON CONFLICT(combination_id) DO UPDATE SET
       active_flag = 1;
 
+    INSERT INTO style_influence_combinations (
+      combination_id, name, active_flag, created_at
+    ) VALUES (
+      'combo_studio_portrait',
+      'Studio Portrait',
+      1,
+      ${quote(now)}
+    )
+    ON CONFLICT(combination_id) DO UPDATE SET
+      active_flag = 1;
+
     INSERT OR IGNORE INTO style_influence_combination_items (
       combination_id, style_influence_id
     ) VALUES ('combo_street_editorial', 'si_profile_smoke');
@@ -119,13 +137,21 @@ function seedSmokeData(dbPath) {
       combination_id, style_influence_id
     ) VALUES ('combo_street_editorial', 'si_sref_smoke');
 
+    INSERT OR IGNORE INTO style_influence_combination_items (
+      combination_id, style_influence_id
+    ) VALUES ('combo_studio_portrait', 'si_profile_smoke');
+
+    INSERT OR IGNORE INTO style_influence_combination_items (
+      combination_id, style_influence_id
+    ) VALUES ('combo_studio_portrait', 'si_sref_smoke');
+
     INSERT INTO recommendation_extractions (
       extraction_id, status, prompt_text, author, creation_time, source_job_id,
       model_family, model_version, model_selection_source,
       is_baseline, has_profile, has_sref,
       parser_version, metadata_raw_json, created_at, confirmed_at
     ) VALUES (
-      ${quote(extractionId)},
+      ${quote(highConfidenceExtractionId)},
       'extracted',
       'cinematic portrait of a boxer in rain --ar 3:4 --v 6',
       'smoke-user',
@@ -142,10 +168,37 @@ function seedSmokeData(dbPath) {
       ${quote(now)},
       NULL
     );
+
+    INSERT INTO recommendation_extractions (
+      extraction_id, status, prompt_text, author, creation_time, source_job_id,
+      model_family, model_version, model_selection_source,
+      is_baseline, has_profile, has_sref,
+      parser_version, metadata_raw_json, created_at, confirmed_at
+    ) VALUES (
+      ${quote(lowConfidenceExtractionId)},
+      'extracted',
+      'minimal abstract geometry in monochrome',
+      'smoke-user',
+      ${quote(now)},
+      '123e4567-e89b-12d3-a456-426614174001',
+      'standard',
+      '6',
+      'prompt_flag',
+      1,
+      0,
+      0,
+      'midjourney-metadata-v1',
+      '[]',
+      ${quote(now)},
+      NULL
+    );
     `
   );
 
-  return { extractionId };
+  return {
+    highConfidenceExtractionId,
+    lowConfidenceExtractionId,
+  };
 }
 
 async function waitForHealth(baseUrl, token) {
@@ -179,7 +232,10 @@ async function main() {
   const token = buildLocalToken();
   const baseUrl = `http://127.0.0.1:${smokePort}/v1`;
 
-  const { extractionId } = seedSmokeData(dbPath);
+  const {
+    highConfidenceExtractionId,
+    lowConfidenceExtractionId,
+  } = seedSmokeData(dbPath);
 
   const apiProc = spawn("node", ["apps/api/src/index.js"], {
     env: {
@@ -197,7 +253,7 @@ async function main() {
   try {
     await waitForHealth(baseUrl, token);
 
-    const confirmResponse = await fetch(`${baseUrl}/recommendation-extractions/${extractionId}/confirm`, {
+    const confirmResponse = await fetch(`${baseUrl}/recommendation-extractions/${highConfidenceExtractionId}/confirm`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -214,9 +270,31 @@ async function main() {
     }
 
     const sessionId = confirmJson?.session?.sessionId;
-    if (!sessionId) {
-      throw new Error("Confirm response did not include session.sessionId");
+    assertCondition(Boolean(sessionId), "Confirm response did not include session.sessionId");
+
+    // Confirm again to verify idempotency for session/recommendation persistence.
+    const confirmAgainResponse = await fetch(
+      `${baseUrl}/recommendation-extractions/${highConfidenceExtractionId}/confirm`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          confirmed: true,
+          mode: "precision",
+        }),
+      }
+    );
+    const confirmAgainJson = await confirmAgainResponse.json();
+    if (!confirmAgainResponse.ok) {
+      throw new Error(`Second confirm failed (${confirmAgainResponse.status}): ${JSON.stringify(confirmAgainJson)}`);
     }
+    assertCondition(
+      confirmAgainJson?.session?.sessionId === sessionId,
+      "Idempotency failed: second confirm returned a different sessionId"
+    );
 
     const sessionResponse = await fetch(`${baseUrl}/recommendation-sessions/${sessionId}`, {
       headers: {
@@ -229,22 +307,105 @@ async function main() {
     }
 
     const recommendations = sessionJson?.session?.recommendations;
-    if (!Array.isArray(recommendations) || recommendations.length === 0) {
-      throw new Error("Smoke check failed: expected non-empty recommendations array");
+    assertCondition(Array.isArray(recommendations), "Session response recommendations is not an array");
+    assertCondition(recommendations.length > 0, "Smoke check failed: expected non-empty recommendations array");
+    assertCondition(sessionJson.session.status === "succeeded", "Expected succeeded session status");
+
+    // Deterministic ordering check (descending confidence, stable by combinationId on ties).
+    for (let i = 1; i < recommendations.length; i += 1) {
+      const prev = recommendations[i - 1];
+      const current = recommendations[i];
+      if (prev.confidence < current.confidence) {
+        throw new Error("Ordering check failed: recommendations are not sorted by confidence desc");
+      }
+      if (prev.confidence === current.confidence && String(prev.combinationId) > String(current.combinationId)) {
+        throw new Error("Ordering check failed: tie-breaker by combinationId is not stable");
+      }
     }
+
+    const precisionThreshold = 0.65;
+    for (const recommendation of recommendations) {
+      const lowConfidence = recommendation.lowConfidence || recommendation.confidenceRisk?.lowConfidence;
+      assertCondition(Boolean(lowConfidence), "Recommendation missing lowConfidence signal");
+      const passesThreshold = recommendation.confidence >= precisionThreshold;
+      const explicitlyLow = lowConfidence.isLowConfidence === true
+        && lowConfidence.reasonCode === "below_mode_threshold";
+      assertCondition(
+        passesThreshold || explicitlyLow,
+        "Threshold policy failed: recommendation is below threshold without low-confidence labeling"
+      );
+      assertCondition(typeof recommendation.rationale === "string" && recommendation.rationale.trim() !== "", "Missing rationale");
+      assertCondition(Array.isArray(recommendation.riskNotes), "Missing risk notes array");
+      assertCondition(Array.isArray(recommendation.promptImprovements), "Missing prompt improvements array");
+    }
+
+    // Verify explicit low-confidence behavior path.
+    const lowConfirmResponse = await fetch(
+      `${baseUrl}/recommendation-extractions/${lowConfidenceExtractionId}/confirm`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          confirmed: true,
+          mode: "precision",
+        }),
+      }
+    );
+    const lowConfirmJson = await lowConfirmResponse.json();
+    if (!lowConfirmResponse.ok) {
+      throw new Error(`Low-confidence confirm failed (${lowConfirmResponse.status}): ${JSON.stringify(lowConfirmJson)}`);
+    }
+    const lowSessionId = lowConfirmJson?.session?.sessionId;
+    assertCondition(Boolean(lowSessionId), "Low-confidence confirm missing sessionId");
+
+    const lowSessionResponse = await fetch(`${baseUrl}/recommendation-sessions/${lowSessionId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const lowSessionJson = await lowSessionResponse.json();
+    if (!lowSessionResponse.ok) {
+      throw new Error(`Low-confidence session fetch failed (${lowSessionResponse.status}): ${JSON.stringify(lowSessionJson)}`);
+    }
+    const lowRecommendations = lowSessionJson?.session?.recommendations || [];
+    assertCondition(lowRecommendations.length > 0, "Expected low-confidence fallback recommendation");
+    assertCondition(
+      lowRecommendations.some((item) => item.lowConfidence?.isLowConfidence === true),
+      "Expected at least one explicitly low-confidence recommendation"
+    );
 
     console.log(
       JSON.stringify(
         {
           ok: true,
-          extractionId,
-          sessionId,
-          sessionStatus: sessionJson.session.status,
-          recommendationCount: recommendations.length,
-          firstRecommendation: {
-            recommendationId: recommendations[0].recommendationId,
-            combinationId: recommendations[0].combinationId,
-            confidence: recommendations[0].confidence,
+          highConfidence: {
+            extractionId: highConfidenceExtractionId,
+            sessionId,
+            sessionStatus: sessionJson.session.status,
+            recommendationCount: recommendations.length,
+            topRecommendation: {
+              recommendationId: recommendations[0].recommendationId,
+              combinationId: recommendations[0].combinationId,
+              confidence: recommendations[0].confidence,
+            },
+          },
+          lowConfidence: {
+            extractionId: lowConfidenceExtractionId,
+            sessionId: lowSessionId,
+            sessionStatus: lowSessionJson.session.status,
+            recommendationCount: lowRecommendations.length,
+            topRecommendation: {
+              recommendationId: lowRecommendations[0].recommendationId,
+              combinationId: lowRecommendations[0].combinationId,
+              confidence: lowRecommendations[0].confidence,
+              lowConfidence: lowRecommendations[0].lowConfidence,
+            },
+          },
+          idempotency: {
+            repeatedConfirmSessionId: confirmAgainJson.session.sessionId,
           },
           port: smokePort,
           previousPort: originalPort,

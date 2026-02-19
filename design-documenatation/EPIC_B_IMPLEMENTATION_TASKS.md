@@ -35,7 +35,7 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 
 3. Outstanding risks/issues:
 - PNG binary parsing is not yet wired; current extraction endpoint expects normalized metadata field payload input.
-- Current ranking is deterministic scaffold logic (hash-based placeholder), not final domain scoring.
+- Current ranking is deterministic scaffold logic (rule-based heuristic), not final domain scoring.
 - End-to-end HTTP route smoke test for new extraction endpoints was not completed in this sandbox due process port-binding restriction (`EPERM` on `0.0.0.0:3001`).
 
 4. Recommended next task:
@@ -230,6 +230,16 @@ Example `200` response:
         "rationale": "Precision match for extracted prompt using combination combo_street_editorial.",
         "confidence": 0.717,
         "riskNotes": [],
+        "confidenceRisk": {
+          "confidence": 0.717,
+          "riskNotes": [],
+          "lowConfidence": {
+            "isLowConfidence": false
+          }
+        },
+        "lowConfidence": {
+          "isLowConfidence": false
+        },
         "promptImprovements": [
           "Try emphasizing style hints aligned with: p-9d2f sref-7ab1."
         ],

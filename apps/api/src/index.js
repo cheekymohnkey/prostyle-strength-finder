@@ -83,18 +83,79 @@ function confidenceThresholdForMode(mode) {
   return mode === "precision" ? 0.65 : 0.45;
 }
 
-function deterministicScore(seed) {
-  const hash = crypto.createHash("sha256").update(seed).digest("hex");
-  const intValue = Number.parseInt(hash.slice(0, 8), 16);
-  return intValue / 0xffffffff;
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
 
-function rankCandidatesForSession(promptText, mode, candidates) {
+function tokenize(value) {
+  return String(value || "")
+    .toLowerCase()
+    .split(/[^a-z0-9_-]+/)
+    .filter((token) => token.length >= 3);
+}
+
+function scoreCandidate({ extraction, promptText, mode, candidate }) {
+  const totalItems = Number(candidate.total_items || 0);
+  const profileItems = Number(candidate.profile_items || 0);
+  const srefItems = Number(candidate.sref_items || 0);
+  const pinnedItems = Number(candidate.pinned_items || 0);
+
+  const profileFit = extraction.has_profile
+    ? (profileItems > 0 ? 1 : 0)
+    : (profileItems === 0 ? 1 : 0.4);
+  const srefFit = extraction.has_sref
+    ? (srefItems > 0 ? 1 : 0)
+    : (srefItems === 0 ? 1 : 0.4);
+
+  const targetItems = (extraction.has_profile ? 1 : 0) + (extraction.has_sref ? 1 : 0);
+  const distance = Math.abs(totalItems - targetItems);
+  const sizeFit = clamp(1 - (distance / 3), 0, 1);
+
+  const promptTerms = new Set(tokenize(promptText));
+  const candidateTerms = new Set(tokenize(`${candidate.name || ""} ${candidate.influence_codes || ""}`));
+  let overlapCount = 0;
+  for (const token of promptTerms) {
+    if (candidateTerms.has(token)) {
+      overlapCount += 1;
+    }
+  }
+  const overlapFit = promptTerms.size > 0
+    ? clamp(overlapCount / promptTerms.size, 0, 1)
+    : 0;
+
+  const pinnedFit = clamp(pinnedItems / 2, 0, 1);
+  const sizeWeight = mode === "precision" ? 0.2 : 0.12;
+
+  const score = (
+    0.12
+    + (0.24 * profileFit)
+    + (0.24 * srefFit)
+    + (sizeWeight * sizeFit)
+    + (0.15 * overlapFit)
+    + (0.05 * pinnedFit)
+  );
+
+  return {
+    ...candidate,
+    score: clamp(score, 0, 1),
+    scoreBreakdown: {
+      profileFit: Number(profileFit.toFixed(3)),
+      srefFit: Number(srefFit.toFixed(3)),
+      sizeFit: Number(sizeFit.toFixed(3)),
+      overlapFit: Number(overlapFit.toFixed(3)),
+      pinnedFit: Number(pinnedFit.toFixed(3)),
+    },
+  };
+}
+
+function rankCandidatesForSession(extraction, mode, candidates) {
   const threshold = confidenceThresholdForMode(mode);
   const scored = candidates
-    .map((candidate) => ({
-      ...candidate,
-      score: deterministicScore(`${mode}|${promptText}|${candidate.combination_id}`),
+    .map((candidate) => scoreCandidate({
+      extraction,
+      promptText: extraction.prompt_text,
+      mode,
+      candidate,
     }))
     .sort((a, b) => {
       if (b.score !== a.score) {
@@ -103,11 +164,14 @@ function rankCandidatesForSession(promptText, mode, candidates) {
       return String(a.combination_id).localeCompare(String(b.combination_id));
     });
 
-  const aboveThreshold = scored.filter((candidate) => candidate.score >= threshold);
+  const aboveThreshold = scored
+    .filter((candidate) => candidate.score >= threshold)
+    .slice(0, 3);
   if (aboveThreshold.length > 0) {
-    return aboveThreshold.slice(0, 3);
+    return aboveThreshold;
   }
 
+  // Preserve explicit low-confidence behavior when no candidate clears threshold.
   return scored.slice(0, 1);
 }
 
@@ -115,7 +179,7 @@ function buildRecommendationPayloads(promptText, mode, rankedCandidates) {
   const threshold = confidenceThresholdForMode(mode);
   return rankedCandidates.map((candidate, index) => {
     const roundedConfidence = Number(candidate.score.toFixed(3));
-    const belowThreshold = roundedConfidence < threshold;
+    const isLowConfidence = roundedConfidence < threshold;
     const modeLabel = mode === "precision" ? "Precision" : "Close enough";
     const influenceText = String(candidate.influence_codes || "").trim();
 
@@ -124,12 +188,21 @@ function buildRecommendationPayloads(promptText, mode, rankedCandidates) {
       combinationId: candidate.combination_id,
       confidence: roundedConfidence,
       rationale: `${modeLabel} match for extracted prompt using combination ${candidate.combination_id}.`,
-      riskNotes: belowThreshold
+      riskNotes: isLowConfidence
         ? [`Confidence ${roundedConfidence} is below ${modeLabel.toLowerCase()} threshold ${threshold}.`]
         : [],
       promptImprovements: influenceText
         ? [`Try emphasizing style hints aligned with: ${influenceText}.`]
         : ["Try adding concrete mood and composition constraints."],
+      lowConfidence: isLowConfidence
+        ? {
+          isLowConfidence: true,
+          reasonCode: "below_mode_threshold",
+          threshold,
+        }
+        : {
+          isLowConfidence: false,
+        },
     };
   });
 }
@@ -326,7 +399,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
       if (existingRecommendationCount === 0) {
         const candidates = listActiveStyleInfluenceCombinations(dbPath);
         const rankedCandidates = rankCandidatesForSession(
-          extraction.prompt_text,
+          extraction,
           session.mode,
           candidates
         );
@@ -457,16 +530,37 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
             curated: Boolean(prompt.curated_flag),
             createdAt: prompt.created_at,
           } : null,
-          recommendations: recommendationRows.map((row) => ({
-            recommendationId: row.recommendation_id,
-            rank: row.rank,
-            combinationId: row.combination_id,
-            rationale: row.rationale,
-            confidence: row.confidence,
-            riskNotes: JSON.parse(row.risk_notes_json || "[]"),
-            promptImprovements: JSON.parse(row.prompt_improvements_json || "[]"),
-            createdAt: row.created_at,
-          })),
+          recommendations: recommendationRows.map((row) => {
+            const threshold = confidenceThresholdForMode(session.mode);
+            const isLowConfidence = row.confidence < threshold;
+            const riskNotes = JSON.parse(row.risk_notes_json || "[]");
+            const lowConfidence = isLowConfidence
+              ? {
+                isLowConfidence: true,
+                reasonCode: "below_mode_threshold",
+                threshold,
+              }
+              : {
+                isLowConfidence: false,
+              };
+
+            return {
+              recommendationId: row.recommendation_id,
+              rank: row.rank,
+              combinationId: row.combination_id,
+              rationale: row.rationale,
+              confidence: row.confidence,
+              riskNotes,
+              confidenceRisk: {
+                confidence: row.confidence,
+                riskNotes,
+                lowConfidence,
+              },
+              lowConfidence,
+              promptImprovements: JSON.parse(row.prompt_improvements_json || "[]"),
+              createdAt: row.created_at,
+            };
+          }),
         },
       },
       ctx

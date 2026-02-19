@@ -360,6 +360,9 @@ function listActiveStyleInfluenceCombinations(dbPath) {
        c.combination_id,
        c.name,
        COUNT(*) AS total_items,
+       SUM(CASE WHEN sit.parameter_prefix = '--profile' THEN 1 ELSE 0 END) AS profile_items,
+       SUM(CASE WHEN sit.parameter_prefix = '--sref' THEN 1 ELSE 0 END) AS sref_items,
+       SUM(CASE WHEN si.pinned_flag = 1 THEN 1 ELSE 0 END) AS pinned_items,
        SUM(CASE WHEN si.status = 'active' AND sit.enabled_flag = 1 THEN 1 ELSE 0 END) AS eligible_items,
        GROUP_CONCAT(si.influence_code, ' ') AS influence_codes
      FROM style_influence_combinations c

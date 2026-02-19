@@ -178,7 +178,10 @@ Response (`200`) shape:
         "recommendationId": "rec_<uuid>",
         "rank": 1,
         "combinationId": "<combination_id>",
-        "confidence": 0.7
+        "confidence": 0.7,
+        "lowConfidence": {
+          "isLowConfidence": false
+        }
       }
     ]
   }
