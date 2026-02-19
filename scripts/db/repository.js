@@ -290,6 +290,17 @@ function insertRecommendationSession(dbPath, input) {
   );
 }
 
+function updateRecommendationSessionStatus(dbPath, sessionId, status) {
+  exec(
+    dbPath,
+    `UPDATE recommendation_sessions
+     SET
+       status = ${quote(status)},
+       updated_at = ${quote(nowIso())}
+     WHERE session_id = ${quote(sessionId)};`
+  );
+}
+
 function ensureRecommendationSession(dbPath, input) {
   const existing = getRecommendationSessionByExtractionId(dbPath, input.extractionId);
   if (existing) {
@@ -332,6 +343,39 @@ function listRecommendationsBySessionId(dbPath, sessionId) {
   );
 }
 
+function getRecommendationCountBySessionId(dbPath, sessionId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT COUNT(*) AS recommendation_count
+     FROM recommendations
+     WHERE recommendation_session_id = ${quote(sessionId)};`
+  );
+  return Number(rows[0]?.recommendation_count || 0);
+}
+
+function listActiveStyleInfluenceCombinations(dbPath) {
+  return queryJson(
+    dbPath,
+    `SELECT
+       c.combination_id,
+       c.name,
+       COUNT(*) AS total_items,
+       SUM(CASE WHEN si.status = 'active' AND sit.enabled_flag = 1 THEN 1 ELSE 0 END) AS eligible_items,
+       GROUP_CONCAT(si.influence_code, ' ') AS influence_codes
+     FROM style_influence_combinations c
+     JOIN style_influence_combination_items sci
+       ON sci.combination_id = c.combination_id
+     JOIN style_influences si
+       ON si.style_influence_id = sci.style_influence_id
+     JOIN style_influence_types sit
+       ON sit.style_influence_type_id = si.style_influence_type_id
+     WHERE c.active_flag = 1
+     GROUP BY c.combination_id, c.name
+     HAVING total_items > 0 AND eligible_items = total_items
+     ORDER BY c.combination_id ASC;`
+  );
+}
+
 module.exports = {
   ensureReady,
   getJobById,
@@ -352,7 +396,10 @@ module.exports = {
   getRecommendationSessionByExtractionId,
   getRecommendationSessionById,
   insertRecommendationSession,
+  updateRecommendationSessionStatus,
   ensureRecommendationSession,
   insertRecommendation,
   listRecommendationsBySessionId,
+  getRecommendationCountBySessionId,
+  listActiveStyleInfluenceCombinations,
 };

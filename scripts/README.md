@@ -17,3 +17,7 @@ Guidelines:
 ## Storage Scripts
 
 - `npm run storage:smoke`: Run local put/get/delete smoke validation through the storage adapter.
+
+## Recommendation Scripts
+
+- `npm run recommendation:smoke`: Seed minimal style-influence data and verify extraction confirm -> session retrieval returns non-empty persisted recommendations.

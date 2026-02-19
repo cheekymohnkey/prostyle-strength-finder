@@ -17,6 +17,10 @@ const {
   getRecommendationSessionById,
   getPromptById,
   listRecommendationsBySessionId,
+  insertRecommendation,
+  getRecommendationCountBySessionId,
+  listActiveStyleInfluenceCombinations,
+  updateRecommendationSessionStatus,
 } = require("../../../scripts/db/repository");
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
@@ -73,6 +77,61 @@ function resolveAuthenticatedUserId(authClaims) {
     return candidate.trim();
   }
   throw new Error("JWT payload missing subject identifier");
+}
+
+function confidenceThresholdForMode(mode) {
+  return mode === "precision" ? 0.65 : 0.45;
+}
+
+function deterministicScore(seed) {
+  const hash = crypto.createHash("sha256").update(seed).digest("hex");
+  const intValue = Number.parseInt(hash.slice(0, 8), 16);
+  return intValue / 0xffffffff;
+}
+
+function rankCandidatesForSession(promptText, mode, candidates) {
+  const threshold = confidenceThresholdForMode(mode);
+  const scored = candidates
+    .map((candidate) => ({
+      ...candidate,
+      score: deterministicScore(`${mode}|${promptText}|${candidate.combination_id}`),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return String(a.combination_id).localeCompare(String(b.combination_id));
+    });
+
+  const aboveThreshold = scored.filter((candidate) => candidate.score >= threshold);
+  if (aboveThreshold.length > 0) {
+    return aboveThreshold.slice(0, 3);
+  }
+
+  return scored.slice(0, 1);
+}
+
+function buildRecommendationPayloads(promptText, mode, rankedCandidates) {
+  const threshold = confidenceThresholdForMode(mode);
+  return rankedCandidates.map((candidate, index) => {
+    const roundedConfidence = Number(candidate.score.toFixed(3));
+    const belowThreshold = roundedConfidence < threshold;
+    const modeLabel = mode === "precision" ? "Precision" : "Close enough";
+    const influenceText = String(candidate.influence_codes || "").trim();
+
+    return {
+      rank: index + 1,
+      combinationId: candidate.combination_id,
+      confidence: roundedConfidence,
+      rationale: `${modeLabel} match for extracted prompt using combination ${candidate.combination_id}.`,
+      riskNotes: belowThreshold
+        ? [`Confidence ${roundedConfidence} is below ${modeLabel.toLowerCase()} threshold ${threshold}.`]
+        : [],
+      promptImprovements: influenceText
+        ? [`Try emphasizing style hints aligned with: ${influenceText}.`]
+        : ["Try adding concrete mood and composition constraints."],
+    };
+  });
 }
 
 function logJson(level, message, fields) {
@@ -263,19 +322,52 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
         promptId: prompt.prompt_id,
         status: "confirmed",
       });
+      const existingRecommendationCount = getRecommendationCountBySessionId(dbPath, session.session_id);
+      if (existingRecommendationCount === 0) {
+        const candidates = listActiveStyleInfluenceCombinations(dbPath);
+        const rankedCandidates = rankCandidatesForSession(
+          extraction.prompt_text,
+          session.mode,
+          candidates
+        );
+
+        if (rankedCandidates.length === 0) {
+          updateRecommendationSessionStatus(dbPath, session.session_id, "failed");
+        } else {
+          const recommendationPayloads = buildRecommendationPayloads(
+            extraction.prompt_text,
+            session.mode,
+            rankedCandidates
+          );
+          for (const payload of recommendationPayloads) {
+            insertRecommendation(dbPath, {
+              recommendationId: `rec_${crypto.randomUUID()}`,
+              recommendationSessionId: session.session_id,
+              rank: payload.rank,
+              combinationId: payload.combinationId,
+              rationale: payload.rationale,
+              confidence: payload.confidence,
+              riskNotes: payload.riskNotes,
+              promptImprovements: payload.promptImprovements,
+            });
+          }
+          updateRecommendationSessionStatus(dbPath, session.session_id, "succeeded");
+        }
+      }
+      const latestSession = getRecommendationSessionById(dbPath, session.session_id);
       sendJson(
         res,
         200,
         {
           session: {
-            sessionId: session.session_id,
-            extractionId: session.extraction_id,
-            promptId: session.prompt_id,
-            userId: session.user_id,
-            mode: session.mode,
-            status: session.status,
-            createdAt: session.created_at,
-            updatedAt: session.updated_at,
+            sessionId: latestSession.session_id,
+            extractionId: latestSession.extraction_id,
+            promptId: latestSession.prompt_id,
+            userId: latestSession.user_id,
+            mode: latestSession.mode,
+            status: latestSession.status,
+            createdAt: latestSession.created_at,
+            updatedAt: latestSession.updated_at,
             confirmedAt,
           },
         },

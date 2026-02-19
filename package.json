@@ -16,6 +16,7 @@
     "db:create": "node scripts/db/migrate.js create",
     "db:rollback": "node scripts/db/migrate.js rollback",
     "db:reset": "node scripts/db/migrate.js reset",
-    "storage:smoke": "node scripts/storage/smoke.js"
+    "storage:smoke": "node scripts/storage/smoke.js",
+    "recommendation:smoke": "node scripts/recommendation/smoke.js"
   }
 }

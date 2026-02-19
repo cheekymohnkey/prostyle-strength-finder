@@ -136,7 +136,7 @@ Response (`200`) shape:
     "sessionId": "rs_<uuid>",
     "extractionId": "rex_<uuid>",
     "mode": "precision",
-    "status": "confirmed"
+    "status": "succeeded"
   }
 }
 ```
@@ -168,12 +168,19 @@ Response (`200`) shape:
   "session": {
     "sessionId": "rs_<uuid>",
     "mode": "precision",
-    "status": "confirmed",
+    "status": "succeeded",
     "prompt": {
       "promptId": "prm_<uuid>",
       "promptText": "<normalized_prompt>"
     },
-    "recommendations": []
+    "recommendations": [
+      {
+        "recommendationId": "rec_<uuid>",
+        "rank": 1,
+        "combinationId": "<combination_id>",
+        "confidence": 0.7
+      }
+    ]
   }
 }
 ```

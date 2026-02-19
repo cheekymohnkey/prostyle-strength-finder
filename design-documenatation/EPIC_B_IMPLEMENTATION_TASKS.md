@@ -35,7 +35,7 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 
 3. Outstanding risks/issues:
 - PNG binary parsing is not yet wired; current extraction endpoint expects normalized metadata field payload input.
-- Recommendation finalization after confirmation currently returns session draft state; full recommendation session/run orchestration is pending.
+- Current ranking is deterministic scaffold logic (hash-based placeholder), not final domain scoring.
 - End-to-end HTTP route smoke test for new extraction endpoints was not completed in this sandbox due process port-binding restriction (`EPERM` on `0.0.0.0:3001`).
 
 4. Recommended next task:
@@ -140,7 +140,7 @@ Example `200` response:
     "promptId": "prm_1f357273-3d13-4e9b-87c7-cf643f42d21d",
     "userId": "user-123",
     "mode": "precision",
-    "status": "confirmed",
+    "status": "succeeded",
     "createdAt": "2026-02-18T18:12:44.021Z",
     "updatedAt": "2026-02-18T18:12:44.021Z",
     "confirmedAt": "2026-02-18T18:12:43.995Z"
@@ -210,7 +210,7 @@ Example `200` response:
     "extractionId": "rex_3f8bb1d5-03a8-4ac3-9e58-cf8508586c49",
     "promptId": "prm_1f357273-3d13-4e9b-87c7-cf643f42d21d",
     "mode": "precision",
-    "status": "confirmed",
+    "status": "succeeded",
     "userId": "user-123",
     "createdAt": "2026-02-18T18:12:44.021Z",
     "updatedAt": "2026-02-18T18:12:44.021Z",
@@ -222,7 +222,20 @@ Example `200` response:
       "curated": false,
       "createdAt": "2026-02-18T18:12:44.010Z"
     },
-    "recommendations": []
+    "recommendations": [
+      {
+        "recommendationId": "rec_0e8ea6d6-3455-4913-89f4-4f61349f801d",
+        "rank": 1,
+        "combinationId": "combo_street_editorial",
+        "rationale": "Precision match for extracted prompt using combination combo_street_editorial.",
+        "confidence": 0.717,
+        "riskNotes": [],
+        "promptImprovements": [
+          "Try emphasizing style hints aligned with: p-9d2f sref-7ab1."
+        ],
+        "createdAt": "2026-02-18T18:12:44.102Z"
+      }
+    ]
   }
 }
 ```
