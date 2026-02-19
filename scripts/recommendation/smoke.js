@@ -327,6 +327,15 @@ async function main() {
     for (const recommendation of recommendations) {
       const lowConfidence = recommendation.lowConfidence || recommendation.confidenceRisk?.lowConfidence;
       assertCondition(Boolean(lowConfidence), "Recommendation missing lowConfidence signal");
+      assertCondition(Boolean(recommendation.confidenceRisk), "Recommendation missing confidenceRisk block");
+      assertCondition(
+        recommendation.confidenceRisk.confidence === recommendation.confidence,
+        "confidenceRisk.confidence does not match top-level confidence"
+      );
+      assertCondition(
+        Array.isArray(recommendation.confidenceRisk.riskNotes),
+        "confidenceRisk.riskNotes must be an array"
+      );
       const passesThreshold = recommendation.confidence >= precisionThreshold;
       const explicitlyLow = lowConfidence.isLowConfidence === true
         && lowConfidence.reasonCode === "below_mode_threshold";
@@ -335,8 +344,28 @@ async function main() {
         "Threshold policy failed: recommendation is below threshold without low-confidence labeling"
       );
       assertCondition(typeof recommendation.rationale === "string" && recommendation.rationale.trim() !== "", "Missing rationale");
+      assertCondition(
+        recommendation.rationale.includes(recommendation.combinationId),
+        "Rationale should include combination identifier context"
+      );
       assertCondition(Array.isArray(recommendation.riskNotes), "Missing risk notes array");
+      assertCondition(
+        recommendation.riskNotes.length === recommendation.confidenceRisk.riskNotes.length,
+        "Top-level and confidenceRisk risk-notes lengths differ"
+      );
       assertCondition(Array.isArray(recommendation.promptImprovements), "Missing prompt improvements array");
+      assertCondition(
+        recommendation.promptImprovements.length > 0 && recommendation.promptImprovements.length <= 3,
+        "Prompt improvements must include 1-3 entries"
+      );
+      assertCondition(
+        recommendation.promptImprovements.every((entry) => typeof entry === "string" && entry.trim() !== ""),
+        "Prompt improvements contain blank entries"
+      );
+      assertCondition(
+        recommendation.riskNotes.every((entry) => typeof entry === "string" && entry.trim() !== ""),
+        "Risk notes contain blank entries"
+      );
     }
 
     // Verify explicit low-confidence behavior path.
@@ -375,6 +404,10 @@ async function main() {
     assertCondition(
       lowRecommendations.some((item) => item.lowConfidence?.isLowConfidence === true),
       "Expected at least one explicitly low-confidence recommendation"
+    );
+    assertCondition(
+      lowRecommendations.every((item) => Array.isArray(item.promptImprovements) && item.promptImprovements.length > 0),
+      "Low-confidence recommendations must still include prompt improvements"
     );
 
     console.log(

@@ -207,6 +207,124 @@ function buildRecommendationPayloads(promptText, mode, rankedCandidates) {
   });
 }
 
+function buildRationaleFromBreakdown(mode, candidate, breakdown) {
+  const modeLabel = mode === "precision" ? "Precision" : "Close enough";
+  const parts = [];
+
+  if (breakdown.profileFit >= 0.9) {
+    parts.push("profile usage aligns with extracted prompt signals");
+  } else if (breakdown.profileFit <= 0.5) {
+    parts.push("profile usage only partially aligns with extracted prompt signals");
+  }
+
+  if (breakdown.srefFit >= 0.9) {
+    parts.push("sref usage aligns with extracted prompt signals");
+  } else if (breakdown.srefFit <= 0.5) {
+    parts.push("sref usage is a weaker fit for extracted prompt signals");
+  }
+
+  if (breakdown.overlapFit >= 0.25) {
+    parts.push("candidate descriptors overlap with prompt wording");
+  } else {
+    parts.push("limited descriptor overlap with prompt wording");
+  }
+
+  if (breakdown.sizeFit >= 0.75) {
+    parts.push("combination size matches extracted control complexity");
+  } else {
+    parts.push("combination size differs from extracted control complexity");
+  }
+
+  return `${modeLabel} match for ${candidate.combination_id}: ${parts.join("; ")}.`;
+}
+
+function buildRiskNotesFromBreakdown(mode, candidate, breakdown, confidence, threshold) {
+  const riskNotes = [];
+  if (confidence < threshold) {
+    riskNotes.push(`Confidence ${confidence} is below ${mode} threshold ${threshold}.`);
+  }
+  if (breakdown.overlapFit < 0.2) {
+    riskNotes.push("Prompt wording has low overlap with candidate descriptors.");
+  }
+  if (breakdown.sizeFit < 0.5) {
+    riskNotes.push("Candidate uses a control-count pattern that differs from extracted prompt controls.");
+  }
+  if (breakdown.profileFit < 0.8 && breakdown.srefFit < 0.8) {
+    riskNotes.push("Both profile and sref fit signals are weaker than preferred.");
+  }
+  return riskNotes;
+}
+
+function buildPromptImprovementsFromBreakdown(candidate, breakdown) {
+  const improvements = [];
+  const influenceText = String(candidate.influence_codes || "").trim();
+  if (influenceText) {
+    improvements.push(`Add explicit style anchors similar to: ${influenceText}.`);
+  }
+  if (breakdown.overlapFit < 0.25) {
+    improvements.push("Use concrete visual descriptors (lighting, lens, mood, composition) to improve style matching.");
+  }
+  if (breakdown.profileFit < 0.8) {
+    improvements.push("If profile behavior matters, include clearer profile-oriented language in the prompt.");
+  }
+  if (breakdown.srefFit < 0.8) {
+    improvements.push("If style-reference behavior matters, add stronger style-reference cues in the prompt.");
+  }
+  if (improvements.length === 0) {
+    improvements.push("Keep prompt structure stable and refine one visual attribute at a time.");
+  }
+  return improvements.slice(0, 3);
+}
+
+function enrichRecommendationExplanations(mode, rankedCandidates, basePayloads) {
+  return basePayloads.map((payload, index) => {
+    const candidate = rankedCandidates[index];
+    const breakdown = candidate.scoreBreakdown;
+    const threshold = confidenceThresholdForMode(mode);
+    const confidence = payload.confidence;
+    const rationale = buildRationaleFromBreakdown(mode, candidate, breakdown);
+    const riskNotes = buildRiskNotesFromBreakdown(mode, candidate, breakdown, confidence, threshold);
+    const promptImprovements = buildPromptImprovementsFromBreakdown(candidate, breakdown);
+    const isLowConfidence = confidence < threshold;
+    const lowConfidence = isLowConfidence
+      ? {
+        isLowConfidence: true,
+        reasonCode: "below_mode_threshold",
+        threshold,
+      }
+      : {
+        isLowConfidence: false,
+      };
+
+    return {
+      ...payload,
+      rationale,
+      riskNotes,
+      promptImprovements,
+      confidenceRisk: {
+        confidence,
+        riskNotes,
+        lowConfidence,
+      },
+      lowConfidence,
+    };
+  });
+}
+
+function assertRecommendationExplanationPayload(payload) {
+  if (typeof payload.rationale !== "string" || payload.rationale.trim() === "") {
+    throw new Error("Recommendation explanation missing rationale");
+  }
+  if (!Array.isArray(payload.riskNotes) || !payload.riskNotes.every((value) => typeof value === "string")) {
+    throw new Error("Recommendation explanation missing riskNotes[]");
+  }
+  if (!Array.isArray(payload.promptImprovements)
+    || payload.promptImprovements.length === 0
+    || !payload.promptImprovements.every((value) => typeof value === "string" && value.trim() !== "")) {
+    throw new Error("Recommendation explanation missing promptImprovements[]");
+  }
+}
+
 function logJson(level, message, fields) {
   console.log(
     JSON.stringify({
@@ -412,7 +530,15 @@ async function requestHandler(req, res, config, dbPath, queueAdapter) {
             session.mode,
             rankedCandidates
           );
-          for (const payload of recommendationPayloads) {
+          const enrichedRecommendationPayloads = enrichRecommendationExplanations(
+            session.mode,
+            rankedCandidates,
+            recommendationPayloads
+          );
+          for (const payload of enrichedRecommendationPayloads) {
+            assertRecommendationExplanationPayload(payload);
+          }
+          for (const payload of enrichedRecommendationPayloads) {
             insertRecommendation(dbPath, {
               recommendationId: `rec_${crypto.randomUUID()}`,
               recommendationSessionId: session.session_id,
