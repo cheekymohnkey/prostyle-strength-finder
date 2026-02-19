@@ -51,10 +51,13 @@ Translate Epic B (MVP-1 Core Recommendation Flow) into executable engineering ta
 3. Outstanding risks/issues:
 - PNG binary parsing is not yet wired; current extraction endpoint expects normalized metadata field payload input.
 - Current ranking is deterministic scaffold logic (rule-based heuristic), not final domain scoring.
-- End-to-end HTTP route smoke test for new extraction endpoints was not completed in this sandbox due process port-binding restriction (`EPERM` on `0.0.0.0:3001`).
+- Frontend flow currently uses metadata-field input stub, not browser PNG metadata extraction.
 
 4. Recommended next task:
-- Execute B2 next: add recommendation session/recommendation persistence schema and finalize extraction-confirm -> recommendation-session creation flow.
+- Execute B9 verification/handoff closure:
+  - add explicit acceptance-check matrix for implemented B tasks (B1/B2/B3 scaffold/B5/B6/B8)
+  - list checks run and residual gaps
+  - confirm recommended next implementation slice after B9 closure (PNG binary extraction path)
 
 Smoke runbook reference:
 - Local reproducible smoke commands are documented in `README.md` under `Reproducible Smoke Runbook`.
