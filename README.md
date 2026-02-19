@@ -106,6 +106,41 @@ Troubleshooting:
 1. Start API and submit analysis job at `POST /v1/analysis-jobs`.
 2. Capture returned job fields (`jobId`, `idempotencyKey`, `runType`, `imageId`).
 3. Run worker with local queue mode (`QUEUE_ADAPTER_MODE=sqlite`) and verify lifecycle logs: `in_progress` -> `succeeded`.
+4. Fetch trait result for completed trait jobs at `GET /v1/analysis-jobs/:jobId/result`.
+
+Trait extraction smoke:
+
+1. `set -a && source .env.local.example && set +a`
+2. `npm run db:reset`
+3. `npm run trait:smoke`
+
+Trait inference mode switch:
+
+1. Deterministic (default): `TRAIT_INFERENCE_MODE=deterministic`
+2. LLM-backed: set `TRAIT_INFERENCE_MODE=llm` and `OPENAI_API_KEY=<your-key>`
+3. Editable LLM system prompt: `scripts/inference/prompts/trait-system.md`
+
+Admin governance smoke:
+
+1. `set -a && source .env.local.example && set +a`
+2. `npm run db:reset`
+3. `npm run admin:governance-smoke`
+
+Admin moderation smoke:
+
+1. `set -a && source .env.local.example && set +a`
+2. `npm run db:reset`
+3. `npm run admin:moderation-smoke`
+
+Admin governance endpoints:
+
+1. `POST /v1/admin/style-influences/:styleInfluenceId/governance`
+2. `GET /v1/admin/style-influences/:styleInfluenceId/audit`
+
+Admin analysis moderation endpoints:
+
+1. `POST /v1/admin/analysis-jobs/:jobId/moderation`
+2. `GET /v1/admin/analysis-jobs/:jobId/moderation`
 
 ## Recommendation API Quick Reference
 

@@ -16,15 +16,16 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 
 Always anchor tasks to:
 
-1. `design-documenatation/DECISIONS.md`
-2. `design-documenatation/USER_NEEDS_ANALYSIS.md`
-3. `design-documenatation/ARCHITECTURE_AND_ERD.md`
-4. `design-documenatation/TECHNICAL_DECISIONS.md`
-5. `design-documenatation/MVP_PATH.md`
-6. `design-documenatation/IMPLEMENTATION_PLAN.md`
-7. `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
-8. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
-9. `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
+01. `design-documenatation/DECISIONS.md`
+02. `design-documenatation/USER_NEEDS_ANALYSIS.md`
+03. `design-documenatation/ARCHITECTURE_AND_ERD.md`
+04. `design-documenatation/TECHNICAL_DECISIONS.md`
+05. `design-documenatation/MVP_PATH.md`
+06. `design-documenatation/IMPLEMENTATION_PLAN.md`
+07. `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
+08. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+09. `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
+10. `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
 
 ## New Task Start Template
 
@@ -39,6 +40,8 @@ Use these docs as source of truth:
 - design-documenatation/IMPLEMENTATION_PLAN.md
 - design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md
 - design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md
+- design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md
+- design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md
 
 Task objective:
 <one concrete objective>

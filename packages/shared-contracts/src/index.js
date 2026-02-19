@@ -30,6 +30,12 @@ const {
   validateGeneratedImageUploadPayload,
   validateFeedbackEvaluationPayload,
 } = require("./post-result-feedback");
+const {
+  STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
+  ANALYSIS_MODERATION_ACTIONS,
+  validateStyleInfluenceGovernancePayload,
+  validateAnalysisModerationPayload,
+} = require("./admin-governance");
 const { createApiErrorResponse } = require("./api-error");
 
 module.exports = {
@@ -58,5 +64,9 @@ module.exports = {
   validateAlignmentEvaluationEnvelope,
   validateGeneratedImageUploadPayload,
   validateFeedbackEvaluationPayload,
+  STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
+  ANALYSIS_MODERATION_ACTIONS,
+  validateStyleInfluenceGovernancePayload,
+  validateAnalysisModerationPayload,
   createApiErrorResponse,
 };

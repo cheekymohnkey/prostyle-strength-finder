@@ -5,10 +5,19 @@ const { verifyJwt } = require("../../../scripts/auth/jwt");
 const { assertDatabaseReady } = require("../../../scripts/db/runtime");
 const {
   ensureReady,
+  ensureUser,
   getJobById,
   getJobByIdempotencyKey,
+  listRerunJobsByParentJobId,
+  getLatestAnalysisRunByJobId,
+  getImageTraitAnalysisByJobId,
+  getStyleInfluenceById,
+  updateStyleInfluenceGovernance,
+  insertAdminActionAudit,
+  listAdminActionsAuditByTarget,
   insertJob,
   updateJobStatus,
+  updateJobModerationStatus,
   getRecommendationExtractionById,
   insertRecommendationExtraction,
   markRecommendationExtractionConfirmed,
@@ -44,6 +53,8 @@ const {
   validateRecommendationExtractionConfirmPayload,
   validateGeneratedImageUploadPayload,
   validateFeedbackEvaluationPayload,
+  validateStyleInfluenceGovernancePayload,
+  validateAnalysisModerationPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -475,6 +486,87 @@ function mapAlignmentRow(row) {
     confidenceDelta: row.confidence_delta,
     createdAt: row.created_at,
   };
+}
+
+function mapAnalysisRunRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    analysisRunId: row.analysis_run_id,
+    jobId: row.job_id,
+    status: row.status,
+    attemptCount: Number(row.attempt_count || 0),
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    lastErrorCode: row.last_error_code,
+    lastErrorMessage: row.last_error_message,
+    modelFamily: row.model_family,
+    modelVersion: row.model_version,
+  };
+}
+
+function mapAnalysisJobRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    jobId: row.job_id,
+    status: row.status,
+    moderationStatus: row.moderation_status || "none",
+    rerunOfJobId: row.rerun_of_job_id || null,
+    runType: row.run_type,
+    imageId: row.image_id,
+    idempotencyKey: row.idempotency_key,
+    submittedAt: row.submitted_at,
+    modelFamily: row.model_family,
+    modelVersion: row.model_version,
+    modelSelectionSource: row.model_selection_source,
+  };
+}
+
+function mapImageTraitAnalysisRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    imageTraitAnalysisId: row.image_trait_analysis_id,
+    analysisRunId: row.analysis_run_id,
+    jobId: row.job_id,
+    imageId: row.image_id,
+    traitSchemaVersion: row.trait_schema_version,
+    traitVector: JSON.parse(row.trait_vector_json || "{}"),
+    evidenceSummary: row.evidence_summary,
+    createdAt: row.created_at,
+  };
+}
+
+function mapAdminAuditRow(row) {
+  return {
+    adminActionAuditId: row.admin_action_audit_id,
+    adminUserId: row.admin_user_id,
+    actionType: row.action_type,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    reason: row.reason,
+    createdAt: row.created_at,
+  };
+}
+
+const SUPPRESSED_ANALYSIS_MODERATION_STATUSES = new Set(["flagged", "removed"]);
+
+function requireAdminUser(dbPath, userId) {
+  const user = ensureUser(dbPath, {
+    userId,
+    role: "consumer",
+    status: "active",
+  });
+  return user && user.role === "admin" && user.status === "active";
+}
+
+function invalidateRecommendationCaches() {
+  // Placeholder hook for future in-process cache invalidation.
+  return { invalidated: false, strategy: "no_cache_layer_present" };
 }
 
 function sendJson(res, statusCode, payload, ctx) {
@@ -1062,6 +1154,229 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
     return;
   }
 
+  if (method === "POST"
+    && path.startsWith("/v1/admin/style-influences/")
+    && path.endsWith("/governance")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const styleInfluenceId = path.slice("/v1/admin/style-influences/".length, -"/governance".length);
+    const existing = getStyleInfluenceById(dbPath, styleInfluenceId);
+    if (!existing) {
+      sendError(res, 404, "NOT_FOUND", "Style influence not found", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleInfluenceGovernancePayload(body);
+      const updated = updateStyleInfluenceGovernance(dbPath, styleInfluenceId, payload.action);
+      const adminActionAuditId = `aud_${crypto.randomUUID()}`;
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId,
+        adminUserId: authenticatedUserId,
+        actionType: `style_influence.${payload.action}`,
+        targetType: "style_influence",
+        targetId: styleInfluenceId,
+        reason: payload.reason,
+      });
+      const cache = invalidateRecommendationCaches();
+      const auditRows = listAdminActionsAuditByTarget(dbPath, "style_influence", styleInfluenceId);
+      const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
+
+      sendJson(
+        res,
+        200,
+        {
+          styleInfluence: {
+            styleInfluenceId: updated.style_influence_id,
+            styleInfluenceTypeId: updated.style_influence_type_id,
+            influenceCode: updated.influence_code,
+            status: updated.status,
+            pinned: Boolean(updated.pinned_flag),
+            createdBy: updated.created_by,
+            createdAt: updated.created_at,
+          },
+          audit: latestAudit,
+          cache,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Governance update failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET"
+    && path.startsWith("/v1/admin/style-influences/")
+    && path.endsWith("/audit")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const styleInfluenceId = path.slice("/v1/admin/style-influences/".length, -"/audit".length);
+    const existing = getStyleInfluenceById(dbPath, styleInfluenceId);
+    if (!existing) {
+      sendError(res, 404, "NOT_FOUND", "Style influence not found", ctx);
+      return;
+    }
+
+    const rows = listAdminActionsAuditByTarget(dbPath, "style_influence", styleInfluenceId);
+    sendJson(
+      res,
+      200,
+      {
+        targetType: "style_influence",
+        targetId: styleInfluenceId,
+        actions: rows.map(mapAdminAuditRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/analysis-jobs/")
+    && path.endsWith("/moderation")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const jobId = path.slice("/v1/admin/analysis-jobs/".length, -"/moderation".length);
+    const existing = getJobById(dbPath, jobId);
+    if (!existing) {
+      sendError(res, 404, "NOT_FOUND", "Analysis job not found", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateAnalysisModerationPayload(body);
+      let rerunJob = null;
+      let cache = null;
+
+      if (payload.action === "flag") {
+        updateJobModerationStatus(dbPath, jobId, "flagged");
+      } else if (payload.action === "remove") {
+        updateJobModerationStatus(dbPath, jobId, "removed");
+        cache = invalidateRecommendationCaches();
+      } else if (payload.action === "re-run") {
+        const envelope = createJobEnvelope({
+          idempotencyKey: `${existing.idempotency_key}:rerun:${crypto.randomUUID().slice(0, 8)}`,
+          runType: existing.run_type,
+          imageId: existing.image_id,
+          context: {
+            rerunOfJobId: existing.job_id,
+            moderationReason: payload.reason,
+          },
+        });
+        const rerunRecord = {
+          jobId: envelope.jobId,
+          status: "queued",
+          moderationStatus: "none",
+          rerunOfJobId: existing.job_id,
+          runType: envelope.runType,
+          imageId: envelope.imageId,
+          idempotencyKey: envelope.idempotencyKey,
+          submittedAt: envelope.submittedAt,
+          modelFamily: envelope.modelFamily,
+          modelVersion: envelope.modelVersion,
+          modelSelectionSource: envelope.modelSelectionSource,
+        };
+
+        insertJob(dbPath, rerunRecord);
+        try {
+          queueAdapter.enqueue({
+            body: JSON.stringify(envelope),
+          });
+        } catch (error) {
+          updateJobStatus(dbPath, rerunRecord.jobId, "failed");
+          sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue rerun analysis job", ctx, {
+            reason: error.message,
+          });
+          return;
+        }
+        rerunJob = rerunRecord;
+      } else {
+        sendError(res, 400, "INVALID_REQUEST", "Unsupported moderation action", ctx);
+        return;
+      }
+
+      const adminActionAuditId = `aud_${crypto.randomUUID()}`;
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId,
+        adminUserId: authenticatedUserId,
+        actionType: `analysis_job.${payload.action}`,
+        targetType: "analysis_job",
+        targetId: jobId,
+        reason: payload.reason,
+      });
+
+      const updated = getJobById(dbPath, jobId);
+      const auditRows = listAdminActionsAuditByTarget(dbPath, "analysis_job", jobId);
+      const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
+
+      sendJson(
+        res,
+        200,
+        {
+          job: mapAnalysisJobRow(updated),
+          rerunJob,
+          audit: latestAudit,
+          cache,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Analysis moderation failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET"
+    && path.startsWith("/v1/admin/analysis-jobs/")
+    && path.endsWith("/moderation")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const jobId = path.slice("/v1/admin/analysis-jobs/".length, -"/moderation".length);
+    const job = getJobById(dbPath, jobId);
+    if (!job) {
+      sendError(res, 404, "NOT_FOUND", "Analysis job not found", ctx);
+      return;
+    }
+
+    const latestRun = getLatestAnalysisRunByJobId(dbPath, jobId);
+    const rerunJobs = listRerunJobsByParentJobId(dbPath, jobId);
+    const actions = listAdminActionsAuditByTarget(dbPath, "analysis_job", jobId).map(mapAdminAuditRow);
+
+    sendJson(
+      res,
+      200,
+      {
+        job: mapAnalysisJobRow(job),
+        latestRun: mapAnalysisRunRow(latestRun),
+        rerunJobs: rerunJobs.map(mapAnalysisJobRow),
+        actions,
+      },
+      ctx
+    );
+    return;
+  }
+
   if (method === "POST" && path === "/v1/analysis-jobs") {
     try {
       const body = await parseJsonBody(req);
@@ -1079,17 +1394,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
           200,
           {
             reused: true,
-            job: {
-              jobId: existingJob.job_id,
-              status: existingJob.status,
-              runType: existingJob.run_type,
-              imageId: existingJob.image_id,
-              idempotencyKey: existingJob.idempotency_key,
-              submittedAt: existingJob.submitted_at,
-              modelFamily: existingJob.model_family,
-              modelVersion: existingJob.model_version,
-              modelSelectionSource: existingJob.model_selection_source,
-            },
+            job: mapAnalysisJobRow(existingJob),
           },
           ctx
         );
@@ -1100,6 +1405,8 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       const jobRecord = {
         jobId: envelope.jobId,
         status: "queued",
+        moderationStatus: "none",
+        rerunOfJobId: null,
         runType: envelope.runType,
         imageId: envelope.imageId,
         idempotencyKey: envelope.idempotencyKey,
@@ -1134,7 +1441,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         202,
         {
           reused: false,
-          job: jobRecord,
+          job: mapAnalysisJobRow(getJobById(dbPath, jobRecord.jobId)),
         },
         ctx
       );
@@ -1148,6 +1455,34 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
   }
 
   if (method === "GET" && path.startsWith("/v1/analysis-jobs/")) {
+    if (path.endsWith("/result")) {
+      const jobId = path.slice("/v1/analysis-jobs/".length, -"/result".length);
+      const job = getJobById(dbPath, jobId);
+      if (!job) {
+        sendError(res, 404, "NOT_FOUND", "Analysis job not found", ctx);
+        return;
+      }
+
+      const latestRun = getLatestAnalysisRunByJobId(dbPath, jobId);
+      const traitAnalysis = getImageTraitAnalysisByJobId(dbPath, jobId);
+
+      sendJson(
+        res,
+        200,
+        {
+          job: mapAnalysisJobRow(job),
+          latestRun: mapAnalysisRunRow(latestRun),
+          result: job.run_type === "trait" && !SUPPRESSED_ANALYSIS_MODERATION_STATUSES.has(job.moderation_status || "none")
+            ? {
+              traitAnalysis: mapImageTraitAnalysisRow(traitAnalysis),
+            }
+            : null,
+        },
+        ctx
+      );
+      return;
+    }
+
     const jobId = path.slice("/v1/analysis-jobs/".length);
     const job = getJobById(dbPath, jobId);
 
@@ -1160,17 +1495,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       res,
       200,
       {
-        job: {
-          jobId: job.job_id,
-          status: job.status,
-          runType: job.run_type,
-          imageId: job.image_id,
-          idempotencyKey: job.idempotency_key,
-          submittedAt: job.submitted_at,
-          modelFamily: job.model_family,
-          modelVersion: job.model_version,
-          modelSelectionSource: job.model_selection_source,
-        },
+        job: mapAnalysisJobRow(job),
       },
       ctx
     );

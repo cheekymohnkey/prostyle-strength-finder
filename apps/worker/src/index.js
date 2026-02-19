@@ -9,6 +9,7 @@ const {
   getNextAttemptCount,
   insertAnalysisRun,
   updateAnalysisRun,
+  insertImageTraitAnalysis,
 } = require("../../../scripts/db/repository");
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
@@ -16,6 +17,7 @@ const {
   resolveModelSelection,
   setCurrentDefaultModels,
 } = require("../../../scripts/models/model-versioning");
+const { createTraitInferenceAdapter } = require("../../../scripts/inference/trait-adapter");
 const {
   parseAnalysisJobEnvelope,
   createAnalysisRunStatusEvent,
@@ -77,7 +79,7 @@ function shouldFailForAttempt(envelope, attempt) {
   return false;
 }
 
-async function processMessage(message, queue, config, dbPath) {
+async function processMessage(message, queue, config, dbPath, traitInferenceAdapter) {
   let envelope;
   try {
     envelope = parseAnalysisJobEnvelope(message.body);
@@ -221,6 +223,25 @@ async function processMessage(message, queue, config, dbPath) {
   }
 
   const succeededEvent = buildStatusEvent(analysisRunId, envelope.jobId, "succeeded");
+  if (envelope.runType === "trait") {
+    const inferred = await traitInferenceAdapter.infer({
+      imageId: envelope.imageId,
+      promptText: envelope.context?.promptText || envelope.context?.prompt || "",
+      modelFamily: envelope.modelFamily,
+      modelVersion: envelope.modelVersion,
+      runContext: envelope.context || {},
+    });
+    insertImageTraitAnalysis(dbPath, {
+      imageTraitAnalysisId: `ita_${crypto.randomUUID()}`,
+      analysisRunId,
+      jobId: envelope.jobId,
+      imageId: envelope.imageId,
+      traitSchemaVersion: inferred.traitSchemaVersion,
+      traitVector: inferred.traitVector,
+      evidenceSummary: inferred.evidenceSummary,
+    });
+  }
+
   updateAnalysisRun(dbPath, analysisRunId, {
     status: "succeeded",
     completedAt: new Date().toISOString(),
@@ -257,6 +278,7 @@ async function runWorker() {
     endpoint: config.storage.endpoint,
   });
   const storageHealth = await storageAdapter.healthcheck();
+  const traitInferenceAdapter = createTraitInferenceAdapter(config);
   const runOnce = parseBooleanEnv("WORKER_RUN_ONCE", true);
   const pollIntervalMs = parseIntegerEnv("WORKER_POLL_INTERVAL_MS", 750);
   let shuttingDown = false;
@@ -279,6 +301,7 @@ async function runWorker() {
     database_path: dbReadiness.dbPath,
     storage_mode: storageHealth.mode,
     storage_bucket: storageHealth.bucket,
+    trait_inference_mode: traitInferenceAdapter.mode,
     queue_mode: queueHealth.mode,
     queue_url: queueHealth.queueUrl,
   });
@@ -293,7 +316,7 @@ async function runWorker() {
       continue;
     }
 
-    await processMessage(message, queue, config, dbPath);
+    await processMessage(message, queue, config, dbPath, traitInferenceAdapter);
   }
 
   logJson("info", "worker.stopped", {

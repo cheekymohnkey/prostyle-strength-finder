@@ -67,6 +67,14 @@ function loadConfig() {
       defaultStandardVersion: requireEnv("DEFAULT_STANDARD_MODEL_VERSION"),
       defaultNijiVersion: requireEnv("DEFAULT_NIJI_MODEL_VERSION"),
     },
+    inference: {
+      mode: (process.env.TRAIT_INFERENCE_MODE || "deterministic").trim(),
+      openAi: {
+        apiKey: process.env.OPENAI_API_KEY || "",
+        model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+        baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+      },
+    },
     observability: {
       logLevel: requireEnv("LOG_LEVEL"),
       serviceName: requireEnv("SERVICE_NAME"),

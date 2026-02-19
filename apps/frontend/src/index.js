@@ -263,6 +263,30 @@ function htmlPage(config) {
       <div id="feedbackMeta" class="meta" hidden></div>
       <div id="feedbackList" class="result-list"></div>
     </section>
+
+    <section class="card" style="margin-top:16px;">
+      <h2>5) Trait Extraction Job</h2>
+      <div class="row">
+        <label for="traitImageId">Image ID</label>
+        <input id="traitImageId" placeholder="img-manual-001" />
+      </div>
+      <div class="row">
+        <label for="traitPromptText">Prompt Text (optional)</label>
+        <input id="traitPromptText" placeholder="moody editorial portrait --v 6" />
+      </div>
+      <div class="row">
+        <label for="traitIdempotencyKey">Idempotency Key</label>
+        <input id="traitIdempotencyKey" placeholder="trait-run-001" />
+      </div>
+      <div class="actions">
+        <button id="btnSubmitTraitJob" type="button">Submit Trait Job</button>
+        <button id="btnFetchTraitJob" type="button" class="secondary" disabled>Fetch Job</button>
+        <button id="btnFetchTraitResult" type="button" class="secondary" disabled>Fetch Result</button>
+      </div>
+      <p id="traitStatus" class="status"></p>
+      <div id="traitMeta" class="meta" hidden></div>
+      <div id="traitResult" class="result-list"></div>
+    </section>
   </div>
 
   <script>
@@ -270,6 +294,7 @@ function htmlPage(config) {
       extractionId: null,
       sessionId: null,
       recommendationIds: [],
+      traitJobId: null,
     };
 
     const authTokenEl = document.getElementById("authToken");
@@ -285,6 +310,11 @@ function htmlPage(config) {
     const feedbackStatusEl = document.getElementById("feedbackStatus");
     const feedbackMetaEl = document.getElementById("feedbackMeta");
     const feedbackListEl = document.getElementById("feedbackList");
+    const fetchTraitJobBtn = document.getElementById("btnFetchTraitJob");
+    const fetchTraitResultBtn = document.getElementById("btnFetchTraitResult");
+    const traitStatusEl = document.getElementById("traitStatus");
+    const traitMetaEl = document.getElementById("traitMeta");
+    const traitResultEl = document.getElementById("traitResult");
 
     function setStatus(el, message, tone) {
       el.textContent = message || "";
@@ -432,6 +462,33 @@ function htmlPage(config) {
         \`;
         feedbackListEl.appendChild(card);
       }
+    }
+
+    function renderTraitResultPayload(payload) {
+      traitResultEl.innerHTML = "";
+      const traitAnalysis = payload && payload.result ? payload.result.traitAnalysis : null;
+      if (!traitAnalysis) {
+        const empty = document.createElement("div");
+        empty.className = "status";
+        empty.textContent = "No trait result available yet.";
+        traitResultEl.appendChild(empty);
+        return;
+      }
+
+      const vector = traitAnalysis.traitVector || {};
+      const entries = Object.entries(vector).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+      const card = document.createElement("article");
+      card.className = "rec";
+      card.innerHTML =
+        '<div class="rec-head"><strong>Trait Analysis ' + traitAnalysis.imageTraitAnalysisId + "</strong>" +
+        '<span class="badge">schema ' + traitAnalysis.traitSchemaVersion + "</span></div>" +
+        "<div><strong>Evidence:</strong> " + (traitAnalysis.evidenceSummary || "n/a") + "</div>" +
+        '<div style="margin-top:6px;"><strong>Trait Vector:</strong>' +
+        (entries.length
+          ? "<ul>" + entries.map((entry) => "<li>" + entry[0] + ": " + entry[1] + "</li>").join("") + "</ul>"
+          : " none") +
+        "</div>";
+      traitResultEl.appendChild(card);
     }
 
     async function onCreateExtraction() {
@@ -583,12 +640,96 @@ function htmlPage(config) {
       }
     }
 
+    async function onSubmitTraitJob() {
+      setStatus(traitStatusEl, "Submitting trait job...", "");
+      try {
+        const imageId = document.getElementById("traitImageId").value.trim();
+        const promptText = document.getElementById("traitPromptText").value.trim();
+        let idempotencyKey = document.getElementById("traitIdempotencyKey").value.trim();
+        if (!imageId) {
+          throw new Error("Image ID is required");
+        }
+        if (!idempotencyKey) {
+          idempotencyKey = "trait-ui-" + Date.now();
+          document.getElementById("traitIdempotencyKey").value = idempotencyKey;
+        }
+
+        const payload = {
+          idempotencyKey,
+          runType: "trait",
+          imageId,
+          context: promptText ? { promptText } : {},
+        };
+        const json = await apiRequest("/api/analysis-jobs", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        const job = json.job || {};
+        state.traitJobId = job.jobId || null;
+        fetchTraitJobBtn.disabled = !state.traitJobId;
+        fetchTraitResultBtn.disabled = !state.traitJobId;
+        traitMetaEl.hidden = false;
+        traitMetaEl.innerHTML =
+          "<div><strong>Job:</strong> " + (job.jobId || "n/a") + "</div>" +
+          "<div><strong>Status:</strong> " + (job.status || "n/a") + "</div>" +
+          "<div><strong>Run Type:</strong> " + (job.runType || "n/a") + "</div>" +
+          "<div><strong>Idempotency:</strong> " + (job.idempotencyKey || "n/a") + "</div>";
+        setStatus(traitStatusEl, json.reused ? "Trait job reused." : "Trait job submitted.", "ok");
+      } catch (error) {
+        setStatus(traitStatusEl, error.message, "error");
+      }
+    }
+
+    async function onFetchTraitJob() {
+      if (!state.traitJobId) {
+        setStatus(traitStatusEl, "Submit a trait job first.", "error");
+        return;
+      }
+      setStatus(traitStatusEl, "Loading trait job...", "");
+      try {
+        const json = await apiRequest("/api/analysis-jobs/" + encodeURIComponent(state.traitJobId), {
+          method: "GET",
+        });
+        const job = json.job || {};
+        traitMetaEl.hidden = false;
+        traitMetaEl.innerHTML =
+          "<div><strong>Job:</strong> " + (job.jobId || "n/a") + "</div>" +
+          "<div><strong>Status:</strong> " + (job.status || "n/a") + "</div>" +
+          "<div><strong>Image:</strong> " + (job.imageId || "n/a") + "</div>" +
+          "<div><strong>Model:</strong> " + (job.modelFamily || "n/a") + " " + (job.modelVersion || "n/a") + "</div>";
+        setStatus(traitStatusEl, "Trait job loaded.", "ok");
+      } catch (error) {
+        setStatus(traitStatusEl, error.message, "error");
+      }
+    }
+
+    async function onFetchTraitResult() {
+      if (!state.traitJobId) {
+        setStatus(traitStatusEl, "Submit a trait job first.", "error");
+        return;
+      }
+      setStatus(traitStatusEl, "Loading trait result...", "");
+      try {
+        const json = await apiRequest("/api/analysis-jobs/" + encodeURIComponent(state.traitJobId) + "/result", {
+          method: "GET",
+        });
+        renderTraitResultPayload(json);
+        const latestRun = json.latestRun || {};
+        setStatus(traitStatusEl, "Trait result loaded (run status: " + (latestRun.status || "n/a") + ").", "ok");
+      } catch (error) {
+        setStatus(traitStatusEl, error.message, "error");
+      }
+    }
+
     document.getElementById("btnToken").addEventListener("click", generateLocalToken);
     document.getElementById("btnExtract").addEventListener("click", onCreateExtraction);
     document.getElementById("btnConfirm").addEventListener("click", onConfirm);
     document.getElementById("btnFetchSession").addEventListener("click", onFetchSession);
     document.getElementById("btnSubmitFeedback").addEventListener("click", onSubmitFeedback);
     document.getElementById("btnFetchFeedback").addEventListener("click", onFetchFeedback);
+    document.getElementById("btnSubmitTraitJob").addEventListener("click", onSubmitTraitJob);
+    document.getElementById("btnFetchTraitJob").addEventListener("click", onFetchTraitJob);
+    document.getElementById("btnFetchTraitResult").addEventListener("click", onFetchTraitResult);
   </script>
 </body>
 </html>`;
@@ -788,6 +929,33 @@ async function requestHandler(config, req, res) {
 
   if (method === "POST" && path === "/api/post-result-feedback") {
     await proxyRequest(config, req, res, "/post-result-feedback");
+    return;
+  }
+
+  if (method === "POST" && path === "/api/analysis-jobs") {
+    await proxyRequest(config, req, res, "/analysis-jobs");
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/api/analysis-jobs/")) {
+    if (path.endsWith("/result")) {
+      const jobId = path.slice("/api/analysis-jobs/".length, -"/result".length);
+      await proxyRequest(
+        config,
+        req,
+        res,
+        `/analysis-jobs/${encodeURIComponent(jobId)}/result`
+      );
+      return;
+    }
+
+    const jobId = path.slice("/api/analysis-jobs/".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/analysis-jobs/${encodeURIComponent(jobId)}`
+    );
     return;
   }
 

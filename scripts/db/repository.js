@@ -30,11 +30,48 @@ function exec(dbPath, sql) {
   runSql(dbPath, sql);
 }
 
+function getUserById(dbPath, userId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT user_id, role, status, created_at, updated_at
+     FROM users
+     WHERE user_id = ${quote(userId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertUser(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  const updatedAt = input.updatedAt || createdAt;
+  exec(
+    dbPath,
+    `INSERT INTO users (
+       user_id, role, status, created_at, updated_at
+     ) VALUES (
+       ${quote(input.userId)},
+       ${quote(input.role || "consumer")},
+       ${quote(input.status || "active")},
+       ${quote(createdAt)},
+       ${quote(updatedAt)}
+     );`
+  );
+}
+
+function ensureUser(dbPath, input) {
+  const existing = getUserById(dbPath, input.userId);
+  if (existing) {
+    return existing;
+  }
+  insertUser(dbPath, input);
+  return getUserById(dbPath, input.userId);
+}
+
 function getJobById(dbPath, jobId) {
   const rows = queryJson(
     dbPath,
     `SELECT job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
-            model_family, model_version, model_selection_source
+            model_family, model_version, model_selection_source, moderation_status, rerun_of_job_id
      FROM analysis_jobs
      WHERE job_id = ${quote(jobId)}
      LIMIT 1;`
@@ -46,7 +83,7 @@ function getJobByIdempotencyKey(dbPath, idempotencyKey) {
   const rows = queryJson(
     dbPath,
     `SELECT job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
-            model_family, model_version, model_selection_source
+            model_family, model_version, model_selection_source, moderation_status, rerun_of_job_id
      FROM analysis_jobs
      WHERE idempotency_key = ${quote(idempotencyKey)}
      LIMIT 1;`
@@ -61,7 +98,7 @@ function insertJob(dbPath, input) {
     dbPath,
     `INSERT INTO analysis_jobs (
        job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
-       model_family, model_version, model_selection_source
+       model_family, model_version, model_selection_source, moderation_status, rerun_of_job_id
      )
      VALUES (
        ${quote(input.jobId)},
@@ -73,7 +110,9 @@ function insertJob(dbPath, input) {
        ${quote(updatedAt)},
        ${quote(input.modelFamily)},
        ${quote(input.modelVersion)},
-       ${quote(input.modelSelectionSource)}
+       ${quote(input.modelSelectionSource)},
+       ${quote(input.moderationStatus || "none")},
+       ${quote(input.rerunOfJobId || null)}
      );`
   );
 }
@@ -96,6 +135,26 @@ function updateJobStatus(dbPath, jobId, status) {
   );
 }
 
+function updateJobModerationStatus(dbPath, jobId, moderationStatus) {
+  exec(
+    dbPath,
+    `UPDATE analysis_jobs
+     SET moderation_status = ${quote(moderationStatus)}, updated_at = ${quote(nowIso())}
+     WHERE job_id = ${quote(jobId)};`
+  );
+}
+
+function listRerunJobsByParentJobId(dbPath, parentJobId) {
+  return queryJson(
+    dbPath,
+    `SELECT job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
+            model_family, model_version, model_selection_source, moderation_status, rerun_of_job_id
+     FROM analysis_jobs
+     WHERE rerun_of_job_id = ${quote(parentJobId)}
+     ORDER BY submitted_at DESC;`
+  );
+}
+
 function getNextAttemptCount(dbPath, jobId) {
   const rows = queryJson(
     dbPath,
@@ -104,6 +163,19 @@ function getNextAttemptCount(dbPath, jobId) {
      WHERE job_id = ${quote(jobId)};`
   );
   return Number(rows[0]?.next_attempt || 1);
+}
+
+function getLatestAnalysisRunByJobId(dbPath, jobId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT analysis_run_id, job_id, status, attempt_count, started_at, completed_at,
+            last_error_code, last_error_message, model_family, model_version
+     FROM analysis_runs
+     WHERE job_id = ${quote(jobId)}
+     ORDER BY attempt_count DESC, started_at DESC
+     LIMIT 1;`
+  );
+  return rows[0] || null;
 }
 
 function insertAnalysisRun(dbPath, input) {
@@ -137,6 +209,118 @@ function updateAnalysisRun(dbPath, analysisRunId, input) {
        last_error_code = ${quote(input.lastErrorCode || null)},
        last_error_message = ${quote(input.lastErrorMessage || null)}
      WHERE analysis_run_id = ${quote(analysisRunId)};`
+  );
+}
+
+function insertImageTraitAnalysis(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO image_trait_analyses (
+       image_trait_analysis_id, analysis_run_id, job_id, image_id, trait_schema_version,
+       trait_vector_json, evidence_summary, created_at
+     ) VALUES (
+       ${quote(input.imageTraitAnalysisId)},
+       ${quote(input.analysisRunId)},
+       ${quote(input.jobId)},
+       ${quote(input.imageId)},
+       ${quote(input.traitSchemaVersion)},
+       ${quote(JSON.stringify(input.traitVector || {}))},
+       ${quote(input.evidenceSummary || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function getImageTraitAnalysisByJobId(dbPath, jobId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT image_trait_analysis_id, analysis_run_id, job_id, image_id, trait_schema_version,
+            trait_vector_json, evidence_summary, created_at
+     FROM image_trait_analyses
+     WHERE job_id = ${quote(jobId)}
+     ORDER BY created_at DESC
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getStyleInfluenceById(dbPath, styleInfluenceId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT style_influence_id, style_influence_type_id, influence_code, status,
+            pinned_flag, created_by, created_at
+     FROM style_influences
+     WHERE style_influence_id = ${quote(styleInfluenceId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function updateStyleInfluenceGovernance(dbPath, styleInfluenceId, action) {
+  const normalized = String(action || "").trim();
+  if (normalized === "disable") {
+    exec(
+      dbPath,
+      `UPDATE style_influences
+       SET status = 'disabled'
+       WHERE style_influence_id = ${quote(styleInfluenceId)};`
+    );
+  } else if (normalized === "pin") {
+    exec(
+      dbPath,
+      `UPDATE style_influences
+       SET pinned_flag = 1
+       WHERE style_influence_id = ${quote(styleInfluenceId)};`
+    );
+  } else if (normalized === "unpin") {
+    exec(
+      dbPath,
+      `UPDATE style_influences
+       SET pinned_flag = 0
+       WHERE style_influence_id = ${quote(styleInfluenceId)};`
+    );
+  } else if (normalized === "remove") {
+    exec(
+      dbPath,
+      `UPDATE style_influences
+       SET status = 'removed',
+           pinned_flag = 0
+       WHERE style_influence_id = ${quote(styleInfluenceId)};`
+    );
+  } else {
+    throw new Error(`Unsupported governance action: ${action}`);
+  }
+
+  return getStyleInfluenceById(dbPath, styleInfluenceId);
+}
+
+function insertAdminActionAudit(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO admin_actions_audit (
+       admin_action_audit_id, admin_user_id, action_type, target_type, target_id, reason, created_at
+     ) VALUES (
+       ${quote(input.adminActionAuditId)},
+       ${quote(input.adminUserId)},
+       ${quote(input.actionType)},
+       ${quote(input.targetType)},
+       ${quote(input.targetId)},
+       ${quote(input.reason)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function listAdminActionsAuditByTarget(dbPath, targetType, targetId) {
+  return queryJson(
+    dbPath,
+    `SELECT admin_action_audit_id, admin_user_id, action_type, target_type, target_id, reason, created_at
+     FROM admin_actions_audit
+     WHERE target_type = ${quote(targetType)}
+       AND target_id = ${quote(targetId)}
+     ORDER BY created_at DESC;`
   );
 }
 
@@ -506,14 +690,26 @@ function listActiveStyleInfluenceCombinations(dbPath) {
 
 module.exports = {
   ensureReady,
+  getUserById,
+  insertUser,
+  ensureUser,
   getJobById,
   getJobByIdempotencyKey,
   insertJob,
   ensureJob,
   updateJobStatus,
+  updateJobModerationStatus,
+  listRerunJobsByParentJobId,
   getNextAttemptCount,
+  getLatestAnalysisRunByJobId,
   insertAnalysisRun,
   updateAnalysisRun,
+  insertImageTraitAnalysis,
+  getImageTraitAnalysisByJobId,
+  getStyleInfluenceById,
+  updateStyleInfluenceGovernance,
+  insertAdminActionAudit,
+  listAdminActionsAuditByTarget,
   getRecommendationExtractionById,
   insertRecommendationExtraction,
   markRecommendationExtractionConfirmed,
