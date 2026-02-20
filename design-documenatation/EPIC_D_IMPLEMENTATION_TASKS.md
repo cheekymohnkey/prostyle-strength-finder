@@ -1,7 +1,7 @@
 # Prostyle Strength Finder - Epic D Implementation Tasks
 
-Status: In progress (D1-D3 completed; D4+ pending)  
-Date: 2026-02-19  
+Status: In progress (D1-D6 completed; D7-D8 pending)  
+Date: 2026-02-20  
 Depends on:
 - `design-documenatation/DECISIONS.md`
 - `design-documenatation/USER_NEEDS_ANALYSIS.md`
@@ -17,60 +17,77 @@ Depends on:
 
 Translate Epic D (MVP-3 Admin + Contributor Essentials) into executable engineering tasks with clear acceptance criteria, sequencing, and handoff context.
 
-## Current Entry Snapshot (2026-02-19)
+## Current Entry Snapshot (2026-02-20)
 
 1. Epic A platform foundation is complete.
 2. Epic B recommendation flow is implemented and smoke-verified.
 3. Epic C feedback loop is implemented and smoke-verified.
 4. Epic D is the next execution focus to deliver governance, moderation, contributor operations, and auditable controls.
 
-## Current Execution Snapshot (2026-02-19 D1-D3 Wrap)
+## Current Execution Snapshot (2026-02-20 D1-D6 Wrap)
 
 1. What was completed:
-- D1 governance contracts are implemented:
-  - `packages/shared-contracts/src/admin-governance.js`
-  - shared-contract exports updated in `packages/shared-contracts/src/index.js`
-- D2 persistence and audit foundation is implemented:
-  - migration `scripts/db/migrations/20260219194000_epic_d_admin_foundation.sql`
-    - `users`
-    - `admin_actions_audit`
-  - repository methods in `scripts/db/repository.js`:
-    - `getUserById`
-    - `insertUser`
-    - `ensureUser`
-    - `getStyleInfluenceById`
-    - `updateStyleInfluenceGovernance`
-    - `insertAdminActionAudit`
-    - `listAdminActionsAuditByTarget`
-- D3 admin governance endpoints are implemented in `apps/api/src/index.js`:
-  - `POST /v1/admin/style-influences/:styleInfluenceId/governance`
-  - `GET /v1/admin/style-influences/:styleInfluenceId/audit`
-  - admin role enforcement (`403` for non-admin)
-  - audit writes for governance actions
-  - cache invalidation hook placeholder (`invalidateRecommendationCaches`)
-- D3 smoke verification script is implemented:
-  - `scripts/admin/governance-smoke.js`
-  - `npm run admin:governance-smoke`
-- README runbook updated for governance smoke and endpoint references.
+- D1-D3 governance foundation is implemented:
+  - shared validators in `packages/shared-contracts/src/admin-governance.js`
+  - persistence/audit foundation in `scripts/db/migrations/20260219194000_epic_d_admin_foundation.sql`
+  - governance endpoints:
+    - `POST /v1/admin/style-influences/:styleInfluenceId/governance`
+    - `GET /v1/admin/style-influences/:styleInfluenceId/audit`
+  - smoke script:
+    - `scripts/admin/governance-smoke.js`
+    - `npm run admin:governance-smoke`
+- D4 analysis moderation is implemented:
+  - migration `scripts/db/migrations/20260219213000_epic_d_analysis_moderation.sql`
+  - moderation endpoints:
+    - `POST /v1/admin/analysis-jobs/:jobId/moderation`
+    - `GET /v1/admin/analysis-jobs/:jobId/moderation`
+  - moderation smoke:
+    - `scripts/admin/moderation-smoke.js`
+    - `npm run admin:moderation-smoke`
+- D5 prompt curation states are implemented:
+  - migration `scripts/db/migrations/20260219230000_epic_d_prompt_curation.sql`
+  - prompt curation endpoints:
+    - `POST /v1/admin/prompts/:promptId/curation`
+    - `GET /v1/admin/prompts/:promptId/curation`
+  - prompt curation smoke:
+    - `scripts/admin/prompt-curation-smoke.js`
+    - `npm run admin:prompt-curation-smoke`
+- D6 approval policy controls are implemented:
+  - migration `scripts/db/migrations/20260220000500_epic_d_approval_policy.sql`
+  - approval policy endpoints:
+    - `GET /v1/admin/approval-policy`
+    - `POST /v1/admin/approval-policy`
+  - manual approval endpoints:
+    - `GET /v1/admin/analysis-jobs/:jobId/approval`
+    - `POST /v1/admin/analysis-jobs/:jobId/approval`
+  - approval policy smoke:
+    - `scripts/admin/approval-policy-smoke.js`
+    - `npm run admin:approval-policy-smoke`
+- README runbook includes Epic D admin smoke commands and endpoint references.
 
 2. Verification run:
 - `npm run contracts`
 - `set -a; source .env.local.example; set +a`
 - `npm run db:reset`
 - `npm run admin:governance-smoke`
-- Result: `ok: true`, with:
-  - non-admin governance call rejected (`forbiddenStatus: 403`)
-  - admin `pin` and `disable` actions applied
-  - audit entries present (`auditCount: 2`)
-  - disabled influence excluded from active combinations (`comboPresentAfterDisable: false`)
+- `npm run admin:moderation-smoke`
+- `npm run admin:prompt-curation-smoke`
+- `npm run admin:approval-policy-smoke`
+- Result: all Epic D admin smokes return `ok: true`, including:
+  - `403` role-boundary rejection checks
+  - audit creation checks for high-impact actions
+  - moderation rerun enqueue and status transitions
+  - prompt curation status transitions and active-prompt preference
+  - approval policy default (`auto-approve`) and manual-mode gating (`pending_approval`)
 
 3. Outstanding risks/issues:
 - Role assignment currently defaults first-seen users to `consumer`; no admin role-management UI/API yet.
 - Cache invalidation currently uses a placeholder hook (no in-process cache registry wired yet).
-- D4 moderation endpoints are not yet implemented.
+- Contributor flows (D7) are not yet implemented.
+- Epic D closeout verification/handoff package (D8) is not yet completed.
 
 4. Recommended next task:
-- Execute D4 (`Admin Analysis Moderation: flag/remove/re-run`) with audit writes and smoke coverage.
+- Execute D7 (`Contributor Essentials: upload/add/status/retry`) with explicit ownership checks and smoke coverage.
 
 ## Epic D - Admin + Contributor Essentials (MVP-3)
 
