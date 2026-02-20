@@ -20,21 +20,34 @@ OS_LIKE="${ID_LIKE:-}"
 
 install_ubuntu() {
   sudo apt-get update
-  sudo apt-get install -y curl git sqlite3 awscli nginx ca-certificates gnupg
+  sudo apt-get install -y curl git sqlite3 nginx ca-certificates gnupg unzip
   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
   sudo apt-get install -y nodejs
 }
 
 install_amazon_like() {
   if command -v dnf >/dev/null 2>&1; then
-    sudo dnf install -y curl git sqlite awscli nginx ca-certificates
+    sudo dnf install -y curl git sqlite nginx ca-certificates unzip
     curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
     sudo dnf install -y nodejs
   else
-    sudo yum install -y curl git sqlite awscli nginx ca-certificates
+    sudo yum install -y curl git sqlite nginx ca-certificates unzip
     curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
     sudo yum install -y nodejs
   fi
+}
+
+install_awscli_if_missing() {
+  if command -v aws >/dev/null 2>&1; then
+    return
+  fi
+
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "$tmp_dir/awscliv2.zip"
+  unzip -q "$tmp_dir/awscliv2.zip" -d "$tmp_dir"
+  sudo "$tmp_dir/aws/install" --update
+  rm -rf "$tmp_dir"
 }
 
 case "$OS_ID" in
@@ -55,6 +68,8 @@ case "$OS_ID" in
     fi
     ;;
 esac
+
+install_awscli_if_missing
 
 sudo mkdir -p "$APP_ROOT" "$APP_DATA_DIR" "$APP_LOG_DIR"
 sudo chown -R "$RUN_USER":"$RUN_USER" "$APP_ROOT" "$APP_DATA_DIR" "$APP_LOG_DIR"
