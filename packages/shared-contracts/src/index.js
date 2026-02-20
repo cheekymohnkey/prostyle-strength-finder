@@ -33,10 +33,14 @@ const {
 const {
   STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
   ANALYSIS_MODERATION_ACTIONS,
+  ANALYSIS_APPROVAL_ACTIONS,
   PROMPT_CURATION_STATUSES,
+  APPROVAL_MODES,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
   validatePromptCurationPayload,
+  validateApprovalPolicyPayload,
+  validateAnalysisApprovalPayload,
 } = require("./admin-governance");
 const { createApiErrorResponse } = require("./api-error");
 
@@ -68,9 +72,13 @@ module.exports = {
   validateFeedbackEvaluationPayload,
   STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
   ANALYSIS_MODERATION_ACTIONS,
+  ANALYSIS_APPROVAL_ACTIONS,
   PROMPT_CURATION_STATUSES,
+  APPROVAL_MODES,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
   validatePromptCurationPayload,
+  validateApprovalPolicyPayload,
+  validateAnalysisApprovalPayload,
   createApiErrorResponse,
 };

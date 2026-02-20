@@ -24,6 +24,7 @@
     "trait:smoke": "node scripts/trait/smoke.js",
     "admin:governance-smoke": "node scripts/admin/governance-smoke.js",
     "admin:moderation-smoke": "node scripts/admin/moderation-smoke.js",
-    "admin:prompt-curation-smoke": "node scripts/admin/prompt-curation-smoke.js"
+    "admin:prompt-curation-smoke": "node scripts/admin/prompt-curation-smoke.js",
+    "admin:approval-policy-smoke": "node scripts/admin/approval-policy-smoke.js"
   }
 }

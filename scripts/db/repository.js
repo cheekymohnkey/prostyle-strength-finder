@@ -155,6 +155,55 @@ function listRerunJobsByParentJobId(dbPath, parentJobId) {
   );
 }
 
+function getApprovalPolicy(dbPath) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT policy_scope, approval_mode, updated_by, created_at, updated_at
+     FROM approval_policies
+     WHERE policy_scope = 'global'
+     LIMIT 1;`
+  );
+  if (rows[0]) {
+    return rows[0];
+  }
+
+  const createdAt = nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO approval_policies (
+       policy_scope, approval_mode, updated_by, created_at, updated_at
+     ) VALUES (
+       'global',
+       'auto-approve',
+       'system',
+       ${quote(createdAt)},
+       ${quote(createdAt)}
+     );`
+  );
+  return getApprovalPolicy(dbPath);
+}
+
+function upsertApprovalPolicy(dbPath, input) {
+  const now = nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO approval_policies (
+       policy_scope, approval_mode, updated_by, created_at, updated_at
+     ) VALUES (
+       'global',
+       ${quote(input.approvalMode)},
+       ${quote(input.updatedBy || null)},
+       ${quote(now)},
+       ${quote(now)}
+     )
+     ON CONFLICT(policy_scope) DO UPDATE SET
+       approval_mode = excluded.approval_mode,
+       updated_by = excluded.updated_by,
+       updated_at = excluded.updated_at;`
+  );
+  return getApprovalPolicy(dbPath);
+}
+
 function getNextAttemptCount(dbPath, jobId) {
   const rows = queryJson(
     dbPath,
@@ -717,6 +766,8 @@ module.exports = {
   updateJobStatus,
   updateJobModerationStatus,
   listRerunJobsByParentJobId,
+  getApprovalPolicy,
+  upsertApprovalPolicy,
   getNextAttemptCount,
   getLatestAnalysisRunByJobId,
   insertAnalysisRun,

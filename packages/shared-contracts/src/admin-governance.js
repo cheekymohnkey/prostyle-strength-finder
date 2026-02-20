@@ -1,6 +1,8 @@
 const STYLE_INFLUENCE_GOVERNANCE_ACTIONS = ["disable", "pin", "unpin", "remove"];
 const ANALYSIS_MODERATION_ACTIONS = ["flag", "remove", "re-run"];
+const ANALYSIS_APPROVAL_ACTIONS = ["approve", "reject"];
 const PROMPT_CURATION_STATUSES = ["active", "deprecated", "experimental"];
+const APPROVAL_MODES = ["auto-approve", "manual"];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -66,11 +68,51 @@ function validatePromptCurationPayload(value) {
   };
 }
 
+function validateApprovalPolicyPayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Approval policy payload must be an object");
+  }
+
+  assertString(value.approvalMode, "approvalMode");
+  if (!APPROVAL_MODES.includes(value.approvalMode.trim())) {
+    throw new Error(`Invalid approval mode: ${value.approvalMode}`);
+  }
+
+  assertString(value.reason, "reason");
+
+  return {
+    approvalMode: value.approvalMode.trim(),
+    reason: value.reason.trim(),
+  };
+}
+
+function validateAnalysisApprovalPayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Analysis approval payload must be an object");
+  }
+
+  assertString(value.action, "action");
+  if (!ANALYSIS_APPROVAL_ACTIONS.includes(value.action.trim())) {
+    throw new Error(`Invalid analysis approval action: ${value.action}`);
+  }
+
+  assertString(value.reason, "reason");
+
+  return {
+    action: value.action.trim(),
+    reason: value.reason.trim(),
+  };
+}
+
 module.exports = {
   STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
   ANALYSIS_MODERATION_ACTIONS,
+  ANALYSIS_APPROVAL_ACTIONS,
   PROMPT_CURATION_STATUSES,
+  APPROVAL_MODES,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
   validatePromptCurationPayload,
+  validateApprovalPolicyPayload,
+  validateAnalysisApprovalPayload,
 };

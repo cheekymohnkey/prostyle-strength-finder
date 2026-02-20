@@ -9,6 +9,8 @@ const {
   getJobById,
   getJobByIdempotencyKey,
   listRerunJobsByParentJobId,
+  getApprovalPolicy,
+  upsertApprovalPolicy,
   getLatestAnalysisRunByJobId,
   getImageTraitAnalysisByJobId,
   getStyleInfluenceById,
@@ -57,6 +59,8 @@ const {
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
   validatePromptCurationPayload,
+  validateApprovalPolicyPayload,
+  validateAnalysisApprovalPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -553,6 +557,37 @@ function mapAdminAuditRow(row) {
     reason: row.reason,
     createdAt: row.created_at,
   };
+}
+
+function mapApprovalPolicyRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    policyScope: row.policy_scope,
+    approvalMode: row.approval_mode,
+    updatedBy: row.updated_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function createStoredJobEnvelope(job) {
+  return validateAnalysisJobEnvelope({
+    schemaVersion: CONTRACT_VERSION,
+    jobId: job.job_id,
+    idempotencyKey: job.idempotency_key,
+    runType: job.run_type,
+    imageId: job.image_id,
+    submittedAt: job.submitted_at || new Date().toISOString(),
+    priority: "normal",
+    context: {
+      approvalSource: "manual_policy",
+    },
+    modelFamily: job.model_family,
+    modelVersion: job.model_version,
+    modelSelectionSource: job.model_selection_source,
+  });
 }
 
 const SUPPRESSED_ANALYSIS_MODERATION_STATUSES = new Set(["flagged", "removed"]);
@@ -1472,6 +1507,170 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
     return;
   }
 
+  if (method === "GET" && path === "/v1/admin/approval-policy") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const policy = getApprovalPolicy(dbPath);
+    const actions = listAdminActionsAuditByTarget(dbPath, "approval_policy", "global").map(mapAdminAuditRow);
+    sendJson(
+      res,
+      200,
+      {
+        policy: mapApprovalPolicyRow(policy),
+        actions,
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/approval-policy") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateApprovalPolicyPayload(body);
+      const updated = upsertApprovalPolicy(dbPath, {
+        approvalMode: payload.approvalMode,
+        updatedBy: authenticatedUserId,
+      });
+      const adminActionAuditId = `aud_${crypto.randomUUID()}`;
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId,
+        adminUserId: authenticatedUserId,
+        actionType: `approval_policy.update.${payload.approvalMode}`,
+        targetType: "approval_policy",
+        targetId: "global",
+        reason: payload.reason,
+      });
+      const auditRows = listAdminActionsAuditByTarget(dbPath, "approval_policy", "global");
+      const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
+      sendJson(
+        res,
+        200,
+        {
+          policy: mapApprovalPolicyRow(updated),
+          audit: latestAudit,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Approval policy update failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/analysis-jobs/")
+    && path.endsWith("/approval")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const jobId = path.slice("/v1/admin/analysis-jobs/".length, -"/approval".length);
+    const existing = getJobById(dbPath, jobId);
+    if (!existing) {
+      sendError(res, 404, "NOT_FOUND", "Analysis job not found", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateAnalysisApprovalPayload(body);
+      if (existing.status !== "pending_approval") {
+        sendError(res, 409, "INVALID_STATE", "Analysis job is not pending approval", ctx, {
+          status: existing.status,
+        });
+        return;
+      }
+
+      if (payload.action === "approve") {
+        const envelope = createStoredJobEnvelope(existing);
+        try {
+          queueAdapter.enqueue({
+            body: JSON.stringify(envelope),
+          });
+        } catch (error) {
+          sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue approved analysis job", ctx, {
+            reason: error.message,
+          });
+          return;
+        }
+        updateJobStatus(dbPath, existing.job_id, "queued");
+      } else {
+        updateJobStatus(dbPath, existing.job_id, "rejected");
+      }
+
+      const adminActionAuditId = `aud_${crypto.randomUUID()}`;
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId,
+        adminUserId: authenticatedUserId,
+        actionType: `analysis_job.approval.${payload.action}`,
+        targetType: "analysis_job",
+        targetId: jobId,
+        reason: payload.reason,
+      });
+      const updated = getJobById(dbPath, jobId);
+      const auditRows = listAdminActionsAuditByTarget(dbPath, "analysis_job", jobId);
+      const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
+      sendJson(
+        res,
+        200,
+        {
+          job: mapAnalysisJobRow(updated),
+          audit: latestAudit,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Analysis approval failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET"
+    && path.startsWith("/v1/admin/analysis-jobs/")
+    && path.endsWith("/approval")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const jobId = path.slice("/v1/admin/analysis-jobs/".length, -"/approval".length);
+    const job = getJobById(dbPath, jobId);
+    if (!job) {
+      sendError(res, 404, "NOT_FOUND", "Analysis job not found", ctx);
+      return;
+    }
+
+    const actions = listAdminActionsAuditByTarget(dbPath, "analysis_job", jobId)
+      .filter((entry) => entry.action_type.startsWith("analysis_job.approval."))
+      .map(mapAdminAuditRow);
+    sendJson(
+      res,
+      200,
+      {
+        job: mapAnalysisJobRow(job),
+        actions,
+      },
+      ctx
+    );
+    return;
+  }
+
   if (method === "POST" && path === "/v1/analysis-jobs") {
     try {
       const body = await parseJsonBody(req);
@@ -1484,22 +1683,26 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
 
       const existingJob = getJobByIdempotencyKey(dbPath, body.idempotencyKey);
       if (existingJob) {
+        const policy = getApprovalPolicy(dbPath);
         sendJson(
           res,
           200,
           {
             reused: true,
             job: mapAnalysisJobRow(existingJob),
+            approvalPolicy: mapApprovalPolicyRow(policy),
           },
           ctx
         );
         return;
       }
 
+      const policy = getApprovalPolicy(dbPath);
       const envelope = createJobEnvelope(body);
+      const requiresManualApproval = policy.approval_mode === "manual";
       const jobRecord = {
         jobId: envelope.jobId,
-        status: "queued",
+        status: requiresManualApproval ? "pending_approval" : "queued",
         moderationStatus: "none",
         rerunOfJobId: null,
         runType: envelope.runType,
@@ -1512,24 +1715,35 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       };
 
       insertJob(dbPath, jobRecord);
-      try {
-        queueAdapter.enqueue({
-          body: JSON.stringify(envelope),
-        });
-      } catch (error) {
-        updateJobStatus(dbPath, jobRecord.jobId, "failed");
-        sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue analysis job", ctx, {
-          reason: error.message,
-        });
-        return;
-      }
+      if (!requiresManualApproval) {
+        try {
+          queueAdapter.enqueue({
+            body: JSON.stringify(envelope),
+          });
+        } catch (error) {
+          updateJobStatus(dbPath, jobRecord.jobId, "failed");
+          sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue analysis job", ctx, {
+            reason: error.message,
+          });
+          return;
+        }
 
-      logJson("info", "analysis.job.enqueued", {
-        request_id: ctx.requestId,
-        job_id: jobRecord.jobId,
-        run_type: jobRecord.runType,
-        status: jobRecord.status,
-      });
+        logJson("info", "analysis.job.enqueued", {
+          request_id: ctx.requestId,
+          job_id: jobRecord.jobId,
+          run_type: jobRecord.runType,
+          status: jobRecord.status,
+          approval_mode: policy.approval_mode,
+        });
+      } else {
+        logJson("info", "analysis.job.pending_approval", {
+          request_id: ctx.requestId,
+          job_id: jobRecord.jobId,
+          run_type: jobRecord.runType,
+          status: jobRecord.status,
+          approval_mode: policy.approval_mode,
+        });
+      }
 
       sendJson(
         res,
@@ -1537,6 +1751,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         {
           reused: false,
           job: mapAnalysisJobRow(getJobById(dbPath, jobRecord.jobId)),
+          approvalPolicy: mapApprovalPolicyRow(policy),
         },
         ctx
       );
