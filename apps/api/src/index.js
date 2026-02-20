@@ -5,7 +5,10 @@ const { verifyJwt } = require("../../../scripts/auth/jwt");
 const { assertDatabaseReady } = require("../../../scripts/db/runtime");
 const {
   ensureReady,
+  getUserById,
+  listUsers,
   ensureUser,
+  updateUserRoleStatus,
   getJobById,
   getJobByIdempotencyKey,
   listRerunJobsByParentJobId,
@@ -71,6 +74,7 @@ const {
   validatePromptCurationPayload,
   validateApprovalPolicyPayload,
   validateAnalysisApprovalPayload,
+  validateUserRoleManagementPayload,
   validateContributorSubmissionCreatePayload,
   validateContributorSubmissionTriggerPayload,
   validateAnalysisJobEnvelope,
@@ -584,7 +588,62 @@ function mapApprovalPolicyRow(row) {
   };
 }
 
-function createStoredJobEnvelope(job) {
+function mapUserRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    userId: row.user_id,
+    role: row.role,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function encodeUsersListCursor(row) {
+  const raw = JSON.stringify({
+    updatedAt: row.updated_at,
+    userId: row.user_id,
+  });
+  return Buffer.from(raw, "utf8").toString("base64url");
+}
+
+function decodeUsersListCursor(rawCursor) {
+  try {
+    const decoded = Buffer.from(rawCursor, "base64url").toString("utf8");
+    const value = JSON.parse(decoded);
+    if (!value || typeof value !== "object") {
+      throw new Error("Cursor payload must be object");
+    }
+    if (typeof value.updatedAt !== "string" || value.updatedAt.trim() === "") {
+      throw new Error("Cursor missing updatedAt");
+    }
+    if (typeof value.userId !== "string" || value.userId.trim() === "") {
+      throw new Error("Cursor missing userId");
+    }
+    return {
+      updatedAt: value.updatedAt.trim(),
+      userId: value.userId.trim(),
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function createStoredJobEnvelope(job, options = {}) {
+  const requestId = typeof options.requestId === "string" && options.requestId.trim() !== ""
+    ? options.requestId.trim()
+    : null;
+  const baseContext = {
+    approvalSource: "manual_policy",
+  };
+  const context = requestId
+    ? {
+      ...baseContext,
+      requestId,
+    }
+    : baseContext;
   return validateAnalysisJobEnvelope({
     schemaVersion: CONTRACT_VERSION,
     jobId: job.job_id,
@@ -593,9 +652,7 @@ function createStoredJobEnvelope(job) {
     imageId: job.image_id,
     submittedAt: job.submitted_at || new Date().toISOString(),
     priority: "normal",
-    context: {
-      approvalSource: "manual_policy",
-    },
+    context,
     modelFamily: job.model_family,
     modelVersion: job.model_version,
     modelSelectionSource: job.model_selection_source,
@@ -622,9 +679,81 @@ function requireContributorUser(dbPath, userId) {
   return user && user.role === "contributor" && user.status === "active";
 }
 
-function invalidateRecommendationCaches() {
-  // Placeholder hook for future in-process cache invalidation.
-  return { invalidated: false, strategy: "no_cache_layer_present" };
+const RECOMMENDATION_CACHE_KEYS = {
+  activeStyleInfluenceCombinations: "recommendation.active_style_influence_combinations",
+};
+
+const RECOMMENDATION_CACHE_TAGS = {
+  rankingInputs: "recommendation.ranking_inputs",
+};
+
+function createRecommendationCacheRegistry() {
+  const entries = new Map();
+
+  return {
+    get(key) {
+      if (!entries.has(key)) {
+        return {
+          hit: false,
+          value: null,
+        };
+      }
+      const entry = entries.get(key);
+      return {
+        hit: true,
+        value: entry.value,
+      };
+    },
+    set(key, value, tags = []) {
+      entries.set(key, {
+        value,
+        tags: new Set(tags),
+        cachedAt: new Date().toISOString(),
+      });
+    },
+    invalidateByTag(tag) {
+      let invalidatedEntries = 0;
+      for (const [key, entry] of entries) {
+        if (entry.tags.has(tag)) {
+          entries.delete(key);
+          invalidatedEntries += 1;
+        }
+      }
+      return {
+        tag,
+        invalidatedEntries,
+        remainingEntries: entries.size,
+      };
+    },
+  };
+}
+
+const recommendationCacheRegistry = createRecommendationCacheRegistry();
+
+function getActiveStyleInfluenceCombinationsCached(dbPath) {
+  const cached = recommendationCacheRegistry.get(RECOMMENDATION_CACHE_KEYS.activeStyleInfluenceCombinations);
+  if (cached.hit) {
+    return cached.value;
+  }
+  const rows = listActiveStyleInfluenceCombinations(dbPath);
+  recommendationCacheRegistry.set(
+    RECOMMENDATION_CACHE_KEYS.activeStyleInfluenceCombinations,
+    rows,
+    [RECOMMENDATION_CACHE_TAGS.rankingInputs]
+  );
+  return rows;
+}
+
+function invalidateRecommendationCaches(reason) {
+  const result = recommendationCacheRegistry.invalidateByTag(RECOMMENDATION_CACHE_TAGS.rankingInputs);
+  return {
+    invalidated: result.invalidatedEntries > 0,
+    invalidatedEntries: result.invalidatedEntries,
+    remainingEntries: result.remainingEntries,
+    strategy: "in_process_registry",
+    scope: result.tag,
+    reason,
+  };
 }
 
 function sendJson(res, statusCode, payload, ctx) {
@@ -645,12 +774,22 @@ function sendError(res, statusCode, code, message, ctx, details) {
   sendJson(res, statusCode, payload, ctx);
 }
 
-function createJobEnvelope(submitBody) {
+function createJobEnvelope(submitBody, options = {}) {
+  const requestId = typeof options.requestId === "string" && options.requestId.trim() !== ""
+    ? options.requestId.trim()
+    : null;
   const promptText = typeof submitBody.prompt === "string"
     ? submitBody.prompt
     : (typeof submitBody.context?.promptText === "string"
       ? submitBody.context.promptText
       : (typeof submitBody.context?.prompt === "string" ? submitBody.context.prompt : ""));
+
+  const context = {
+    ...(submitBody.context || {}),
+  };
+  if (requestId && !context.requestId && !context.request_id) {
+    context.requestId = requestId;
+  }
 
   const modelSelection = resolveModelSelection({ promptText });
   const envelope = {
@@ -661,7 +800,7 @@ function createJobEnvelope(submitBody) {
     imageId: submitBody.imageId,
     submittedAt: new Date().toISOString(),
     priority: submitBody.priority || "normal",
-    context: submitBody.context || {},
+    context,
     modelFamily: modelSelection.modelFamily,
     modelVersion: modelSelection.modelVersion,
     modelSelectionSource: modelSelection.modelSelectionSource,
@@ -867,7 +1006,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       });
       const existingRecommendationCount = getRecommendationCountBySessionId(dbPath, session.session_id);
       if (existingRecommendationCount === 0) {
-        const candidates = listActiveStyleInfluenceCombinations(dbPath);
+        const candidates = getActiveStyleInfluenceCombinationsCached(dbPath);
         const rankedCandidates = rankCandidatesForSession(
           extraction,
           session.mode,
@@ -1273,6 +1412,152 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
     return;
   }
 
+  if (method === "GET" && path === "/v1/admin/users") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const role = typeof url.searchParams.get("role") === "string"
+      ? url.searchParams.get("role").trim()
+      : "";
+    const status = typeof url.searchParams.get("status") === "string"
+      ? url.searchParams.get("status").trim()
+      : "";
+    const query = typeof url.searchParams.get("q") === "string"
+      ? url.searchParams.get("q").trim()
+      : "";
+    const cursorRaw = typeof url.searchParams.get("cursor") === "string"
+      ? url.searchParams.get("cursor").trim()
+      : "";
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 50;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid users list limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..200",
+      });
+      return;
+    }
+
+    const cursor = cursorRaw ? decodeUsersListCursor(cursorRaw) : null;
+    if (cursorRaw && !cursor) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid users list cursor", ctx);
+      return;
+    }
+
+    const rows = listUsers(dbPath, {
+      role: role || undefined,
+      status: status || undefined,
+      query: query || undefined,
+      cursorUpdatedAt: cursor ? cursor.updatedAt : undefined,
+      cursorUserId: cursor ? cursor.userId : undefined,
+      limit,
+    });
+    const pageRows = rows.slice(0, limit);
+    const hasMore = rows.length > limit;
+    const nextCursor = hasMore && pageRows.length > 0
+      ? encodeUsersListCursor(pageRows[pageRows.length - 1])
+      : null;
+    sendJson(
+      res,
+      200,
+      {
+        users: pageRows.map(mapUserRow),
+        page: {
+          limit,
+          nextCursor,
+        },
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "GET"
+    && path.startsWith("/v1/admin/users/")
+    && path.endsWith("/role")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const userId = path.slice("/v1/admin/users/".length, -"/role".length);
+    const user = getUserById(dbPath, userId);
+    if (!user) {
+      sendError(res, 404, "NOT_FOUND", "User not found", ctx);
+      return;
+    }
+
+    const actions = listAdminActionsAuditByTarget(dbPath, "user", userId)
+      .filter((entry) => entry.action_type === "user.role_status.update")
+      .map(mapAdminAuditRow);
+    sendJson(
+      res,
+      200,
+      {
+        user: mapUserRow(user),
+        actions,
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/users/")
+    && path.endsWith("/role")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const userId = path.slice("/v1/admin/users/".length, -"/role".length);
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateUserRoleManagementPayload(body);
+      const existing = ensureUser(dbPath, {
+        userId,
+        role: "consumer",
+        status: "active",
+      });
+      const updated = updateUserRoleStatus(dbPath, userId, {
+        role: payload.role,
+        status: payload.status,
+      });
+      const adminActionAuditId = `aud_${crypto.randomUUID()}`;
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId,
+        adminUserId: authenticatedUserId,
+        actionType: "user.role_status.update",
+        targetType: "user",
+        targetId: userId,
+        reason: payload.reason,
+      });
+      const auditRows = listAdminActionsAuditByTarget(dbPath, "user", userId);
+      const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
+      sendJson(
+        res,
+        200,
+        {
+          previous: mapUserRow(existing),
+          user: mapUserRow(updated),
+          audit: latestAudit,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "User role update failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
   if (method === "POST" && path === "/v1/contributor/submissions") {
     if (!requireContributorUser(dbPath, authenticatedUserId)) {
       sendError(res, 403, "FORBIDDEN", "Contributor role is required", ctx);
@@ -1319,11 +1604,13 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
 
       const submission = getContributorSubmissionById(dbPath, submissionId);
       const styleInfluence = getStyleInfluenceById(dbPath, styleInfluenceId);
+      const cache = invalidateRecommendationCaches("contributor.submission.create");
       sendJson(
         res,
         201,
         {
           submission: mapContributorSubmissionRow(submission, styleInfluence, styleInfluenceType, null),
+          cache,
         },
         ctx
       );
@@ -1414,6 +1701,8 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         context: payload.promptText
           ? { promptText: payload.promptText, submissionId }
           : { submissionId },
+      }, {
+        requestId: ctx.requestId,
       });
       const requiresManualApproval = policy.approval_mode === "manual";
       const jobRecord = {
@@ -1542,6 +1831,8 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         context: payload.promptText
           ? { promptText: payload.promptText, submissionId, rerunOfJobId: lastJob.job_id }
           : { submissionId, rerunOfJobId: lastJob.job_id },
+      }, {
+        requestId: ctx.requestId,
       });
       const requiresManualApproval = policy.approval_mode === "manual";
       const jobRecord = {
@@ -1697,7 +1988,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         targetId: styleInfluenceId,
         reason: payload.reason,
       });
-      const cache = invalidateRecommendationCaches();
+      const cache = invalidateRecommendationCaches("admin.style_influence.governance");
       const auditRows = listAdminActionsAuditByTarget(dbPath, "style_influence", styleInfluenceId);
       const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
 
@@ -1782,7 +2073,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         updateJobModerationStatus(dbPath, jobId, "flagged");
       } else if (payload.action === "remove") {
         updateJobModerationStatus(dbPath, jobId, "removed");
-        cache = invalidateRecommendationCaches();
+        cache = invalidateRecommendationCaches("admin.analysis_job.moderation.remove");
       } else if (payload.action === "re-run") {
         const envelope = createJobEnvelope({
           idempotencyKey: `${existing.idempotency_key}:rerun:${crypto.randomUUID().slice(0, 8)}`,
@@ -1792,6 +2083,8 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
             rerunOfJobId: existing.job_id,
             moderationReason: payload.reason,
           },
+        }, {
+          requestId: ctx.requestId,
         });
         const rerunRecord = {
           jobId: envelope.jobId,
@@ -1920,6 +2213,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         targetId: promptId,
         reason: payload.reason,
       });
+      const cache = invalidateRecommendationCaches("admin.prompt.curation");
       const auditRows = listAdminActionsAuditByTarget(dbPath, "prompt", promptId);
       const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
 
@@ -1937,6 +2231,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
             createdAt: updated.created_at,
           },
           audit: latestAudit,
+          cache,
         },
         ctx
       );
@@ -2027,6 +2322,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         targetId: "global",
         reason: payload.reason,
       });
+      const cache = invalidateRecommendationCaches("admin.approval_policy.update");
       const auditRows = listAdminActionsAuditByTarget(dbPath, "approval_policy", "global");
       const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
       sendJson(
@@ -2035,6 +2331,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         {
           policy: mapApprovalPolicyRow(updated),
           audit: latestAudit,
+          cache,
         },
         ctx
       );
@@ -2073,7 +2370,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       }
 
       if (payload.action === "approve") {
-        const envelope = createStoredJobEnvelope(existing);
+        const envelope = createStoredJobEnvelope(existing, {
+          requestId: ctx.requestId,
+        });
         try {
           queueAdapter.enqueue({
             body: JSON.stringify(envelope),
@@ -2176,7 +2475,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       }
 
       const policy = getApprovalPolicy(dbPath);
-      const envelope = createJobEnvelope(body);
+      const envelope = createJobEnvelope(body, {
+        requestId: ctx.requestId,
+      });
       const requiresManualApproval = policy.approval_mode === "manual";
       const jobRecord = {
         jobId: envelope.jobId,

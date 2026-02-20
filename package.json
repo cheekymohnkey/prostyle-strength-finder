@@ -16,6 +16,13 @@
     "db:create": "node scripts/db/migrate.js create",
     "db:rollback": "node scripts/db/migrate.js rollback",
     "db:reset": "node scripts/db/migrate.js reset",
+    "backup:create": "node scripts/backup/create-and-upload.js",
+    "backup:restore": "node scripts/backup/restore.js",
+    "backup:restore-smoke": "node scripts/backup/restore-smoke.js",
+    "queue:recovery-smoke": "node scripts/queue/recovery-smoke.js",
+    "ops:checks": "node scripts/ops/operational-checks.js",
+    "frontend:critical-flow-smoke": "node scripts/frontend/critical-flow-smoke.js",
+    "launch:readiness-smoke": "node scripts/launch/readiness-smoke.js",
     "storage:smoke": "node scripts/storage/smoke.js",
     "recommendation:smoke": "node scripts/recommendation/smoke.js",
     "feedback:foundation-check": "node scripts/feedback/foundation-check.js",
@@ -26,6 +33,8 @@
     "admin:moderation-smoke": "node scripts/admin/moderation-smoke.js",
     "admin:prompt-curation-smoke": "node scripts/admin/prompt-curation-smoke.js",
     "admin:approval-policy-smoke": "node scripts/admin/approval-policy-smoke.js",
+    "admin:role-management-smoke": "node scripts/admin/role-management-smoke.js",
+    "cache:invalidation-smoke": "node scripts/admin/cache-invalidation-smoke.js",
     "admin:frontend-proxy-smoke": "node scripts/admin/frontend-proxy-smoke.js",
     "contributor:essentials-smoke": "node scripts/contributor/essentials-smoke.js"
   }

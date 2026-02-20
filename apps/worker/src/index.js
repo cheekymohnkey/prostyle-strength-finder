@@ -93,6 +93,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
     });
     return;
   }
+  const requestId = envelope.context?.requestId || envelope.context?.request_id || null;
 
   const analysisRunId = `run_${envelope.jobId}_${crypto.randomUUID().slice(0, 8)}`;
   const modelSelection = resolveModelSelection({
@@ -104,6 +105,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
   const existingByIdempotency = getJobByIdempotencyKey(dbPath, envelope.idempotencyKey);
   if (existingByIdempotency && existingByIdempotency.job_id !== envelope.jobId) {
     logJson("info", "worker.job.duplicate_skipped", {
+      request_id: requestId,
       job_id: envelope.jobId,
       analysis_run_id: analysisRunId,
       idempotency_key: envelope.idempotencyKey,
@@ -128,6 +130,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
 
   if (job.status === "succeeded") {
     logJson("info", "worker.job.duplicate_skipped", {
+      request_id: requestId,
       job_id: envelope.jobId,
       analysis_run_id: analysisRunId,
       idempotency_key: envelope.idempotencyKey,
@@ -151,6 +154,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
 
   const inProgressEvent = buildStatusEvent(analysisRunId, envelope.jobId, "in_progress");
   logJson("info", "worker.job.lifecycle", {
+    request_id: requestId,
     job_id: envelope.jobId,
     analysis_run_id: analysisRunId,
     status_event: inProgressEvent,
@@ -166,6 +170,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
     const failedEvent = buildStatusEvent(analysisRunId, envelope.jobId, "failed", processingError);
 
     logJson("warn", "worker.job.lifecycle", {
+      request_id: requestId,
       job_id: envelope.jobId,
       analysis_run_id: analysisRunId,
       status_event: failedEvent,
@@ -184,6 +189,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
       const retryDelayMs = config.queue.retryBaseMs * 2 ** (attempt - 1);
       const retryingEvent = buildStatusEvent(analysisRunId, envelope.jobId, "retrying", processingError);
       logJson("info", "worker.job.lifecycle", {
+        request_id: requestId,
         job_id: envelope.jobId,
         analysis_run_id: analysisRunId,
         status_event: retryingEvent,
@@ -204,6 +210,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
 
     const deadLetterEvent = buildStatusEvent(analysisRunId, envelope.jobId, "dead_letter", processingError);
     logJson("error", "worker.job.lifecycle", {
+      request_id: requestId,
       job_id: envelope.jobId,
       analysis_run_id: analysisRunId,
       status_event: deadLetterEvent,
@@ -251,6 +258,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
   updateJobStatus(dbPath, envelope.jobId, "succeeded");
 
   logJson("info", "worker.job.lifecycle", {
+    request_id: requestId,
     job_id: envelope.jobId,
     analysis_run_id: analysisRunId,
     status_event: succeededEvent,

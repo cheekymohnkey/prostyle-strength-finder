@@ -67,6 +67,57 @@ function ensureUser(dbPath, input) {
   return getUserById(dbPath, input.userId);
 }
 
+function updateUserRoleStatus(dbPath, userId, input) {
+  exec(
+    dbPath,
+    `UPDATE users
+     SET
+       role = ${quote(input.role)},
+       status = ${quote(input.status)},
+       updated_at = ${quote(nowIso())}
+     WHERE user_id = ${quote(userId)};`
+  );
+  return getUserById(dbPath, userId);
+}
+
+function listUsers(dbPath, input = {}) {
+  const where = [];
+  if (input.role) {
+    where.push(`role = ${quote(input.role)}`);
+  }
+  if (input.status) {
+    where.push(`status = ${quote(input.status)}`);
+  }
+  if (input.query) {
+    const pattern = `%${String(input.query).replace(/%/g, "\\%").replace(/_/g, "\\_")}%`;
+    where.push(`user_id LIKE ${quote(pattern)} ESCAPE '\\'`);
+  }
+  if (input.cursorUpdatedAt && input.cursorUserId) {
+    where.push(
+      `(
+        updated_at < ${quote(input.cursorUpdatedAt)}
+        OR (updated_at = ${quote(input.cursorUpdatedAt)} AND user_id > ${quote(input.cursorUserId)})
+      )`
+    );
+  }
+
+  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+  const rawLimit = Number(input.limit || 50);
+  const safeLimit = Number.isFinite(rawLimit)
+    ? Math.min(200, Math.max(1, Math.floor(rawLimit)))
+    : 50;
+  const queryLimit = safeLimit + 1;
+
+  return queryJson(
+    dbPath,
+    `SELECT user_id, role, status, created_at, updated_at
+     FROM users
+     ${whereClause}
+     ORDER BY updated_at DESC, user_id ASC
+     LIMIT ${queryLimit};`
+  );
+}
+
 function getJobById(dbPath, jobId) {
   const rows = queryJson(
     dbPath,
@@ -907,6 +958,8 @@ module.exports = {
   getUserById,
   insertUser,
   ensureUser,
+  updateUserRoleStatus,
+  listUsers,
   getJobById,
   getJobByIdempotencyKey,
   insertJob,

@@ -23,6 +23,10 @@ Primary design and planning docs:
 - `design-documenatation/IMPLEMENTATION_PLAN.md`
 - `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
 - `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/EPIC_D_D8_HANDOVER.md`
+- `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
 - `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 
 ## Environment Set
@@ -144,6 +148,12 @@ Admin approval policy smoke:
 2. `npm run db:reset`
 3. `npm run admin:approval-policy-smoke`
 
+Admin role-management smoke:
+
+1. `set -a && source .env.local.example && set +a`
+2. `npm run db:reset`
+3. `npm run admin:role-management-smoke`
+
 Admin/frontend proxy smoke (D8 minimal frontend checks):
 
 1. `set -a && source .env.local.example && set +a`
@@ -177,6 +187,14 @@ Admin approval policy endpoints:
 2. `POST /v1/admin/approval-policy`
 3. `GET /v1/admin/analysis-jobs/:jobId/approval`
 4. `POST /v1/admin/analysis-jobs/:jobId/approval`
+
+Admin user role-management endpoints:
+
+1. `GET /v1/admin/users`
+   - query params: `role`, `status`, `q`, `limit`, `cursor`
+   - response page metadata: `page.limit`, `page.nextCursor`
+2. `GET /v1/admin/users/:userId/role`
+3. `POST /v1/admin/users/:userId/role`
 
 Contributor essentials endpoints:
 

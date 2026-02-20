@@ -3,6 +3,8 @@ const ANALYSIS_MODERATION_ACTIONS = ["flag", "remove", "re-run"];
 const ANALYSIS_APPROVAL_ACTIONS = ["approve", "reject"];
 const PROMPT_CURATION_STATUSES = ["active", "deprecated", "experimental"];
 const APPROVAL_MODES = ["auto-approve", "manual"];
+const USER_ROLES = ["admin", "contributor", "consumer"];
+const USER_STATUSES = ["active", "disabled"];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -104,15 +106,42 @@ function validateAnalysisApprovalPayload(value) {
   };
 }
 
+function validateUserRoleManagementPayload(value) {
+  if (!isObject(value)) {
+    throw new Error("User role management payload must be an object");
+  }
+
+  assertString(value.role, "role");
+  if (!USER_ROLES.includes(value.role.trim())) {
+    throw new Error(`Invalid user role: ${value.role}`);
+  }
+
+  assertString(value.status, "status");
+  if (!USER_STATUSES.includes(value.status.trim())) {
+    throw new Error(`Invalid user status: ${value.status}`);
+  }
+
+  assertString(value.reason, "reason");
+
+  return {
+    role: value.role.trim(),
+    status: value.status.trim(),
+    reason: value.reason.trim(),
+  };
+}
+
 module.exports = {
   STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
   ANALYSIS_MODERATION_ACTIONS,
   ANALYSIS_APPROVAL_ACTIONS,
   PROMPT_CURATION_STATUSES,
   APPROVAL_MODES,
+  USER_ROLES,
+  USER_STATUSES,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
   validatePromptCurationPayload,
   validateApprovalPolicyPayload,
   validateAnalysisApprovalPayload,
+  validateUserRoleManagementPayload,
 };
