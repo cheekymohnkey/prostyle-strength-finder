@@ -306,6 +306,73 @@ function getStyleInfluenceById(dbPath, styleInfluenceId) {
   return rows[0] || null;
 }
 
+function getStyleInfluenceTypeByKey(dbPath, typeKey) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT style_influence_type_id, type_key, label, parameter_prefix, related_parameter_name, description, enabled_flag
+     FROM style_influence_types
+     WHERE type_key = ${quote(typeKey)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getStyleInfluenceTypeById(dbPath, styleInfluenceTypeId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT style_influence_type_id, type_key, label, parameter_prefix, related_parameter_name, description, enabled_flag
+     FROM style_influence_types
+     WHERE style_influence_type_id = ${quote(styleInfluenceTypeId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertStyleInfluenceType(dbPath, input) {
+  exec(
+    dbPath,
+    `INSERT INTO style_influence_types (
+       style_influence_type_id, type_key, label, parameter_prefix, related_parameter_name, description, enabled_flag
+     ) VALUES (
+       ${quote(input.styleInfluenceTypeId)},
+       ${quote(input.typeKey)},
+       ${quote(input.label)},
+       ${quote(input.parameterPrefix)},
+       ${quote(input.relatedParameterName || null)},
+       ${quote(input.description || null)},
+       ${Number(input.enabledFlag === undefined ? 1 : input.enabledFlag)}
+     );`
+  );
+}
+
+function ensureStyleInfluenceTypeByKey(dbPath, input) {
+  const existing = getStyleInfluenceTypeByKey(dbPath, input.typeKey);
+  if (existing) {
+    return existing;
+  }
+  insertStyleInfluenceType(dbPath, input);
+  return getStyleInfluenceTypeByKey(dbPath, input.typeKey);
+}
+
+function insertStyleInfluence(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO style_influences (
+       style_influence_id, style_influence_type_id, influence_code, status,
+       pinned_flag, created_by, created_at
+     ) VALUES (
+       ${quote(input.styleInfluenceId)},
+       ${quote(input.styleInfluenceTypeId)},
+       ${quote(input.influenceCode)},
+       ${quote(input.status || "active")},
+       ${input.pinnedFlag ? 1 : 0},
+       ${quote(input.createdBy || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
 function updateStyleInfluenceGovernance(dbPath, styleInfluenceId, action) {
   const normalized = String(action || "").trim();
   if (normalized === "disable") {
@@ -369,6 +436,87 @@ function listAdminActionsAuditByTarget(dbPath, targetType, targetId) {
      FROM admin_actions_audit
      WHERE target_type = ${quote(targetType)}
        AND target_id = ${quote(targetId)}
+     ORDER BY created_at DESC;`
+  );
+}
+
+function getContributorSubmissionById(dbPath, submissionId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT submission_id, owner_user_id, style_influence_id, source_image_id, status, last_job_id, created_at, updated_at
+     FROM contributor_submissions
+     WHERE submission_id = ${quote(submissionId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listContributorSubmissionsByOwnerUserId(dbPath, ownerUserId) {
+  return queryJson(
+    dbPath,
+    `SELECT submission_id, owner_user_id, style_influence_id, source_image_id, status, last_job_id, created_at, updated_at
+     FROM contributor_submissions
+     WHERE owner_user_id = ${quote(ownerUserId)}
+     ORDER BY updated_at DESC;`
+  );
+}
+
+function insertContributorSubmission(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  const updatedAt = input.updatedAt || createdAt;
+  exec(
+    dbPath,
+    `INSERT INTO contributor_submissions (
+       submission_id, owner_user_id, style_influence_id, source_image_id,
+       status, last_job_id, created_at, updated_at
+     ) VALUES (
+       ${quote(input.submissionId)},
+       ${quote(input.ownerUserId)},
+       ${quote(input.styleInfluenceId)},
+       ${quote(input.sourceImageId)},
+       ${quote(input.status || "created")},
+       ${quote(input.lastJobId || null)},
+       ${quote(createdAt)},
+       ${quote(updatedAt)}
+     );`
+  );
+}
+
+function updateContributorSubmissionStatusAndJob(dbPath, submissionId, input) {
+  exec(
+    dbPath,
+    `UPDATE contributor_submissions
+     SET
+       status = ${quote(input.status)},
+       last_job_id = ${quote(input.lastJobId || null)},
+       updated_at = ${quote(nowIso())}
+     WHERE submission_id = ${quote(submissionId)};`
+  );
+}
+
+function insertContributorSubmissionAction(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO contributor_submission_actions (
+       contributor_submission_action_id, submission_id, user_id, action_type, job_id, created_at
+     ) VALUES (
+       ${quote(input.contributorSubmissionActionId)},
+       ${quote(input.submissionId)},
+       ${quote(input.userId)},
+       ${quote(input.actionType)},
+       ${quote(input.jobId || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function listContributorSubmissionActionsBySubmissionId(dbPath, submissionId) {
+  return queryJson(
+    dbPath,
+    `SELECT contributor_submission_action_id, submission_id, user_id, action_type, job_id, created_at
+     FROM contributor_submission_actions
+     WHERE submission_id = ${quote(submissionId)}
      ORDER BY created_at DESC;`
   );
 }
@@ -775,9 +923,20 @@ module.exports = {
   insertImageTraitAnalysis,
   getImageTraitAnalysisByJobId,
   getStyleInfluenceById,
+  getStyleInfluenceTypeByKey,
+  getStyleInfluenceTypeById,
+  insertStyleInfluenceType,
+  ensureStyleInfluenceTypeByKey,
+  insertStyleInfluence,
   updateStyleInfluenceGovernance,
   insertAdminActionAudit,
   listAdminActionsAuditByTarget,
+  getContributorSubmissionById,
+  listContributorSubmissionsByOwnerUserId,
+  insertContributorSubmission,
+  updateContributorSubmissionStatusAndJob,
+  insertContributorSubmissionAction,
+  listContributorSubmissionActionsBySubmissionId,
   getRecommendationExtractionById,
   insertRecommendationExtraction,
   markRecommendationExtractionConfirmed,

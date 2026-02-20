@@ -14,9 +14,19 @@ const {
   getLatestAnalysisRunByJobId,
   getImageTraitAnalysisByJobId,
   getStyleInfluenceById,
+  getStyleInfluenceTypeByKey,
+  getStyleInfluenceTypeById,
+  ensureStyleInfluenceTypeByKey,
+  insertStyleInfluence,
   updateStyleInfluenceGovernance,
   insertAdminActionAudit,
   listAdminActionsAuditByTarget,
+  getContributorSubmissionById,
+  listContributorSubmissionsByOwnerUserId,
+  insertContributorSubmission,
+  updateContributorSubmissionStatusAndJob,
+  insertContributorSubmissionAction,
+  listContributorSubmissionActionsBySubmissionId,
   insertJob,
   updateJobStatus,
   updateJobModerationStatus,
@@ -61,6 +71,8 @@ const {
   validatePromptCurationPayload,
   validateApprovalPolicyPayload,
   validateAnalysisApprovalPayload,
+  validateContributorSubmissionCreatePayload,
+  validateContributorSubmissionTriggerPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -601,6 +613,15 @@ function requireAdminUser(dbPath, userId) {
   return user && user.role === "admin" && user.status === "active";
 }
 
+function requireContributorUser(dbPath, userId) {
+  const user = ensureUser(dbPath, {
+    userId,
+    role: "consumer",
+    status: "active",
+  });
+  return user && user.role === "contributor" && user.status === "active";
+}
+
 function invalidateRecommendationCaches() {
   // Placeholder hook for future in-process cache invalidation.
   return { invalidated: false, strategy: "no_cache_layer_present" };
@@ -647,6 +668,67 @@ function createJobEnvelope(submitBody) {
   };
 
   return validateAnalysisJobEnvelope(envelope);
+}
+
+function mapContributorSubmissionActionRow(row) {
+  return {
+    contributorSubmissionActionId: row.contributor_submission_action_id,
+    submissionId: row.submission_id,
+    userId: row.user_id,
+    actionType: row.action_type,
+    jobId: row.job_id,
+    createdAt: row.created_at,
+  };
+}
+
+function mapContributorSubmissionRow(row, styleInfluence, styleInfluenceType, job) {
+  const status = job ? job.status : row.status;
+  return {
+    submissionId: row.submission_id,
+    ownerUserId: row.owner_user_id,
+    sourceImageId: row.source_image_id,
+    status,
+    lastJobId: row.last_job_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    styleInfluence: styleInfluence ? {
+      styleInfluenceId: styleInfluence.style_influence_id,
+      styleInfluenceTypeId: styleInfluence.style_influence_type_id,
+      influenceType: styleInfluenceType ? styleInfluenceType.type_key : null,
+      influenceCode: styleInfluence.influence_code,
+      status: styleInfluence.status,
+      pinned: Boolean(styleInfluence.pinned_flag),
+      createdBy: styleInfluence.created_by,
+      createdAt: styleInfluence.created_at,
+    } : null,
+    lastJob: job ? mapAnalysisJobRow(job) : null,
+  };
+}
+
+function ensureDefaultContributorStyleInfluenceType(dbPath, influenceType) {
+  if (influenceType === "profile") {
+    return ensureStyleInfluenceTypeByKey(dbPath, {
+      styleInfluenceTypeId: "sit_profile_default",
+      typeKey: "profile",
+      label: "Profile",
+      parameterPrefix: "--profile",
+      relatedParameterName: "--stylize",
+      description: "Default contributor-managed profile type",
+      enabledFlag: 1,
+    });
+  }
+  if (influenceType === "sref") {
+    return ensureStyleInfluenceTypeByKey(dbPath, {
+      styleInfluenceTypeId: "sit_sref_default",
+      typeKey: "sref",
+      label: "Style Reference",
+      parameterPrefix: "--sref",
+      relatedParameterName: "--sw",
+      description: "Default contributor-managed style-reference type",
+      enabledFlag: 1,
+    });
+  }
+  return null;
 }
 
 async function requestHandler(req, res, config, dbPath, queueAdapter, storageAdapter) {
@@ -1185,6 +1267,402 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       {
         recommendationSessionId: sessionId,
         feedback,
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/contributor/submissions") {
+    if (!requireContributorUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Contributor role is required", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateContributorSubmissionCreatePayload(body);
+      const styleInfluenceType = ensureDefaultContributorStyleInfluenceType(dbPath, payload.influenceType)
+        || getStyleInfluenceTypeByKey(dbPath, payload.influenceType);
+      if (!styleInfluenceType || Number(styleInfluenceType.enabled_flag || 0) !== 1) {
+        sendError(res, 400, "INVALID_REQUEST", "Unknown or disabled style influence type", ctx, {
+          influenceType: payload.influenceType,
+        });
+        return;
+      }
+
+      const styleInfluenceId = `si_${crypto.randomUUID()}`;
+      insertStyleInfluence(dbPath, {
+        styleInfluenceId,
+        styleInfluenceTypeId: styleInfluenceType.style_influence_type_id,
+        influenceCode: payload.influenceCode,
+        status: "active",
+        pinnedFlag: false,
+        createdBy: authenticatedUserId,
+      });
+      const submissionId = `csub_${crypto.randomUUID()}`;
+      insertContributorSubmission(dbPath, {
+        submissionId,
+        ownerUserId: authenticatedUserId,
+        styleInfluenceId,
+        sourceImageId: payload.sourceImageId,
+        status: "created",
+        lastJobId: null,
+      });
+      insertContributorSubmissionAction(dbPath, {
+        contributorSubmissionActionId: `csa_${crypto.randomUUID()}`,
+        submissionId,
+        userId: authenticatedUserId,
+        actionType: "created",
+        jobId: null,
+      });
+
+      const submission = getContributorSubmissionById(dbPath, submissionId);
+      const styleInfluence = getStyleInfluenceById(dbPath, styleInfluenceId);
+      sendJson(
+        res,
+        201,
+        {
+          submission: mapContributorSubmissionRow(submission, styleInfluence, styleInfluenceType, null),
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      const duplicateInfluenceCode = String(error.message || "").includes("UNIQUE constraint failed: style_influences.influence_code");
+      if (duplicateInfluenceCode) {
+        sendError(res, 409, "CONFLICT", "Influence code already exists", ctx);
+        return;
+      }
+      sendError(res, 400, "INVALID_REQUEST", "Contributor submission failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path === "/v1/contributor/submissions") {
+    if (!requireContributorUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Contributor role is required", ctx);
+      return;
+    }
+
+    const rows = listContributorSubmissionsByOwnerUserId(dbPath, authenticatedUserId);
+    const submissions = rows.map((row) => {
+      const styleInfluence = getStyleInfluenceById(dbPath, row.style_influence_id);
+      const styleInfluenceType = styleInfluence
+        ? getStyleInfluenceTypeById(dbPath, styleInfluence.style_influence_type_id)
+        : null;
+      const job = row.last_job_id ? getJobById(dbPath, row.last_job_id) : null;
+      if (job && job.status !== row.status) {
+        updateContributorSubmissionStatusAndJob(dbPath, row.submission_id, {
+          status: job.status,
+          lastJobId: row.last_job_id,
+        });
+      }
+      const refreshed = getContributorSubmissionById(dbPath, row.submission_id);
+      const refreshedJob = refreshed?.last_job_id ? getJobById(dbPath, refreshed.last_job_id) : null;
+      return mapContributorSubmissionRow(refreshed || row, styleInfluence, styleInfluenceType, refreshedJob);
+    });
+
+    sendJson(
+      res,
+      200,
+      {
+        submissions,
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/contributor/submissions/")
+    && path.endsWith("/trigger")) {
+    if (!requireContributorUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Contributor role is required", ctx);
+      return;
+    }
+
+    const submissionId = path.slice("/v1/contributor/submissions/".length, -"/trigger".length);
+    const submission = getContributorSubmissionById(dbPath, submissionId);
+    if (!submission) {
+      sendError(res, 404, "NOT_FOUND", "Contributor submission not found", ctx);
+      return;
+    }
+    if (submission.owner_user_id !== authenticatedUserId) {
+      sendError(res, 403, "FORBIDDEN", "Contributor submission is not accessible", ctx);
+      return;
+    }
+
+    const existingJob = submission.last_job_id ? getJobById(dbPath, submission.last_job_id) : null;
+    if (existingJob && ["queued", "in_progress", "retrying", "pending_approval"].includes(existingJob.status)) {
+      sendError(res, 409, "INVALID_STATE", "Contributor submission already has an active analysis job", ctx, {
+        status: existingJob.status,
+      });
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateContributorSubmissionTriggerPayload(body);
+      const policy = getApprovalPolicy(dbPath);
+      const envelope = createJobEnvelope({
+        idempotencyKey: `contrib:${submissionId}:trigger:${Date.now()}`,
+        runType: "trait",
+        imageId: submission.source_image_id,
+        context: payload.promptText
+          ? { promptText: payload.promptText, submissionId }
+          : { submissionId },
+      });
+      const requiresManualApproval = policy.approval_mode === "manual";
+      const jobRecord = {
+        jobId: envelope.jobId,
+        status: requiresManualApproval ? "pending_approval" : "queued",
+        moderationStatus: "none",
+        rerunOfJobId: null,
+        runType: envelope.runType,
+        imageId: envelope.imageId,
+        idempotencyKey: envelope.idempotencyKey,
+        submittedAt: envelope.submittedAt,
+        modelFamily: envelope.modelFamily,
+        modelVersion: envelope.modelVersion,
+        modelSelectionSource: envelope.modelSelectionSource,
+      };
+
+      insertJob(dbPath, jobRecord);
+      if (!requiresManualApproval) {
+        try {
+          queueAdapter.enqueue({
+            body: JSON.stringify(envelope),
+          });
+        } catch (error) {
+          updateJobStatus(dbPath, jobRecord.jobId, "failed");
+          updateContributorSubmissionStatusAndJob(dbPath, submissionId, {
+            status: "failed",
+            lastJobId: jobRecord.jobId,
+          });
+          insertContributorSubmissionAction(dbPath, {
+            contributorSubmissionActionId: `csa_${crypto.randomUUID()}`,
+            submissionId,
+            userId: authenticatedUserId,
+            actionType: "trigger_failed_enqueue",
+            jobId: jobRecord.jobId,
+          });
+          sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue contributor analysis job", ctx, {
+            reason: error.message,
+          });
+          return;
+        }
+      }
+
+      updateContributorSubmissionStatusAndJob(dbPath, submissionId, {
+        status: jobRecord.status,
+        lastJobId: jobRecord.jobId,
+      });
+      insertContributorSubmissionAction(dbPath, {
+        contributorSubmissionActionId: `csa_${crypto.randomUUID()}`,
+        submissionId,
+        userId: authenticatedUserId,
+        actionType: "triggered",
+        jobId: jobRecord.jobId,
+      });
+
+      const latestSubmission = getContributorSubmissionById(dbPath, submissionId);
+      const styleInfluence = getStyleInfluenceById(dbPath, latestSubmission.style_influence_id);
+      const styleInfluenceType = styleInfluence
+        ? getStyleInfluenceTypeById(dbPath, styleInfluence.style_influence_type_id)
+        : null;
+      sendJson(
+        res,
+        202,
+        {
+          submission: mapContributorSubmissionRow(
+            latestSubmission,
+            styleInfluence,
+            styleInfluenceType,
+            getJobById(dbPath, jobRecord.jobId)
+          ),
+          approvalPolicy: mapApprovalPolicyRow(policy),
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Contributor trigger failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/contributor/submissions/")
+    && path.endsWith("/retry")) {
+    if (!requireContributorUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Contributor role is required", ctx);
+      return;
+    }
+
+    const submissionId = path.slice("/v1/contributor/submissions/".length, -"/retry".length);
+    const submission = getContributorSubmissionById(dbPath, submissionId);
+    if (!submission) {
+      sendError(res, 404, "NOT_FOUND", "Contributor submission not found", ctx);
+      return;
+    }
+    if (submission.owner_user_id !== authenticatedUserId) {
+      sendError(res, 403, "FORBIDDEN", "Contributor submission is not accessible", ctx);
+      return;
+    }
+    if (!submission.last_job_id) {
+      sendError(res, 409, "INVALID_STATE", "Contributor submission has no prior job to retry", ctx);
+      return;
+    }
+
+    const lastJob = getJobById(dbPath, submission.last_job_id);
+    if (!lastJob) {
+      sendError(res, 409, "INVALID_STATE", "Contributor submission has no prior job to retry", ctx);
+      return;
+    }
+    if (!["failed", "dead_letter", "rejected"].includes(lastJob.status)) {
+      sendError(res, 409, "INVALID_STATE", "Contributor submission can only retry failed jobs", ctx, {
+        status: lastJob.status,
+      });
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateContributorSubmissionTriggerPayload(body);
+      const policy = getApprovalPolicy(dbPath);
+      const envelope = createJobEnvelope({
+        idempotencyKey: `contrib:${submissionId}:retry:${Date.now()}`,
+        runType: "trait",
+        imageId: submission.source_image_id,
+        context: payload.promptText
+          ? { promptText: payload.promptText, submissionId, rerunOfJobId: lastJob.job_id }
+          : { submissionId, rerunOfJobId: lastJob.job_id },
+      });
+      const requiresManualApproval = policy.approval_mode === "manual";
+      const jobRecord = {
+        jobId: envelope.jobId,
+        status: requiresManualApproval ? "pending_approval" : "queued",
+        moderationStatus: "none",
+        rerunOfJobId: lastJob.job_id,
+        runType: envelope.runType,
+        imageId: envelope.imageId,
+        idempotencyKey: envelope.idempotencyKey,
+        submittedAt: envelope.submittedAt,
+        modelFamily: envelope.modelFamily,
+        modelVersion: envelope.modelVersion,
+        modelSelectionSource: envelope.modelSelectionSource,
+      };
+
+      insertJob(dbPath, jobRecord);
+      if (!requiresManualApproval) {
+        try {
+          queueAdapter.enqueue({
+            body: JSON.stringify(envelope),
+          });
+        } catch (error) {
+          updateJobStatus(dbPath, jobRecord.jobId, "failed");
+          updateContributorSubmissionStatusAndJob(dbPath, submissionId, {
+            status: "failed",
+            lastJobId: jobRecord.jobId,
+          });
+          insertContributorSubmissionAction(dbPath, {
+            contributorSubmissionActionId: `csa_${crypto.randomUUID()}`,
+            submissionId,
+            userId: authenticatedUserId,
+            actionType: "retry_failed_enqueue",
+            jobId: jobRecord.jobId,
+          });
+          sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue contributor retry job", ctx, {
+            reason: error.message,
+          });
+          return;
+        }
+      }
+
+      updateContributorSubmissionStatusAndJob(dbPath, submissionId, {
+        status: jobRecord.status,
+        lastJobId: jobRecord.jobId,
+      });
+      insertContributorSubmissionAction(dbPath, {
+        contributorSubmissionActionId: `csa_${crypto.randomUUID()}`,
+        submissionId,
+        userId: authenticatedUserId,
+        actionType: "retried",
+        jobId: jobRecord.jobId,
+      });
+
+      const latestSubmission = getContributorSubmissionById(dbPath, submissionId);
+      const styleInfluence = getStyleInfluenceById(dbPath, latestSubmission.style_influence_id);
+      const styleInfluenceType = styleInfluence
+        ? getStyleInfluenceTypeById(dbPath, styleInfluence.style_influence_type_id)
+        : null;
+      sendJson(
+        res,
+        202,
+        {
+          submission: mapContributorSubmissionRow(
+            latestSubmission,
+            styleInfluence,
+            styleInfluenceType,
+            getJobById(dbPath, jobRecord.jobId)
+          ),
+          approvalPolicy: mapApprovalPolicyRow(policy),
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Contributor retry failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path.startsWith("/v1/contributor/submissions/")) {
+    if (!requireContributorUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Contributor role is required", ctx);
+      return;
+    }
+
+    const submissionId = path.slice("/v1/contributor/submissions/".length);
+    const submission = getContributorSubmissionById(dbPath, submissionId);
+    if (!submission) {
+      sendError(res, 404, "NOT_FOUND", "Contributor submission not found", ctx);
+      return;
+    }
+    if (submission.owner_user_id !== authenticatedUserId) {
+      sendError(res, 403, "FORBIDDEN", "Contributor submission is not accessible", ctx);
+      return;
+    }
+
+    const job = submission.last_job_id ? getJobById(dbPath, submission.last_job_id) : null;
+    if (job && job.status !== submission.status) {
+      updateContributorSubmissionStatusAndJob(dbPath, submissionId, {
+        status: job.status,
+        lastJobId: submission.last_job_id,
+      });
+    }
+    const latest = getContributorSubmissionById(dbPath, submissionId);
+    const styleInfluence = getStyleInfluenceById(dbPath, latest.style_influence_id);
+    const styleInfluenceType = styleInfluence
+      ? getStyleInfluenceTypeById(dbPath, styleInfluence.style_influence_type_id)
+      : null;
+    const actions = listContributorSubmissionActionsBySubmissionId(dbPath, submissionId)
+      .map(mapContributorSubmissionActionRow);
+    sendJson(
+      res,
+      200,
+      {
+        submission: mapContributorSubmissionRow(latest, styleInfluence, styleInfluenceType, latest.last_job_id
+          ? getJobById(dbPath, latest.last_job_id)
+          : null),
+        actions,
       },
       ctx
     );

@@ -937,6 +937,58 @@ async function requestHandler(config, req, res) {
     return;
   }
 
+  if (method === "POST" && path === "/api/contributor/submissions") {
+    await proxyRequest(config, req, res, "/contributor/submissions");
+    return;
+  }
+
+  if (method === "GET" && path === "/api/contributor/submissions") {
+    await proxyRequest(config, req, res, "/contributor/submissions");
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/api/contributor/submissions/")
+    && path.endsWith("/trigger")) {
+    const submissionId = path.slice("/api/contributor/submissions/".length, -"/trigger".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/contributor/submissions/${encodeURIComponent(submissionId)}/trigger`
+    );
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/api/contributor/submissions/")
+    && path.endsWith("/retry")) {
+    const submissionId = path.slice("/api/contributor/submissions/".length, -"/retry".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/contributor/submissions/${encodeURIComponent(submissionId)}/retry`
+    );
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/api/contributor/submissions/")) {
+    const submissionId = path.slice("/api/contributor/submissions/".length);
+    await proxyRequest(
+      config,
+      req,
+      res,
+      `/contributor/submissions/${encodeURIComponent(submissionId)}`
+    );
+    return;
+  }
+
+  if (method === "GET" && path === "/api/admin/approval-policy") {
+    await proxyRequest(config, req, res, "/admin/approval-policy");
+    return;
+  }
+
   if (method === "GET" && path.startsWith("/api/analysis-jobs/")) {
     if (path.endsWith("/result")) {
       const jobId = path.slice("/api/analysis-jobs/".length, -"/result".length);

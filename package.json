@@ -25,6 +25,8 @@
     "admin:governance-smoke": "node scripts/admin/governance-smoke.js",
     "admin:moderation-smoke": "node scripts/admin/moderation-smoke.js",
     "admin:prompt-curation-smoke": "node scripts/admin/prompt-curation-smoke.js",
-    "admin:approval-policy-smoke": "node scripts/admin/approval-policy-smoke.js"
+    "admin:approval-policy-smoke": "node scripts/admin/approval-policy-smoke.js",
+    "admin:frontend-proxy-smoke": "node scripts/admin/frontend-proxy-smoke.js",
+    "contributor:essentials-smoke": "node scripts/contributor/essentials-smoke.js"
   }
 }

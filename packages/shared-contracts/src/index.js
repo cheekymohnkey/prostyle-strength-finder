@@ -42,6 +42,11 @@ const {
   validateApprovalPolicyPayload,
   validateAnalysisApprovalPayload,
 } = require("./admin-governance");
+const {
+  CONTRIBUTOR_SUBMISSION_INFLUENCE_TYPES,
+  validateContributorSubmissionCreatePayload,
+  validateContributorSubmissionTriggerPayload,
+} = require("./contributor-essentials");
 const { createApiErrorResponse } = require("./api-error");
 
 module.exports = {
@@ -80,5 +85,8 @@ module.exports = {
   validatePromptCurationPayload,
   validateApprovalPolicyPayload,
   validateAnalysisApprovalPayload,
+  CONTRIBUTOR_SUBMISSION_INFLUENCE_TYPES,
+  validateContributorSubmissionCreatePayload,
+  validateContributorSubmissionTriggerPayload,
   createApiErrorResponse,
 };

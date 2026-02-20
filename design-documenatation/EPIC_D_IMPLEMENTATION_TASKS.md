@@ -1,6 +1,6 @@
 # Prostyle Strength Finder - Epic D Implementation Tasks
 
-Status: In progress (D1-D6 completed; D7-D8 pending)  
+Status: Complete (D1-D8 completed)  
 Date: 2026-02-20  
 Depends on:
 - `design-documenatation/DECISIONS.md`
@@ -24,7 +24,7 @@ Translate Epic D (MVP-3 Admin + Contributor Essentials) into executable engineer
 3. Epic C feedback loop is implemented and smoke-verified.
 4. Epic D is the next execution focus to deliver governance, moderation, contributor operations, and auditable controls.
 
-## Current Execution Snapshot (2026-02-20 D1-D6 Wrap)
+## Current Execution Snapshot (2026-02-20 D1-D7 Wrap)
 
 1. What was completed:
 - D1-D3 governance foundation is implemented:
@@ -63,6 +63,25 @@ Translate Epic D (MVP-3 Admin + Contributor Essentials) into executable engineer
   - approval policy smoke:
     - `scripts/admin/approval-policy-smoke.js`
     - `npm run admin:approval-policy-smoke`
+- D7 contributor essentials are implemented:
+  - migration `scripts/db/migrations/20260220113000_epic_d_contributor_essentials.sql`
+  - shared contributor validators in:
+    - `packages/shared-contracts/src/contributor-essentials.js`
+  - contributor endpoints:
+    - `POST /v1/contributor/submissions`
+    - `GET /v1/contributor/submissions`
+    - `POST /v1/contributor/submissions/:submissionId/trigger`
+    - `GET /v1/contributor/submissions/:submissionId`
+    - `POST /v1/contributor/submissions/:submissionId/retry`
+  - contributor smoke:
+    - `scripts/contributor/essentials-smoke.js`
+    - `npm run contributor:essentials-smoke`
+- D8 verification + handoff artifacts are implemented:
+  - minimal frontend critical-flow proxy smoke:
+    - `scripts/admin/frontend-proxy-smoke.js`
+    - `npm run admin:frontend-proxy-smoke`
+  - handoff artifact:
+    - `design-documenatation/EPIC_D_D8_HANDOVER.md`
 - README runbook includes Epic D admin smoke commands and endpoint references.
 
 2. Verification run:
@@ -73,21 +92,23 @@ Translate Epic D (MVP-3 Admin + Contributor Essentials) into executable engineer
 - `npm run admin:moderation-smoke`
 - `npm run admin:prompt-curation-smoke`
 - `npm run admin:approval-policy-smoke`
+- `npm run contributor:essentials-smoke`
+- `npm run admin:frontend-proxy-smoke`
 - Result: all Epic D admin smokes return `ok: true`, including:
   - `403` role-boundary rejection checks
   - audit creation checks for high-impact actions
   - moderation rerun enqueue and status transitions
   - prompt curation status transitions and active-prompt preference
   - approval policy default (`auto-approve`) and manual-mode gating (`pending_approval`)
+  - contributor ownership/role boundaries and retry flow checks
 
 3. Outstanding risks/issues:
 - Role assignment currently defaults first-seen users to `consumer`; no admin role-management UI/API yet.
 - Cache invalidation currently uses a placeholder hook (no in-process cache registry wired yet).
-- Contributor flows (D7) are not yet implemented.
 - Epic D closeout verification/handoff package (D8) is not yet completed.
 
 4. Recommended next task:
-- Execute D7 (`Contributor Essentials: upload/add/status/retry`) with explicit ownership checks and smoke coverage.
+- Start Epic E hardening follow-ups (role-management tooling, real cache invalidation, contributor/admin UX expansion).
 
 ## Epic D - Admin + Contributor Essentials (MVP-3)
 
