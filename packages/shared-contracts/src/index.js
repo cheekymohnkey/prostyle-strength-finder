@@ -33,8 +33,10 @@ const {
 const {
   STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
   ANALYSIS_MODERATION_ACTIONS,
+  PROMPT_CURATION_STATUSES,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
+  validatePromptCurationPayload,
 } = require("./admin-governance");
 const { createApiErrorResponse } = require("./api-error");
 
@@ -66,7 +68,9 @@ module.exports = {
   validateFeedbackEvaluationPayload,
   STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
   ANALYSIS_MODERATION_ACTIONS,
+  PROMPT_CURATION_STATUSES,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
+  validatePromptCurationPayload,
   createApiErrorResponse,
 };

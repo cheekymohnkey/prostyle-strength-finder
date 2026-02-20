@@ -1,5 +1,6 @@
 const STYLE_INFLUENCE_GOVERNANCE_ACTIONS = ["disable", "pin", "unpin", "remove"];
 const ANALYSIS_MODERATION_ACTIONS = ["flag", "remove", "re-run"];
+const PROMPT_CURATION_STATUSES = ["active", "deprecated", "experimental"];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -47,9 +48,29 @@ function validateAnalysisModerationPayload(value) {
   };
 }
 
+function validatePromptCurationPayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Prompt curation payload must be an object");
+  }
+
+  assertString(value.status, "status");
+  if (!PROMPT_CURATION_STATUSES.includes(value.status.trim())) {
+    throw new Error(`Invalid prompt curation status: ${value.status}`);
+  }
+
+  assertString(value.reason, "reason");
+
+  return {
+    status: value.status.trim(),
+    reason: value.reason.trim(),
+  };
+}
+
 module.exports = {
   STYLE_INFLUENCE_GOVERNANCE_ACTIONS,
   ANALYSIS_MODERATION_ACTIONS,
+  PROMPT_CURATION_STATUSES,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
+  validatePromptCurationPayload,
 };

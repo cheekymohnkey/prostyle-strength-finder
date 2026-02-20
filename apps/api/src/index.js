@@ -25,6 +25,7 @@ const {
   ensureRecommendationSession,
   getRecommendationSessionById,
   getPromptById,
+  updatePromptCurationStatus,
   listRecommendationsBySessionId,
   insertRecommendation,
   getRecommendationCountBySessionId,
@@ -55,6 +56,7 @@ const {
   validateFeedbackEvaluationPayload,
   validateStyleInfluenceGovernancePayload,
   validateAnalysisModerationPayload,
+  validatePromptCurationPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -1370,6 +1372,99 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         job: mapAnalysisJobRow(job),
         latestRun: mapAnalysisRunRow(latestRun),
         rerunJobs: rerunJobs.map(mapAnalysisJobRow),
+        actions,
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/prompts/")
+    && path.endsWith("/curation")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const promptId = path.slice("/v1/admin/prompts/".length, -"/curation".length);
+    const existing = getPromptById(dbPath, promptId);
+    if (!existing) {
+      sendError(res, 404, "NOT_FOUND", "Prompt not found", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validatePromptCurationPayload(body);
+      const updated = updatePromptCurationStatus(dbPath, promptId, payload.status);
+      const adminActionAuditId = `aud_${crypto.randomUUID()}`;
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId,
+        adminUserId: authenticatedUserId,
+        actionType: `prompt.curation.${payload.status}`,
+        targetType: "prompt",
+        targetId: promptId,
+        reason: payload.reason,
+      });
+      const auditRows = listAdminActionsAuditByTarget(dbPath, "prompt", promptId);
+      const latestAudit = auditRows.length > 0 ? mapAdminAuditRow(auditRows[0]) : null;
+
+      sendJson(
+        res,
+        200,
+        {
+          prompt: {
+            promptId: updated.prompt_id,
+            promptText: updated.prompt_text,
+            status: updated.status,
+            version: updated.version,
+            curated: Boolean(updated.curated_flag),
+            createdBy: updated.created_by,
+            createdAt: updated.created_at,
+          },
+          audit: latestAudit,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Prompt curation update failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET"
+    && path.startsWith("/v1/admin/prompts/")
+    && path.endsWith("/curation")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const promptId = path.slice("/v1/admin/prompts/".length, -"/curation".length);
+    const prompt = getPromptById(dbPath, promptId);
+    if (!prompt) {
+      sendError(res, 404, "NOT_FOUND", "Prompt not found", ctx);
+      return;
+    }
+
+    const actions = listAdminActionsAuditByTarget(dbPath, "prompt", promptId).map(mapAdminAuditRow);
+    sendJson(
+      res,
+      200,
+      {
+        prompt: {
+          promptId: prompt.prompt_id,
+          promptText: prompt.prompt_text,
+          status: prompt.status,
+          version: prompt.version,
+          curated: Boolean(prompt.curated_flag),
+          createdBy: prompt.created_by,
+          createdAt: prompt.created_at,
+        },
         actions,
       },
       ctx

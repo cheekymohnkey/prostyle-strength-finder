@@ -132,6 +132,12 @@ Admin moderation smoke:
 2. `npm run db:reset`
 3. `npm run admin:moderation-smoke`
 
+Admin prompt curation smoke:
+
+1. `set -a && source .env.local.example && set +a`
+2. `npm run db:reset`
+3. `npm run admin:prompt-curation-smoke`
+
 Admin governance endpoints:
 
 1. `POST /v1/admin/style-influences/:styleInfluenceId/governance`
@@ -141,6 +147,11 @@ Admin analysis moderation endpoints:
 
 1. `POST /v1/admin/analysis-jobs/:jobId/moderation`
 2. `GET /v1/admin/analysis-jobs/:jobId/moderation`
+
+Admin prompt curation endpoints:
+
+1. `POST /v1/admin/prompts/:promptId/curation`
+2. `GET /v1/admin/prompts/:promptId/curation`
 
 ## Recommendation API Quick Reference
 

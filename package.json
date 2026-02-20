@@ -23,6 +23,7 @@
     "feedback:frontend-proxy-smoke": "node scripts/feedback/frontend-proxy-smoke.js",
     "trait:smoke": "node scripts/trait/smoke.js",
     "admin:governance-smoke": "node scripts/admin/governance-smoke.js",
-    "admin:moderation-smoke": "node scripts/admin/moderation-smoke.js"
+    "admin:moderation-smoke": "node scripts/admin/moderation-smoke.js",
+    "admin:prompt-curation-smoke": "node scripts/admin/prompt-curation-smoke.js"
   }
 }

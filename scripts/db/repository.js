@@ -387,7 +387,14 @@ function getPromptByText(dbPath, promptText) {
     `SELECT prompt_id, prompt_text, status, version, curated_flag, created_by, created_at
      FROM prompts
      WHERE prompt_text = ${quote(promptText)}
-     ORDER BY created_at ASC
+     ORDER BY
+       CASE status
+         WHEN 'active' THEN 0
+         WHEN 'experimental' THEN 1
+         WHEN 'deprecated' THEN 2
+         ELSE 3
+       END ASC,
+       created_at DESC
      LIMIT 1;`
   );
   return rows[0] || null;
@@ -430,6 +437,16 @@ function ensurePromptByText(dbPath, input) {
 
   insertPrompt(dbPath, input);
   return getPromptByText(dbPath, input.promptText);
+}
+
+function updatePromptCurationStatus(dbPath, promptId, status) {
+  exec(
+    dbPath,
+    `UPDATE prompts
+     SET status = ${quote(status)}
+     WHERE prompt_id = ${quote(promptId)};`
+  );
+  return getPromptById(dbPath, promptId);
 }
 
 function getRecommendationSessionByExtractionId(dbPath, extractionId) {
@@ -717,6 +734,7 @@ module.exports = {
   getPromptById,
   insertPrompt,
   ensurePromptByText,
+  updatePromptCurationStatus,
   getRecommendationSessionByExtractionId,
   getRecommendationSessionById,
   insertRecommendationSession,
