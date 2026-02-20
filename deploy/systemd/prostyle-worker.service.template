@@ -1,0 +1,17 @@
+[Unit]
+Description=Prostyle Worker
+After=network.target prostyle-api.service
+
+[Service]
+Type=simple
+User=__RUN_USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__ENV_FILE__
+ExecStart=/usr/bin/env npm run worker
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/prostyle/worker.log
+StandardError=append:/var/log/prostyle/worker.log
+
+[Install]
+WantedBy=multi-user.target

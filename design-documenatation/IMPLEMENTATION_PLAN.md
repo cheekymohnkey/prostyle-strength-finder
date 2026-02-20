@@ -14,7 +14,7 @@ Approved on: 2026-02-18
 
 Convert agreed design artifacts into executable engineering work with clear sequencing, dependencies, and done criteria.
 
-## Current Status Snapshot (2026-02-18)
+## Current Status Snapshot (2026-02-20)
 
 1. Epic A foundation scope is complete in implementation.
 2. Non-local infrastructure baseline is provisioned via Terraform:
@@ -23,8 +23,8 @@ Convert agreed design artifacts into executable engineering work with clear sequ
 3. Live non-local smoke verification has passed for both environments:
 - S3: put/head/get/delete
 - SQS: send/receive/delete
-4. Recommended active focus for next build session:
-- Continue Epic B execution (MVP-1 Core Recommendation Flow), starting with B2 persistence and extraction-confirm -> recommendation-session finalization.
+4. Current execution focus:
+- Production deployment planning from local-first baseline, with optional UAT kept for future activation.
 
 ## Delivery Structure
 
@@ -41,7 +41,7 @@ Objective:
 
 Scope:
 1. Repository structure for API, worker, frontend, shared contracts.
-2. Environment configuration contract (`local`, `uat`, `prod`).
+2. Environment configuration contract (`local`, `prod`, with optional `uat`).
 3. SQLite setup + migration framework.
 4. S3 storage adapter + bucket structure conventions.
 5. SQS queue setup + DLQ policy scaffolding.

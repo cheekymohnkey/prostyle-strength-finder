@@ -1,0 +1,17 @@
+[Unit]
+Description=Prostyle API
+After=network.target
+
+[Service]
+Type=simple
+User=__RUN_USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__ENV_FILE__
+ExecStart=/usr/bin/env npm run api
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/prostyle/api.log
+StandardError=append:/var/log/prostyle/api.log
+
+[Install]
+WantedBy=multi-user.target

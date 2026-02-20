@@ -170,6 +170,33 @@ Expected:
 2. Forbidden-path checks return stable `403` behavior.
 3. Backup/restore and queue-recovery checks are reproducible and documented.
 
+## Launch Gate Execution Record (2026-02-20)
+
+Command executed:
+1. `/bin/zsh -lc 'export PATH="/opt/homebrew/opt/node@20/bin:$PATH"; set -a; source .env.local.example; set +a; npm run launch:readiness-smoke'`
+
+Result:
+1. `ok: true`
+2. `scope: full`
+3. `failedStep: null`
+4. Passed checks (16/16):
+- `contracts`
+- `db_reset`
+- `admin_governance_smoke`
+- `admin_moderation_smoke`
+- `admin_prompt_curation_smoke`
+- `admin_approval_policy_smoke`
+- `contributor_essentials_smoke`
+- `admin_frontend_proxy_smoke`
+- `feedback_service_smoke`
+- `feedback_frontend_proxy_smoke`
+- `admin_role_management_smoke`
+- `cache_invalidation_smoke`
+- `backup_restore_smoke`
+- `queue_recovery_smoke`
+- `frontend_critical_flow_smoke`
+- `ops_checks`
+
 ## Risks and Controls
 
 1. Risk: role-management endpoint misuse.

@@ -20,7 +20,7 @@ This file is the source of truth for product and technical decisions.
 
 ## Current State
 
-Status date: 2026-02-18
+Status date: 2026-02-20
 
 ### Decided
 
@@ -67,8 +67,8 @@ Rationale: Build can proceed without unresolved technical prerequisites.
 13. Implementation sequence is documented in `design-documenatation/IMPLEMENTATION_PLAN.md`.
 Rationale: Execution can proceed with an agreed epic/task dependency structure.
 
-14. Non-local environment strategy is fixed to exactly two environments for now: `uat` and `prod`.
-Rationale: Keeps operational surface area small while supporting safe pre-production and production separation.
+14. Active environment strategy is `local` + `prod`; `uat` remains an optional future environment.
+Rationale: Keeps recurring infrastructure cost lower while preserving a clear path to add UAT later if risk/cost tradeoffs change.
 
 15. AWS storage and queue foundations are provisioned and live-verified via Terraform.
 Rationale: Non-local S3/SQS prerequisites are now reproducible through IaC and validated with live smoke tests.
@@ -85,24 +85,39 @@ Rationale: Early parser confidence is still maturing; required confirmation redu
 19. Raw extracted metadata payloads are retained.
 Rationale: Enables future reprocessing with updated parsing rules without requiring users to re-upload historical files.
 
+20. MVP implementation epics A-E are completed and smoke-verified.
+Rationale: Core delivery scope, hardening, and launch-readiness gates have been executed with passing reproducible checks.
+
+21. Current database schema baseline is migration-driven SQLite and evolves only through versioned migrations.
+Rationale: Epic implementation established executable migration workflows and applied baseline + feature migrations as the operational source of truth for MVP.
+
+22. API contract baseline is versioned REST (`/v1/...`) with shared contract validators and smoke-verified endpoint behavior.
+Rationale: API style and payload validation rules are now implemented and exercised across recommendation, feedback, and admin flows.
+
+23. MVP hosting topology target is single-instance app/worker + SQLite with AWS S3/SQS, deploying to `prod` first while keeping `uat` as a future option.
+Rationale: Deployment strategy is decided for current phase; S3/SQS foundations are provisioned, Lightsail compute provisioning remains pending, and UAT can be added later without architecture changes.
+
 ### Open
 
 1. Canonical trait taxonomy.
-Notes: Needs a stable trait set and versioning strategy before schema finalization.
+Notes: Still open for long-term taxonomy governance/versioning; does not block current MVP operation.
 
 ### Deferred
 
-1. Final database schema.
-Blocked by: storage decision + trait taxonomy finalization.
-
-2. API contract definitions.
-Blocked by: backend architecture + UX flow decisions.
-
-3. Production hosting topology.
-Blocked by: stack decisions and expected usage patterns.
-
-4. Exploratory recommendation features (`Roll the Dice`, `Surprise Me`) for post-MVP.
+1. Exploratory recommendation features (`Roll the Dice`, `Surprise Me`) for post-MVP.
 Rationale: Valuable for creative discovery, but not required to start MVP implementation.
+
+2. Metric stack expansion beyond CloudWatch baseline (additional APM).
+Rationale: Useful for deeper observability, but not required for MVP launch gates.
+
+3. LocalStack vs AWS-dev-resource split for local pre-prod testing.
+Rationale: Can start with current approach and tighten environment strategy later.
+
+4. Final test-tooling selection details.
+Rationale: Current smoke/unit/integration coverage is sufficient for MVP; tooling standardization can be iterated post-MVP.
+
+5. Optional UAT compute environment activation.
+Rationale: UAT is intentionally deferred to control recurring cost; enable when additional non-local pre-production validation is worth the spend.
 
 ## Decision Template (copy/paste)
 

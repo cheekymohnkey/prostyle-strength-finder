@@ -238,11 +238,12 @@ MVP shared component scope:
 4. Async job status indicator.
 5. Filter/sort controls for library and admin tables.
 
-## Decision 13: Environment Strategy (Local Pre-Prod + Two Non-Local Environments)
+## Decision 13: Environment Strategy (Local + Prod, with Optional Future UAT)
 
 Proposed:
 - Local-first pre-prod testing environment as standard workflow.
-- Two non-local environments only for now: `uat` and `prod`.
+- One active non-local environment for now: `prod`.
+- Keep `uat` as an optional future environment if additional pre-production isolation is needed.
 
 Local pre-prod baseline:
 1. API process + worker process run locally.
@@ -250,7 +251,7 @@ Local pre-prod baseline:
 3. S3/SQS simulation via LocalStack, or separate low-risk AWS dev resources.
 4. Seed fixtures for recommendation, feedback, moderation, and queue-failure scenarios.
 
-UAT baseline:
+Optional UAT baseline (future):
 1. Single Lightsail UAT instance.
 2. Isolated S3 bucket and SQS queue (separate from production).
 3. Production-like config shape with environment-specific values.
@@ -261,11 +262,11 @@ Why:
 - Maintains high confidence with low operational overhead.
 
 Required rule:
-- Environment parity by configuration contract (same env var names and service interfaces across local/uat/prod).
+- Environment parity by configuration contract (same env var names and service interfaces across local/prod and optional uat).
 
 Implementation status (2026-02-18):
 1. Terraform IaC scaffold implemented under `infra/terraform` for `uat` and `prod`.
-2. Stacks applied successfully for both non-local environments.
+2. S3/SQS stacks applied successfully for both non-local environments.
 3. Live smoke checks confirmed runtime access for required operations:
 - S3 `put/get/delete` (with object head verification)
 - SQS `send/receive/delete`

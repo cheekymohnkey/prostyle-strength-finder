@@ -1,0 +1,17 @@
+[Unit]
+Description=Prostyle Frontend
+After=network.target prostyle-api.service
+
+[Service]
+Type=simple
+User=__RUN_USER__
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__ENV_FILE__
+ExecStart=/usr/bin/env npm run frontend
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/prostyle/frontend.log
+StandardError=append:/var/log/prostyle/frontend.log
+
+[Install]
+WantedBy=multi-user.target
