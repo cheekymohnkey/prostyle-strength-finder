@@ -28,6 +28,21 @@ Always anchor tasks to:
 10. `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
 10. `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
 
+## Implementation Plan Links
+
+1. Master implementation plan:
+- `design-documenatation/IMPLEMENTATION_PLAN.md`
+2. UI upgrade implementation plan:
+- `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+3. Style-DNA admin implementation plan:
+- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+4. Style-DNA admin implementation tasks:
+- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+5. UI upgrade handover (latest):
+- `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-21.md`
+6. Style-DNA handover (latest):
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-21.md`
+
 
 ## New Task Start Template
 
@@ -125,57 +140,12 @@ Pause and re-scope when:
 2. Minimal context-window degradation effects.
 3. Clean handoffs between chats with no decision loss.
 
-## Trait Synonym Squashing Policy
+## Feature-Specific Contracts
 
-Use this policy for trait taxonomy analysis/discovery so labels stay stable over time.
-Reference schema draft:
-- `design-documenatation/TRAIT_TAXONOMY_SCHEMA_DRAFT.json`
-- `design-documenatation/TRAIT_TAXONOMY_SQL_DRAFT.sql`
+Keep feature implementation contracts out of this workflow doc.
 
-1. Canonical-first registry:
-- Every trait maps to one `canonical_trait_id` and one display label.
-- All variants map through `trait_aliases` -> `canonical_trait_id`.
-
-2. Normalize before lookup:
-- lowercase
-- trim whitespace
-- convert hyphen/underscore to spaces
-- collapse repeated spaces
-- singularize simple plurals where safe
-
-3. Alias resolution order:
-- exact canonical label match
-- exact alias match
-- normalized string match
-- embedding-assisted candidate merge (see thresholds below)
-
-4. Auto-merge thresholds (both required):
-- lexical similarity threshold: Jaccard token similarity `>= 0.70`
-- semantic similarity threshold: embedding cosine similarity `>= 0.88`
-
-5. Manual-review gate:
-- If either threshold fails, do not auto-merge.
-- If term is semantically close but definition intent differs, do not merge; route to review.
-
-6. Ambiguity denylist:
-- Reject vague labels such as `style`, `quality`, `nice lighting`, `good colors`.
-- Require concrete remap to approved trait family/definition.
-
-7. Versioning and audit:
-- Persist alias decisions with `taxonomy_version`, timestamp, and reviewer/source.
-- Never hard-delete aliases; mark deprecated when replaced.
-- Re-analysis/replay should use the taxonomy version active at original scoring time.
-
-8. Discovery-mode boundary:
-- Open-trait discovery may propose candidates, but production scoring must use canonical traits only until approved.
-
-### Synonym Examples
-
-1. Merge to `color.temperature_bias`:
-- `cool palette`, `cool-toned`, `cold color cast`
-
-2. Merge to `color.saturation_level`:
-- `muted color`, `low saturation`, `desaturated look`
-
-3. Do not auto-merge:
-- `cinematic` -> could map to mood, lighting, grade, or composition; requires manual review.
+Style-DNA extraction and taxonomy policy references:
+1. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+2. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+3. `design-documenatation/TRAIT_TAXONOMY_SCHEMA_DRAFT.json`
+4. `design-documenatation/TRAIT_TAXONOMY_SQL_DRAFT.sql`

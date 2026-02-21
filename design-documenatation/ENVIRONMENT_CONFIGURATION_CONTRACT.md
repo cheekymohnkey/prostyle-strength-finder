@@ -38,6 +38,14 @@ For the current phase, these are the only supported environments beyond local: `
 | `COGNITO_CLIENT_ID` | Yes | API, Worker | string | Cognito app client identifier. |
 | `COGNITO_ISSUER` | Yes | API, Worker | URL | JWT issuer expected by API. |
 | `COGNITO_AUDIENCE` | Yes | API, Worker | string | JWT audience expected by API. |
+| `FRONTEND_AUTH_MODE` | No | Frontend | `cognito|disabled` | Frontend auth mode. `disabled` is allowed only when `APP_ENV=local`. |
+| `COGNITO_HOSTED_UI_BASE_URL` | Yes | Frontend | URL | Cognito Hosted UI domain base URL used for `/oauth2/authorize`, `/oauth2/token`, and `/logout`. |
+| `COGNITO_REDIRECT_PATH` | No | Frontend | path | Frontend callback path for OAuth code exchange (default `/api/auth/callback`). |
+| `COGNITO_POST_LOGOUT_REDIRECT_PATH` | No | Frontend | path | App path used as Cognito logout return target (default `/`). |
+| `FRONTEND_SESSION_SECRET` | Yes | Frontend | string | HMAC signing secret for encrypted/signed frontend auth session cookie. |
+| `FRONTEND_SESSION_COOKIE_NAME` | No | Frontend | string | Frontend auth session cookie key (default `prostyle_frontend_session`). |
+| `LOCAL_AUTH_BYPASS_SUBJECT` | No | Frontend | string | Local bypass subject when `FRONTEND_AUTH_MODE=disabled` (default `frontend-local-user`). |
+| `LOCAL_AUTH_BYPASS_EMAIL` | No | Frontend | string | Optional local bypass email claim when `FRONTEND_AUTH_MODE=disabled`. |
 | `AUTH_JWT_VERIFICATION_MODE` | No | API | `jwks|insecure` | `jwks` verifies signature against JWKS; `insecure` validates claims only (local dev only). |
 | `AUTH_JWKS_CACHE_TTL_SEC` | No | API | integer | JWKS cache TTL in seconds (default `600`). |
 | `DEFAULT_STANDARD_MODEL_VERSION` | Yes | API, Worker | integer string | Current default MidJourney standard model version used when prompt has no `--v`/`--niji`. |
@@ -50,6 +58,7 @@ For the current phase, these are the only supported environments beyond local: `
 | `SERVICE_NAME` | Yes | API, Worker | string | Service identifier in logs. |
 | `LOG_INCLUDE_CORRELATION_IDS` | No | API, Worker | `true|false` | Defaults to `true` when omitted. |
 | `NEXT_PUBLIC_API_BASE_URL` | Yes | Frontend | URL | API base URL exposed to browser runtime. |
+| `NEXT_PUBLIC_APP_BASE_URL` | Yes | Frontend | URL | Browser-visible frontend base URL used to build OAuth redirect/logout URIs. |
 
 ## Ownership and Validation
 

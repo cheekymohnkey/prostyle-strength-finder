@@ -25,6 +25,10 @@ Convert agreed design artifacts into executable engineering work with clear sequ
 - SQS: send/receive/delete
 4. Current execution focus:
 - Production deployment planning from local-first baseline, with optional UAT kept for future activation.
+5. UI upgrade status:
+- Next.js frontend is now default local frontend entrypoint.
+- Legacy frontend is retained as fallback during migration window.
+- Launch readiness smoke currently passes with Next frontend flow.
 
 ## Delivery Structure
 
@@ -33,6 +37,15 @@ Convert agreed design artifacts into executable engineering work with clear sequ
 3. Epic C: Feedback Loop (MVP-2)
 4. Epic D: Admin + Contributor Essentials (MVP-3)
 5. Epic E: Hardening, Observability, and Launch Readiness
+6. UI Upgrade Track: Frontend stack alignment and migration plan
+7. Style-DNA Delta Track: Controlled baseline-vs-test grid analysis
+
+UI Upgrade reference:
+- `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+Style-DNA dedicated reference:
+- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+Style-DNA execution tasks:
+- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
 ## Epic A: Platform Foundation
 
@@ -191,3 +204,65 @@ Mitigation: enforce MVP scope gates from `MVP_PATH.md`.
 1. Epics accepted and ordered.
 2. First sprint scope accepted.
 3. Team agrees definitions of done and dependency order.
+
+## Style-DNA Delta Track (Cross-Tier)
+
+Objective:
+- Implement a rigorous style influence analysis workflow using paired MidJourney grids and strict structured LLM extraction.
+
+Scope:
+1. Implement this as an admin-only workflow.
+2. Accept baseline/test grid pair uploads plus shared render parameter envelope.
+3. Run vision analysis with strict JSON schema output.
+4. Persist raw extraction and normalized/canonical trait outputs.
+5. Support stylize-tiered comparison (`0`, `100`, `250`, `1000`) with same-tier delta rules.
+6. Add reusable baseline-set management keyed by MidJourney version + parameter envelope.
+7. Expose API/UI surfaces for prompt generation, pair submission, status, and results.
+
+Out of scope:
+1. In-app MidJourney rendering orchestration.
+2. Mandatory per-quadrant image splitting for MVP.
+
+### Tier Breakdown
+
+Frontend:
+1. Add admin-only style-dna console.
+2. Add stored style-influence list/select UI (srefs/moodboards).
+3. Add prompt-generation UI producing copy-ready MidJourney prompt blocks.
+4. Add paired-grid intake UX (Baseline Grid A, Test Grid B), with baseline pre-linked from reusable baseline set.
+5. Show extraction status + structured result panels (structural, lighting, color, texture, tags).
+
+API:
+1. Add baseline-set endpoints (create/list/get) keyed by MJ model/version + parameter envelope hash.
+2. Add prompt-generation endpoint that takes selected style influence and emits paste-ready prompts.
+3. Add submit endpoint for style-dna jobs with pair validation and idempotency.
+4. Add status/result endpoints returning both raw and canonicalized views.
+5. Enforce schema version + prompt version references per run.
+
+Worker/LLM:
+1. Load prompt text from versioned file at runtime.
+2. Call OpenAI with strict schema response format.
+3. Validate response against contract; fail job with explicit error codes on schema mismatch.
+
+Persistence:
+1. Store reusable baseline sets and their prompt-level baseline grid references.
+2. Store baseline/test image references and pair linkage.
+3. Store LLM raw JSON response for audit/replay.
+4. Store normalized atomic traits and mapped canonical traits with taxonomy version.
+
+Taxonomy governance:
+1. Apply alias/synonym snapping after extraction.
+2. Route low-confidence or ambiguous traits to manual-review queue.
+3. Keep discovery-mode candidates separate from production canonical traits until approved.
+
+Observability/testing:
+1. Add smoke for strict JSON contract success/failure paths.
+2. Add deterministic fixture tests for stylize-tier comparison behavior.
+3. Track metrics: extraction success rate, schema-failure rate, unmapped trait rate, median analysis latency.
+
+Definition of done:
+1. Admin can generate copy-ready prompts for a selected stored style influence.
+2. Admin can upload returned test grid(s) and retrieve structured delta output against matching reusable baselines.
+3. Strict schema responses parse without fallback string handling.
+4. Canonical trait mapping runs with auditable alias/taxonomy version metadata.
+5. Same-tier stylize comparisons are enforced by API validation rules.

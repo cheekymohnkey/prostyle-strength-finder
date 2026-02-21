@@ -162,6 +162,54 @@ Approved on: 2026-02-18
 - if neither is present, persist current default `standard` model version
 - prompts containing both `--v` and `--niji` are invalid
 
+## Style-DNA Delta Analysis Extension (Agreed Direction)
+
+Purpose:
+- Add a controlled image-pair analysis workflow that isolates aesthetic influence changes between baseline and injected style controls.
+
+Operational shape:
+1. Admin selects a stored style influence (sref/moodboard) and target MidJourney model family/version.
+2. System generates paste-ready test prompts from a baseline prompt suite and fixed parameter envelope.
+3. Intake stores two grid images for one analysis pair:
+- `baseline_grid_image_id`
+- `test_grid_image_id`
+4. Both runs share a parameter envelope contract:
+- prompt text
+- seed
+- quality
+- stylize tier
+- raw/style mode
+- influence controls (`profile`, `sref`, `sw`)
+5. Worker sends both grids to vision LLM with strict JSON schema response contract.
+6. Persist:
+- raw structured output (audit/replay)
+- normalized atomic trait strings
+- canonical-mapped traits for scoring/query
+
+Recommended entity linkage (implementation-level, naming can vary):
+1. `analysis_runs`:
+- add optional pair/group key for baseline-test join.
+2. `images`:
+- continue using source types; include explicit baseline/test pair association at run level.
+3. `image_trait_analyses`:
+- retain `trait_schema_version`.
+- persist both:
+  - `atomic_traits_raw` (open strings from LLM)
+  - `trait_vector` (canonicalized/mapped payload).
+4. Baseline registry entities (logical):
+- `baseline_prompt_suites` (suite version + prompts)
+- `baseline_render_sets` (MJ model/version + parameter envelope + prompt suite version)
+- `baseline_render_set_items` (prompt -> baseline grid image reference)
+5. Prompt generation entities (logical):
+- `style_dna_prompt_jobs` (selected influence + target tier(s) + generated prompt text blocks)
+- `style_dna_prompt_job_items` (one paste-ready prompt string per baseline prompt/tier)
+
+Style tier interpretation policy:
+1. `stylize=0` run: prioritize structural/core trait extraction.
+2. `stylize=100|250|1000` runs: prioritize amplification/interaction analysis with model stylization pressure.
+3. Comparisons must be interpreted within the same stylize tier only.
+4. Baseline reuse is valid only when model family/version and parameter envelope match exactly.
+
 ## Open Design Questions
 
 1. Should trait vectors be fully structured columns or JSON first?

@@ -1,4 +1,5 @@
 const { spawn } = require("child_process");
+const net = require("net");
 const { parseDatabaseUrl, ensureDbParentDir, ensureMigrationsTable, runSql } = require("../db/lib");
 const { assertDatabaseReady } = require("../db/runtime");
 
@@ -12,6 +13,27 @@ function requireEnv(key) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function canBindPort(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+async function pickAvailablePort(startPort, maxAttempts = 40) {
+  for (let offset = 0; offset < maxAttempts; offset += 1) {
+    const candidate = startPort + offset;
+    // eslint-disable-next-line no-await-in-loop
+    if (await canBindPort(candidate)) {
+      return String(candidate);
+    }
+  }
+  throw new Error(`No available port found near ${startPort}`);
 }
 
 function quote(value) {
@@ -38,7 +60,7 @@ function buildToken(sub) {
 }
 
 async function waitForUrl(url) {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
       const response = await fetch(url);
       if (response.ok) {
@@ -47,7 +69,7 @@ async function waitForUrl(url) {
     } catch (_error) {
       // service may not be ready
     }
-    await sleep(200);
+    await sleep(250);
   }
   throw new Error(`Service did not become ready: ${url}`);
 }
@@ -71,22 +93,28 @@ async function main() {
   );
   const adminToken = buildToken("admin-frontend-critical-smoke-user");
 
-  const apiPort = process.env.FRONTEND_CRITICAL_SMOKE_API_PORT || "3026";
-  const frontendPort = process.env.FRONTEND_CRITICAL_SMOKE_FE_PORT || "3006";
+  const apiPort = await pickAvailablePort(Number(process.env.FRONTEND_CRITICAL_SMOKE_API_PORT || "3026"));
+  const frontendPort = await pickAvailablePort(Number(process.env.FRONTEND_CRITICAL_SMOKE_FE_PORT || "3006"));
   const frontendBase = `http://127.0.0.1:${frontendPort}`;
 
   const apiProc = spawn("node", ["apps/api/src/index.js"], {
     env: { ...process.env, PORT: apiPort },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const frontendProc = spawn("node", ["apps/frontend/src/index.js"], {
+  const frontendProc = spawn(
+    "/bin/zsh",
+    ["-lc", `cd apps/frontend && rm -rf .next/cache/webpack && exec ../../node_modules/.bin/next dev -p ${frontendPort}`],
+    {
     env: {
       ...process.env,
-      FRONTEND_PORT: frontendPort,
+      FRONTEND_AUTH_MODE: "disabled",
+      NEXT_DISABLE_WEBPACK_CACHE: "1",
       NEXT_PUBLIC_API_BASE_URL: `http://127.0.0.1:${apiPort}/v1`,
+      NEXT_PUBLIC_APP_BASE_URL: `http://127.0.0.1:${frontendPort}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
-  });
+    }
+  );
 
   let stderr = "";
   apiProc.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8"); });
@@ -100,14 +128,14 @@ async function main() {
     if (!htmlResponse.ok) {
       throw new Error(`Frontend page failed (${htmlResponse.status})`);
     }
-    if (!html.includes("Recommendation + Feedback Flow")) {
+    if (!html.includes("UI Upgrade - U3 Recommendation Flow")) {
       throw new Error("Frontend page missing recommendation flow heading");
     }
     if (!html.includes("Create Extraction")) {
       throw new Error("Frontend page missing extraction action");
     }
 
-    const policyResponse = await fetch(`${frontendBase}/api/admin/approval-policy`, {
+    const policyResponse = await fetch(`${frontendBase}/api/proxy/admin/approval-policy`, {
       headers: {
         "x-auth-token": adminToken,
       },

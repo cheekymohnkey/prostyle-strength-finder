@@ -10,6 +10,7 @@
     "api": "npm run dev --workspace=@prostyle/api",
     "worker": "npm run dev --workspace=@prostyle/worker",
     "frontend": "npm run dev --workspace=@prostyle/frontend",
+    "frontend:next": "npm run dev:next --workspace=@prostyle/frontend",
     "contracts": "npm run build --workspace=@prostyle/shared-contracts",
     "db:migrate": "node scripts/db/migrate.js apply",
     "db:status": "node scripts/db/migrate.js status",

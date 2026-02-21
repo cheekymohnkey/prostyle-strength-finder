@@ -258,8 +258,49 @@ Optional UAT baseline (future):
 
 Why:
 - Enables fast iteration without cloud-cost friction.
-- Catches integration failures before production rollout.
-- Maintains high confidence with low operational overhead.
+
+## Decision 14: Style-DNA Delta Analysis Contract
+
+Proposed:
+- Add a paired-grid analysis path for style DNA extraction using:
+  - `Grid A` = baseline render
+  - `Grid B` = test render with profile/sref controls
+- Scope this workflow to admin endpoints/UI only.
+- Persist parameter envelope per run:
+  - prompt text
+  - seed
+  - quality
+  - stylize tier (`0`, `100`, `250`, `1000`)
+  - raw/style mode flag
+  - influence parameters (`--profile`, `--sref`, `--sw`)
+- Use provider structured outputs with strict JSON schema enforcement:
+  - `response_format.type = json_schema`
+  - `strict = true`
+  - `additionalProperties = false` on all objects
+  - all fields required (with explicit `"No change"` or empty arrays when needed)
+- Keep system prompt text in versioned external file(s) loaded at runtime by Node backend.
+- Introduce reusable baseline sets keyed by:
+  - MidJourney model family/version
+  - baseline prompt suite version
+  - baseline parameter envelope hash
+- Add prompt-template generation service that emits paste-ready prompt strings for selected stored style influences.
+
+Why:
+- Enables rigorous baseline-vs-test comparison with minimal uncontrolled variance.
+- Prevents parse failures from free-form responses.
+- Keeps prompt iteration auditable and deployable without handler rewrites.
+
+Implementation notes:
+1. Preferred transport is single PNG grid upload (1024x1024 typical MJ grid), not per-quadrant splitting by default.
+2. Vision detail level should be explicitly high for grid-level analysis.
+3. Worker/API stores raw model JSON alongside normalized trait payload for replay.
+4. Taxonomy snapping/aliasing occurs post-extraction in application logic, not in the vision prompt.
+5. Baseline lookup must resolve by exact MidJourney model family/version and matching parameter envelope; no cross-version reuse.
+6. Prompt generation output should include one-click copy blocks for each baseline prompt in the suite.
+
+Deferred:
+- Automatic quadrant segmentation service (only if single-grid analysis proves insufficient).
+- Multi-model adjudication for disagreement handling.
 
 Required rule:
 - Environment parity by configuration contract (same env var names and service interfaces across local/prod and optional uat).
@@ -271,7 +312,7 @@ Implementation status (2026-02-18):
 - S3 `put/get/delete` (with object head verification)
 - SQS `send/receive/delete`
 
-## Decision 14: Testing Strategy
+## Decision 15: Testing Strategy
 
 Proposed:
 - Backend-first testing investment.
@@ -304,7 +345,7 @@ Why:
 - Avoids disproportionate time sink in fragile front-end test maintenance.
 - Keeps release safety through a compact smoke safety net.
 
-## Decision 15: Backend Runtime and Worker Library
+## Decision 16: Backend Runtime and Worker Library
 
 Proposed:
 - Backend runtime: Node.js + TypeScript.
@@ -324,7 +365,7 @@ Alternatives considered:
 - Python backend/worker: viable, but would split language/tooling across stack.
 - Raw custom SQS poll loop only: possible, but higher implementation/maintenance overhead for MVP.
 
-## Decision 16: Cognito Auth Integration Details
+## Decision 17: Cognito Auth Integration Details
 
 Proposed:
 - Use Cognito Hosted UI with Google IdP.
@@ -347,7 +388,7 @@ Why:
 - Keeps identity external and authorization internal.
 - Minimizes custom auth surface area.
 
-## Decision 17: Backup and Restore Policy (SQLite + S3)
+## Decision 18: Backup and Restore Policy (SQLite + S3)
 
 Proposed:
 - S3 is the backup destination for both database backups and image/artifact durability.

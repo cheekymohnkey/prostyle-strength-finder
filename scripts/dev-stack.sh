@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 ENV_FILE="${ENV_FILE:-.env.local}"
 NODE_PATH_PREFIX="${NODE_PATH_PREFIX:-/opt/homebrew/opt/node@20/bin}"
+FRONTEND_VARIANT="${FRONTEND_VARIANT:-legacy}"
 
 API_PID_FILE="/tmp/prostyle_api.pid"
 WORKER_PID_FILE="/tmp/prostyle_worker.pid"
@@ -14,6 +15,21 @@ FRONTEND_PID_FILE="/tmp/prostyle_frontend.pid"
 API_LOG="/tmp/prostyle_api.log"
 WORKER_LOG="/tmp/prostyle_worker.log"
 FRONTEND_LOG="/tmp/prostyle_frontend.log"
+
+resolve_frontend_cmd() {
+  case "${FRONTEND_VARIANT}" in
+    legacy)
+      echo "npm run frontend"
+      ;;
+    next)
+      echo "PORT=3000 npm run frontend:next"
+      ;;
+    *)
+      echo "Invalid FRONTEND_VARIANT='$FRONTEND_VARIANT' (expected: legacy|next)" >&2
+      exit 1
+      ;;
+  esac
+}
 
 if [[ -f "$ENV_FILE" ]]; then
   set -a
@@ -97,9 +113,13 @@ status_one() {
 }
 
 start_all() {
+  local frontend_cmd
+  frontend_cmd="$(resolve_frontend_cmd)"
+
   start_one "api" "npm run api" "$API_PID_FILE" "$API_LOG"
   start_one "worker" "npm run worker" "$WORKER_PID_FILE" "$WORKER_LOG"
-  start_one "frontend" "npm run frontend" "$FRONTEND_PID_FILE" "$FRONTEND_LOG"
+  start_one "frontend" "$frontend_cmd" "$FRONTEND_PID_FILE" "$FRONTEND_LOG"
+  echo "frontend_variant: ${FRONTEND_VARIANT}"
   echo "frontend: http://127.0.0.1:3000"
   echo "api health: http://127.0.0.1:3001/v1/health"
 }
@@ -132,7 +152,7 @@ case "${1:-}" in
     ;;
   *)
     echo "usage: scripts/dev-stack.sh {start|stop|restart|status}"
-    echo "optional: ENV_FILE=.env.local NODE_PATH_PREFIX=/opt/homebrew/opt/node@20/bin"
+    echo "optional: ENV_FILE=.env.local NODE_PATH_PREFIX=/opt/homebrew/opt/node@20/bin FRONTEND_VARIANT=legacy|next"
     exit 1
     ;;
 esac

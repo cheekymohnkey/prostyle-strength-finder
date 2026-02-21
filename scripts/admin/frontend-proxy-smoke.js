@@ -1,4 +1,5 @@
 const { spawn } = require("child_process");
+const net = require("net");
 const { parseDatabaseUrl, ensureDbParentDir, ensureMigrationsTable, runSql } = require("../db/lib");
 const { assertDatabaseReady } = require("../db/runtime");
 
@@ -27,6 +28,27 @@ function buildToken(sub) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function canBindPort(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+async function pickAvailablePort(startPort, maxAttempts = 40) {
+  for (let offset = 0; offset < maxAttempts; offset += 1) {
+    const candidate = startPort + offset;
+    // eslint-disable-next-line no-await-in-loop
+    if (await canBindPort(candidate)) {
+      return String(candidate);
+    }
+  }
+  throw new Error(`No available port found near ${startPort}`);
 }
 
 function requireEnv(key) {
@@ -147,7 +169,7 @@ function seedData(dbPath) {
 }
 
 async function waitForUrl(url) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
       const response = await fetch(url);
       if (response.ok) {
@@ -169,8 +191,8 @@ async function main() {
   assertDatabaseReady(databaseUrl);
   seedData(dbPath);
 
-  const apiPort = process.env.ADMIN_FRONTEND_PROXY_SMOKE_API_PORT || "3019";
-  const frontendPort = process.env.ADMIN_FRONTEND_PROXY_SMOKE_FE_PORT || "3003";
+  const apiPort = await pickAvailablePort(Number(process.env.ADMIN_FRONTEND_PROXY_SMOKE_API_PORT || "3019"));
+  const frontendPort = await pickAvailablePort(Number(process.env.ADMIN_FRONTEND_PROXY_SMOKE_FE_PORT || "3003"));
   const adminToken = buildToken("admin-frontend-proxy-smoke-user");
   const contributorToken = buildToken("contributor-frontend-proxy-smoke-user");
   const otherContributorToken = buildToken("contributor-frontend-proxy-other-user");
@@ -180,14 +202,20 @@ async function main() {
     env: { ...process.env, PORT: apiPort },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const feProc = spawn("node", ["apps/frontend/src/index.js"], {
+  const feProc = spawn(
+    "/bin/zsh",
+    ["-lc", `cd apps/frontend && rm -rf .next/cache/webpack && exec ../../node_modules/.bin/next dev -p ${frontendPort}`],
+    {
     env: {
       ...process.env,
-      FRONTEND_PORT: frontendPort,
+      FRONTEND_AUTH_MODE: "disabled",
+      NEXT_DISABLE_WEBPACK_CACHE: "1",
       NEXT_PUBLIC_API_BASE_URL: `http://127.0.0.1:${apiPort}/v1`,
+      NEXT_PUBLIC_APP_BASE_URL: `http://127.0.0.1:${frontendPort}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
-  });
+    }
+  );
 
   let stderr = "";
   apiProc.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8"); });
@@ -196,7 +224,7 @@ async function main() {
   try {
     await waitForUrl(`http://127.0.0.1:${frontendPort}/`);
 
-    const adminPolicyResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/admin/approval-policy`, {
+    const adminPolicyResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/proxy/admin/approval-policy`, {
       headers: { "x-auth-token": adminToken },
     });
     const adminPolicyJson = await adminPolicyResponse.json();
@@ -205,12 +233,12 @@ async function main() {
     }
     assertCondition(adminPolicyJson.policy.approvalMode === "auto-approve", "Expected admin policy approvalMode=auto-approve");
 
-    const forbiddenAdminPolicyResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/admin/approval-policy`, {
+    const forbiddenAdminPolicyResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/proxy/admin/approval-policy`, {
       headers: { "x-auth-token": contributorToken },
     });
     assertCondition(forbiddenAdminPolicyResponse.status === 403, "Expected contributor admin policy access to return 403");
 
-    const forbiddenConsumerCreateResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/contributor/submissions`, {
+    const forbiddenConsumerCreateResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/proxy/contributor/submissions`, {
       method: "POST",
       headers: {
         "x-auth-token": consumerToken,
@@ -224,7 +252,7 @@ async function main() {
     });
     assertCondition(forbiddenConsumerCreateResponse.status === 403, "Expected consumer contributor-create to return 403");
 
-    const createResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/contributor/submissions`, {
+    const createResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/proxy/contributor/submissions`, {
       method: "POST",
       headers: {
         "x-auth-token": contributorToken,
@@ -243,7 +271,7 @@ async function main() {
     const createdSubmissionId = createJson.submission.submissionId;
     assertCondition(Boolean(createdSubmissionId), "Expected created submission id");
 
-    const listResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/contributor/submissions`, {
+    const listResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/proxy/contributor/submissions`, {
       headers: { "x-auth-token": contributorToken },
     });
     const listJson = await listResponse.json();
@@ -257,7 +285,7 @@ async function main() {
     );
 
     const triggerResponse = await fetch(
-      `http://127.0.0.1:${frontendPort}/api/contributor/submissions/${encodeURIComponent(createdSubmissionId)}/trigger`,
+      `http://127.0.0.1:${frontendPort}/api/proxy/contributor/submissions/${encodeURIComponent(createdSubmissionId)}/trigger`,
       {
         method: "POST",
         headers: {
@@ -276,7 +304,7 @@ async function main() {
     assertCondition(["queued", "pending_approval"].includes(triggerJson.submission.status), "Expected trigger queued or pending_approval");
 
     const foreignReadResponse = await fetch(
-      `http://127.0.0.1:${frontendPort}/api/contributor/submissions/${encodeURIComponent(createdSubmissionId)}`,
+      `http://127.0.0.1:${frontendPort}/api/proxy/contributor/submissions/${encodeURIComponent(createdSubmissionId)}`,
       {
         headers: { "x-auth-token": otherContributorToken },
       }
@@ -284,7 +312,7 @@ async function main() {
     assertCondition(foreignReadResponse.status === 403, "Expected foreign-owner submission read to return 403");
 
     const retryResponse = await fetch(
-      `http://127.0.0.1:${frontendPort}/api/contributor/submissions/csub_frontend_proxy_retry_smoke/retry`,
+      `http://127.0.0.1:${frontendPort}/api/proxy/contributor/submissions/csub_frontend_proxy_retry_smoke/retry`,
       {
         method: "POST",
         headers: {

@@ -1,4 +1,5 @@
 const { spawn } = require("child_process");
+const net = require("net");
 const { parseDatabaseUrl, ensureDbParentDir, ensureMigrationsTable, runSql } = require("../db/lib");
 const { assertDatabaseReady } = require("../db/runtime");
 
@@ -27,6 +28,27 @@ function buildToken(sub) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function canBindPort(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+async function pickAvailablePort(startPort, maxAttempts = 40) {
+  for (let offset = 0; offset < maxAttempts; offset += 1) {
+    const candidate = startPort + offset;
+    // eslint-disable-next-line no-await-in-loop
+    if (await canBindPort(candidate)) {
+      return String(candidate);
+    }
+  }
+  throw new Error(`No available port found near ${startPort}`);
 }
 
 function requireEnv(key) {
@@ -138,7 +160,7 @@ function seedRecommendationSession(dbPath, userId) {
 }
 
 async function waitForUrl(url) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
       const response = await fetch(url);
       if (response.ok) {
@@ -159,8 +181,8 @@ async function main() {
   ensureMigrationsTable(dbPath);
   assertDatabaseReady(databaseUrl);
 
-  const apiPort = process.env.FRONTEND_PROXY_SMOKE_API_PORT || "3013";
-  const frontendPort = process.env.FRONTEND_PROXY_SMOKE_FE_PORT || "3002";
+  const apiPort = await pickAvailablePort(Number(process.env.FRONTEND_PROXY_SMOKE_API_PORT || "3013"));
+  const frontendPort = await pickAvailablePort(Number(process.env.FRONTEND_PROXY_SMOKE_FE_PORT || "3002"));
   const userId = "feedback-proxy-user";
   const token = buildToken(userId);
 
@@ -170,14 +192,20 @@ async function main() {
     env: { ...process.env, PORT: apiPort },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const feProc = spawn("node", ["apps/frontend/src/index.js"], {
+  const feProc = spawn(
+    "/bin/zsh",
+    ["-lc", `cd apps/frontend && rm -rf .next/cache/webpack && exec ../../node_modules/.bin/next dev -p ${frontendPort}`],
+    {
     env: {
       ...process.env,
-      FRONTEND_PORT: frontendPort,
+      FRONTEND_AUTH_MODE: "disabled",
+      NEXT_DISABLE_WEBPACK_CACHE: "1",
       NEXT_PUBLIC_API_BASE_URL: `http://127.0.0.1:${apiPort}/v1`,
+      NEXT_PUBLIC_APP_BASE_URL: `http://127.0.0.1:${frontendPort}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
-  });
+    }
+  );
 
   let stderr = "";
   apiProc.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8"); });
@@ -186,7 +214,7 @@ async function main() {
   try {
     await waitForUrl(`http://127.0.0.1:${frontendPort}/`);
 
-    const uploadResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/generated-images`, {
+    const uploadResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/proxy/generated-images`, {
       method: "POST",
       headers: {
         "x-auth-token": token,
@@ -206,7 +234,7 @@ async function main() {
     const generatedImageId = uploadJson?.generatedImage?.generatedImageId;
     assertCondition(Boolean(generatedImageId), "Proxy upload missing generatedImageId");
 
-    const feedbackResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/post-result-feedback`, {
+    const feedbackResponse = await fetch(`http://127.0.0.1:${frontendPort}/api/proxy/post-result-feedback`, {
       method: "POST",
       headers: {
         "x-auth-token": token,
@@ -229,7 +257,7 @@ async function main() {
     assertCondition(Boolean(feedbackId), "Proxy feedback response missing feedbackId");
 
     const getFeedbackResponse = await fetch(
-      `http://127.0.0.1:${frontendPort}/api/post-result-feedback/${feedbackId}`,
+      `http://127.0.0.1:${frontendPort}/api/proxy/post-result-feedback/${feedbackId}`,
       { headers: { "x-auth-token": token } }
     );
     const getFeedbackJson = await getFeedbackResponse.json();
@@ -238,7 +266,7 @@ async function main() {
     }
 
     const listResponse = await fetch(
-      `http://127.0.0.1:${frontendPort}/api/recommendation-sessions/${seeded.sessionId}/post-result-feedback`,
+      `http://127.0.0.1:${frontendPort}/api/proxy/recommendation-sessions/${seeded.sessionId}/post-result-feedback`,
       { headers: { "x-auth-token": token } }
     );
     const listJson = await listResponse.json();

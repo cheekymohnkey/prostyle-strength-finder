@@ -97,6 +97,30 @@ Rationale: API style and payload validation rules are now implemented and exerci
 23. MVP hosting topology target is single-instance app/worker + SQLite with AWS S3/SQS, deploying to `prod` first while keeping `uat` as a future option.
 Rationale: Deployment strategy is decided for current phase; S3/SQS foundations are provisioned, Lightsail compute provisioning remains pending, and UAT can be added later without architecture changes.
 
+24. Style-DNA analysis will use paired MidJourney 2x2 grid comparison (baseline vs test) as a first-class workflow.
+Rationale: Side-by-side delta analysis is required to isolate profile/sref influence from prompt and model baseline behavior.
+
+25. The baseline/test parameter contract for Style-DNA analysis is fixed for controlled runs and persisted per analysis run.
+Rationale: Objective comparison requires locked variables (seed, quality, stylize tier, style-raw toggle, and influence parameters) to avoid false assumptions.
+
+26. Vision extraction responses for Style-DNA analysis must use strict structured JSON output from the LLM provider.
+Rationale: Downstream parsing, taxonomy mapping, and auditability require deterministic machine-readable payloads without conversational variance.
+
+27. Trait extraction strategy is hybrid: open-trait discovery at ingestion + canonical taxonomy mapping for production scoring.
+Rationale: Strict taxonomy-only extraction misses nuance; open extraction without mapping causes synonym fragmentation.
+
+28. Style-DNA baseline generation and comparison operations are admin-only workflows.
+Rationale: Controlled execution and dataset quality are operational governance concerns, not general consumer flow.
+
+29. Baseline grids are reusable assets keyed by MidJourney model family/version + fixed baseline parameter envelope, and should be created once then reused.
+Rationale: Re-generating baseline controls for every new style influence is redundant and increases operator friction.
+
+30. Style-DNA test flow uses stored style influences (srefs/moodboards) selected from system records, with system-generated paste-ready prompt variants.
+Rationale: Prompt template consistency is required for repeatable comparisons and lowers manual formatting errors.
+
+31. Admin uploads returned MidJourney test grids back into the app for queued analysis against the matching reusable baseline set.
+Rationale: Keeps render execution external while preserving internal async analysis reliability/auditability.
+
 ### Open
 
 1. Canonical trait taxonomy.
