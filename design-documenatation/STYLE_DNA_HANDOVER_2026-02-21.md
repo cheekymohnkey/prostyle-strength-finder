@@ -1,6 +1,6 @@
 # Prostyle Strength Finder - Style-DNA Handover (2026-02-21)
 
-Status: Planned / Pre-Implementation  
+Status: In Progress  
 Handover Date: 2026-02-21  
 Owner: Codex Session Handover
 
@@ -32,6 +32,10 @@ Capture the current Style-DNA feature state and provide a direct, executable sta
 6. Trait handling is hybrid:
 - open atomic extraction at ingestion
 - canonical mapping for production scoring.
+7. Workflow is explicitly split into three use cases:
+- baseline test definition management
+- baseline grid capture/upload
+- style adjustment comparison runs (`sref|profile`) against stored baseline
 
 ## What Was Completed So Far
 
@@ -44,14 +48,19 @@ Capture the current Style-DNA feature state and provide a direct, executable sta
 
 ## Current Implementation State
 
-1. No Style-DNA API endpoints are implemented yet.
-2. No Style-DNA persistence migrations are implemented yet.
-3. No Style-DNA worker job path is implemented yet.
-4. No `/admin/style-dna` UI route is implemented yet.
+1. Style-DNA persistence migration is implemented for baseline sets/items, prompt jobs/items, runs/results.
+2. Style-DNA API baseline is implemented:
+- baseline set create/list/detail/item attach
+- prompt job create/get
+- run submit/list/get
+- style-dna image upload endpoint
+3. `/admin/style-dna` UI route exists and is wired to the admin proxy flow.
+4. Worker style-dna compare path is in progress with runtime prompt/schema resources and strict response contract integration.
 
 Status summary:
 1. Planning complete.
-2. Execution not started.
+2. SD1/SD2 baseline implementation active.
+3. SD3 in active implementation.
 
 ## Recommended Next Session Start (First Slice)
 

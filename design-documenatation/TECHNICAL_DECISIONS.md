@@ -270,7 +270,7 @@ Proposed:
   - prompt text
   - seed
   - quality
-  - stylize tier (`0`, `100`, `250`, `1000`)
+  - stylize tier (`0`, `100`, `1000`)
   - raw/style mode flag
   - influence parameters (`--profile`, `--sref`, `--sw`)
 - Use provider structured outputs with strict JSON schema enforcement:

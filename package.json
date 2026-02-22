@@ -37,6 +37,7 @@
     "admin:role-management-smoke": "node scripts/admin/role-management-smoke.js",
     "cache:invalidation-smoke": "node scripts/admin/cache-invalidation-smoke.js",
     "admin:frontend-proxy-smoke": "node scripts/admin/frontend-proxy-smoke.js",
-    "contributor:essentials-smoke": "node scripts/contributor/essentials-smoke.js"
+    "contributor:essentials-smoke": "node scripts/contributor/essentials-smoke.js",
+    "style-dna:tier-validation-smoke": "node scripts/style-dna/tier-validation-smoke.js"
   }
 }

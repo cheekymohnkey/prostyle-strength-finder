@@ -23,6 +23,17 @@ Define a dedicated, execution-ready implementation plan for the admin-only Style
 
 Enable administrators to run rigorous, repeatable baseline-vs-test aesthetic delta analysis with minimal manual overhead and strong auditability.
 
+## Primary Use Cases (Explicit Split)
+
+1. Use Case 1: Baseline Test Definition Management
+- Admin manages baseline prompt templates and locked parameter envelopes (model/version, seed, stylize tier, quality, aspect ratio, and generation flags).
+
+2. Use Case 2: Baseline Grid Capture
+- Admin selects a baseline test definition, renders externally in MidJourney, uploads the returned baseline 2x2 grid, and stores it as canonical baseline evidence for that test definition.
+
+3. Use Case 3: Style Adjustment Comparison Run
+- Admin selects a baseline test with stored baseline grid, selects adjustment type (`--sref` or `--profile`), enters MidJourney adjustment ID, copies system-generated prompt, renders externally, uploads test grid, then system compares baseline vs test using strict-schema LLM extraction and persists traits/results linked to the selected style adjustment.
+
 ## Scope
 
 In scope:
@@ -42,15 +53,14 @@ Out of scope:
 
 ## Workflow Contract (End-to-End)
 
-1. Admin chooses target MidJourney model family/version and baseline parameter envelope.
-2. Admin verifies an existing baseline render set or creates one if missing.
-3. Admin selects a stored style influence (`sref`/moodboard).
-4. System generates copy-ready prompt lines for each baseline prompt in scope.
-5. Admin pastes prompts into MidJourney externally and receives test grids.
-6. Admin uploads/pastes returned test grids into the app.
-7. API enqueues Style-DNA runs.
-8. Worker resolves baseline grid + test grid pair, calls LLM with strict schema, persists results.
-9. Admin views structured delta output and mapped tags.
+1. Admin creates/selects baseline test definition (prompt suite + fixed parameter envelope).
+2. Admin uploads baseline render grid(s) for baseline definition coverage.
+3. Admin chooses style adjustment type (`sref|profile`) and MidJourney ID.
+4. System generates copy-ready prompt lines that inject `--sref <id>` or `--profile <id>`.
+5. Admin renders externally and uploads returned test grid(s).
+6. API enqueues Style-DNA run with baseline/test image pair and adjustment metadata.
+7. Worker compares Grid B vs Grid A using strict JSON schema and persists results.
+8. Admin views structured delta output + downstream trait persistence artifacts.
 
 ## Baseline Reuse Rules
 
@@ -101,9 +111,9 @@ Use this contract for baseline-vs-test grid analysis tasks.
 - use empty arrays or `"No change"` instead of optional fields
 
 5. Minimum output families:
-- `structural_overrides`
-- `lighting_traits`
-- `color_grading`
+- `composition_and_structure`
+- `lighting_and_contrast`
+- `color_palette`
 - `texture_and_medium`
 - `dominant_dna_tags`
 - `delta_strength`
@@ -319,7 +329,7 @@ All routes require admin role.
 - status indicators (`active`, `disabled`, `experimental`).
 
 3. Prompt Generation Panel:
-- choose tier set (`0`, `100`, `250`, `1000`)
+- choose tier set (`0`, `100`, `1000`)
 - generate prompts button
 - one-click copy prompt lines.
 

@@ -953,6 +953,446 @@ function listActiveStyleInfluenceCombinations(dbPath) {
   );
 }
 
+function getBaselinePromptSuiteById(dbPath, suiteId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT suite_id, name, suite_version, status, created_by, created_at
+     FROM baseline_prompt_suites
+     WHERE suite_id = ${quote(suiteId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertBaselinePromptSuite(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO baseline_prompt_suites (
+       suite_id, name, suite_version, status, created_by, created_at
+     ) VALUES (
+       ${quote(input.suiteId)},
+       ${quote(input.name)},
+       ${quote(input.suiteVersion)},
+       ${quote(input.status || "active")},
+       ${quote(input.createdBy || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function ensureBaselinePromptSuiteById(dbPath, input) {
+  const existing = getBaselinePromptSuiteById(dbPath, input.suiteId);
+  if (existing) {
+    return existing;
+  }
+  insertBaselinePromptSuite(dbPath, input);
+  return getBaselinePromptSuiteById(dbPath, input.suiteId);
+}
+
+function getBaselinePromptSuiteItemByPromptKey(dbPath, suiteId, promptKey) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT item_id, suite_id, prompt_key, prompt_text, display_order, created_at
+     FROM baseline_prompt_suite_items
+     WHERE suite_id = ${quote(suiteId)}
+       AND prompt_key = ${quote(promptKey)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listBaselinePromptSuiteItems(dbPath, suiteId) {
+  return queryJson(
+    dbPath,
+    `SELECT item_id, suite_id, prompt_key, prompt_text, display_order, created_at
+     FROM baseline_prompt_suite_items
+     WHERE suite_id = ${quote(suiteId)}
+     ORDER BY display_order ASC, prompt_key ASC;`
+  );
+}
+
+function insertBaselinePromptSuiteItem(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO baseline_prompt_suite_items (
+       item_id, suite_id, prompt_key, prompt_text, display_order, created_at
+     ) VALUES (
+       ${quote(input.itemId)},
+       ${quote(input.suiteId)},
+       ${quote(input.promptKey)},
+       ${quote(input.promptText)},
+       ${Number(input.displayOrder || 0)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function ensureBaselinePromptSuiteItemByPromptKey(dbPath, input) {
+  const existing = getBaselinePromptSuiteItemByPromptKey(dbPath, input.suiteId, input.promptKey);
+  if (existing) {
+    return existing;
+  }
+  insertBaselinePromptSuiteItem(dbPath, input);
+  return getBaselinePromptSuiteItemByPromptKey(dbPath, input.suiteId, input.promptKey);
+}
+
+function getBaselineRenderSetById(dbPath, baselineRenderSetId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT baseline_render_set_id, mj_model_family, mj_model_version, suite_id,
+            parameter_envelope_json, parameter_envelope_hash, status, created_by, created_at
+     FROM baseline_render_sets
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getBaselineRenderSetByCompatibility(dbPath, input) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT baseline_render_set_id, mj_model_family, mj_model_version, suite_id,
+            parameter_envelope_json, parameter_envelope_hash, status, created_by, created_at
+     FROM baseline_render_sets
+     WHERE mj_model_family = ${quote(input.mjModelFamily)}
+       AND mj_model_version = ${quote(input.mjModelVersion)}
+       AND suite_id = ${quote(input.suiteId)}
+       AND parameter_envelope_hash = ${quote(input.parameterEnvelopeHash)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listBaselineRenderSets(dbPath, input = {}) {
+  const where = [];
+  if (input.mjModelFamily) {
+    where.push(`mj_model_family = ${quote(input.mjModelFamily)}`);
+  }
+  if (input.mjModelVersion) {
+    where.push(`mj_model_version = ${quote(input.mjModelVersion)}`);
+  }
+  if (input.suiteId) {
+    where.push(`suite_id = ${quote(input.suiteId)}`);
+  }
+  if (input.status) {
+    where.push(`status = ${quote(input.status)}`);
+  }
+  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+  return queryJson(
+    dbPath,
+    `SELECT baseline_render_set_id, mj_model_family, mj_model_version, suite_id,
+            parameter_envelope_json, parameter_envelope_hash, status, created_by, created_at
+     FROM baseline_render_sets
+     ${whereClause}
+     ORDER BY created_at DESC
+     LIMIT ${Number(input.limit || 100)};`
+  );
+}
+
+function insertBaselineRenderSet(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO baseline_render_sets (
+       baseline_render_set_id, mj_model_family, mj_model_version, suite_id,
+       parameter_envelope_json, parameter_envelope_hash, status, created_by, created_at
+     ) VALUES (
+       ${quote(input.baselineRenderSetId)},
+       ${quote(input.mjModelFamily)},
+       ${quote(input.mjModelVersion)},
+       ${quote(input.suiteId)},
+       ${quote(JSON.stringify(input.parameterEnvelope || {}))},
+       ${quote(input.parameterEnvelopeHash)},
+       ${quote(input.status || "active")},
+       ${quote(input.createdBy || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function getBaselineRenderSetItem(dbPath, baselineRenderSetId, promptKey, stylizeTier) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT item_id, baseline_render_set_id, prompt_key, stylize_tier, grid_image_id, created_at
+     FROM baseline_render_set_items
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+       AND prompt_key = ${quote(promptKey)}
+       AND stylize_tier = ${Number(stylizeTier)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listBaselineRenderSetItems(dbPath, baselineRenderSetId) {
+  return queryJson(
+    dbPath,
+    `SELECT item_id, baseline_render_set_id, prompt_key, stylize_tier, grid_image_id, created_at
+     FROM baseline_render_set_items
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+     ORDER BY prompt_key ASC, stylize_tier ASC;`
+  );
+}
+
+function insertBaselineRenderSetItem(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO baseline_render_set_items (
+       item_id, baseline_render_set_id, prompt_key, stylize_tier, grid_image_id, created_at
+     ) VALUES (
+       ${quote(input.itemId)},
+       ${quote(input.baselineRenderSetId)},
+       ${quote(input.promptKey)},
+       ${Number(input.stylizeTier)},
+       ${quote(input.gridImageId)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function upsertBaselineRenderSetItem(dbPath, input) {
+  const existing = getBaselineRenderSetItem(
+    dbPath,
+    input.baselineRenderSetId,
+    input.promptKey,
+    input.stylizeTier
+  );
+  if (existing) {
+    exec(
+      dbPath,
+      `UPDATE baseline_render_set_items
+       SET grid_image_id = ${quote(input.gridImageId)}
+       WHERE item_id = ${quote(existing.item_id)};`
+    );
+    return getBaselineRenderSetItem(dbPath, input.baselineRenderSetId, input.promptKey, input.stylizeTier);
+  }
+  insertBaselineRenderSetItem(dbPath, input);
+  return getBaselineRenderSetItem(dbPath, input.baselineRenderSetId, input.promptKey, input.stylizeTier);
+}
+
+function insertStyleDnaPromptJob(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO style_dna_prompt_jobs (
+       prompt_job_id, style_influence_id, baseline_render_set_id, requested_tiers_json,
+       status, created_by, created_at
+     ) VALUES (
+       ${quote(input.promptJobId)},
+       ${quote(input.styleInfluenceId)},
+       ${quote(input.baselineRenderSetId)},
+       ${quote(JSON.stringify(input.requestedTiers || []))},
+       ${quote(input.status || "generated")},
+       ${quote(input.createdBy || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function getStyleDnaPromptJobById(dbPath, promptJobId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT prompt_job_id, style_influence_id, baseline_render_set_id, requested_tiers_json,
+            status, created_by, created_at
+     FROM style_dna_prompt_jobs
+     WHERE prompt_job_id = ${quote(promptJobId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertStyleDnaPromptJobItem(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO style_dna_prompt_job_items (
+       item_id, prompt_job_id, prompt_key, stylize_tier, prompt_text_generated, copy_block_order, created_at
+     ) VALUES (
+       ${quote(input.itemId)},
+       ${quote(input.promptJobId)},
+       ${quote(input.promptKey)},
+       ${Number(input.stylizeTier)},
+       ${quote(input.promptTextGenerated)},
+       ${Number(input.copyBlockOrder || 0)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function listStyleDnaPromptJobItems(dbPath, promptJobId) {
+  return queryJson(
+    dbPath,
+    `SELECT item_id, prompt_job_id, prompt_key, stylize_tier, prompt_text_generated, copy_block_order, created_at
+     FROM style_dna_prompt_job_items
+     WHERE prompt_job_id = ${quote(promptJobId)}
+     ORDER BY copy_block_order ASC, prompt_key ASC;`
+  );
+}
+
+function getStyleDnaRunById(dbPath, styleDnaRunId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT style_dna_run_id, idempotency_key, style_influence_id, baseline_render_set_id,
+            style_adjustment_type, style_adjustment_midjourney_id, prompt_key,
+            stylize_tier, baseline_grid_image_id, test_grid_image_id, analysis_run_id, status,
+            last_error_code, last_error_message, created_by, created_at, updated_at
+     FROM style_dna_runs
+     WHERE style_dna_run_id = ${quote(styleDnaRunId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getStyleDnaRunByIdempotencyKey(dbPath, idempotencyKey) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT style_dna_run_id, idempotency_key, style_influence_id, baseline_render_set_id,
+            style_adjustment_type, style_adjustment_midjourney_id, prompt_key,
+            stylize_tier, baseline_grid_image_id, test_grid_image_id, analysis_run_id, status,
+            last_error_code, last_error_message, created_by, created_at, updated_at
+     FROM style_dna_runs
+     WHERE idempotency_key = ${quote(idempotencyKey)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listStyleDnaRuns(dbPath, input = {}) {
+  const where = [];
+  if (input.styleInfluenceId) {
+    where.push(`style_influence_id = ${quote(input.styleInfluenceId)}`);
+  }
+  if (input.baselineRenderSetId) {
+    where.push(`baseline_render_set_id = ${quote(input.baselineRenderSetId)}`);
+  }
+  if (input.status) {
+    where.push(`status = ${quote(input.status)}`);
+  }
+  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+  return queryJson(
+    dbPath,
+    `SELECT style_dna_run_id, idempotency_key, style_influence_id, baseline_render_set_id,
+            style_adjustment_type, style_adjustment_midjourney_id, prompt_key,
+            stylize_tier, baseline_grid_image_id, test_grid_image_id, analysis_run_id, status,
+            last_error_code, last_error_message, created_by, created_at, updated_at
+     FROM style_dna_runs
+     ${whereClause}
+     ORDER BY created_at DESC
+     LIMIT ${Number(input.limit || 100)};`
+  );
+}
+
+function insertStyleDnaRun(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  const updatedAt = input.updatedAt || createdAt;
+  exec(
+    dbPath,
+    `INSERT INTO style_dna_runs (
+       style_dna_run_id, idempotency_key, style_influence_id, baseline_render_set_id,
+       style_adjustment_type, style_adjustment_midjourney_id, prompt_key,
+       stylize_tier, baseline_grid_image_id, test_grid_image_id, analysis_run_id, status,
+       last_error_code, last_error_message, created_by, created_at, updated_at
+     ) VALUES (
+       ${quote(input.styleDnaRunId)},
+       ${quote(input.idempotencyKey)},
+       ${quote(input.styleInfluenceId)},
+       ${quote(input.baselineRenderSetId)},
+       ${quote(input.styleAdjustmentType)},
+       ${quote(input.styleAdjustmentMidjourneyId)},
+       ${quote(input.promptKey)},
+       ${Number(input.stylizeTier)},
+       ${quote(input.baselineGridImageId)},
+       ${quote(input.testGridImageId)},
+       ${quote(input.analysisRunId || null)},
+       ${quote(input.status || "queued")},
+       ${quote(input.lastErrorCode || null)},
+       ${quote(input.lastErrorMessage || null)},
+       ${quote(input.createdBy || null)},
+       ${quote(createdAt)},
+       ${quote(updatedAt)}
+     );`
+  );
+}
+
+function updateStyleDnaRunStatus(dbPath, styleDnaRunId, input) {
+  exec(
+    dbPath,
+    `UPDATE style_dna_runs
+     SET
+       status = ${quote(input.status)},
+       analysis_run_id = COALESCE(${quote(input.analysisRunId || null)}, analysis_run_id),
+       last_error_code = ${quote(input.lastErrorCode || null)},
+       last_error_message = ${quote(input.lastErrorMessage || null)},
+       updated_at = ${quote(nowIso())}
+     WHERE style_dna_run_id = ${quote(styleDnaRunId)};`
+  );
+}
+
+function getStyleDnaRunResultByRunId(dbPath, styleDnaRunId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT style_dna_run_result_id, style_dna_run_id, llm_raw_json, atomic_traits_json, canonical_traits_json,
+            taxonomy_version, summary, created_at
+     FROM style_dna_run_results
+     WHERE style_dna_run_id = ${quote(styleDnaRunId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertStyleDnaRunResult(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO style_dna_run_results (
+       style_dna_run_result_id, style_dna_run_id, llm_raw_json, atomic_traits_json, canonical_traits_json,
+       taxonomy_version, summary, created_at
+     ) VALUES (
+       ${quote(input.styleDnaRunResultId)},
+       ${quote(input.styleDnaRunId)},
+       ${quote(JSON.stringify(input.llmRaw || {}))},
+       ${quote(JSON.stringify(input.atomicTraits || {}))},
+       ${quote(JSON.stringify(input.canonicalTraits || {}))},
+       ${quote(input.taxonomyVersion || "draft-v1")},
+       ${quote(input.summary || null)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
+function getStyleDnaImageById(dbPath, styleDnaImageId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT style_dna_image_id, image_kind, storage_key, storage_uri, mime_type, file_name, size_bytes, created_by, created_at
+     FROM style_dna_images
+     WHERE style_dna_image_id = ${quote(styleDnaImageId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertStyleDnaImage(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO style_dna_images (
+       style_dna_image_id, image_kind, storage_key, storage_uri, mime_type, file_name, size_bytes, created_by, created_at
+     ) VALUES (
+       ${quote(input.styleDnaImageId)},
+       ${quote(input.imageKind)},
+       ${quote(input.storageKey)},
+       ${quote(input.storageUri)},
+       ${quote(input.mimeType)},
+       ${quote(input.fileName)},
+       ${Number(input.sizeBytes)},
+       ${quote(input.createdBy)},
+       ${quote(createdAt)}
+     );`
+  );
+}
+
 module.exports = {
   ensureReady,
   getUserById,
@@ -1015,4 +1455,32 @@ module.exports = {
   insertAlignmentEvaluation,
   getAlignmentEvaluationByFeedbackId,
   listActiveStyleInfluenceCombinations,
+  getBaselinePromptSuiteById,
+  insertBaselinePromptSuite,
+  ensureBaselinePromptSuiteById,
+  getBaselinePromptSuiteItemByPromptKey,
+  listBaselinePromptSuiteItems,
+  insertBaselinePromptSuiteItem,
+  ensureBaselinePromptSuiteItemByPromptKey,
+  getBaselineRenderSetById,
+  getBaselineRenderSetByCompatibility,
+  listBaselineRenderSets,
+  insertBaselineRenderSet,
+  getBaselineRenderSetItem,
+  listBaselineRenderSetItems,
+  insertBaselineRenderSetItem,
+  upsertBaselineRenderSetItem,
+  insertStyleDnaPromptJob,
+  getStyleDnaPromptJobById,
+  insertStyleDnaPromptJobItem,
+  listStyleDnaPromptJobItems,
+  getStyleDnaRunById,
+  getStyleDnaRunByIdempotencyKey,
+  listStyleDnaRuns,
+  insertStyleDnaRun,
+  updateStyleDnaRunStatus,
+  getStyleDnaRunResultByRunId,
+  insertStyleDnaRunResult,
+  getStyleDnaImageById,
+  insertStyleDnaImage,
 };

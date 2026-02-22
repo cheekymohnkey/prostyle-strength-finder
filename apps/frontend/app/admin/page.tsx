@@ -229,6 +229,9 @@ export default function AdminOperationsPage() {
           <a href="/" className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm font-medium text-[var(--ink)]">
             Back to Recommendation Flow
           </a>
+          <a href="/admin/style-dna" className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm font-medium text-[var(--ink)]">
+            Open Style-DNA Console
+          </a>
           <button
             type="button"
             onClick={() => sessionStateQuery.refetch()}

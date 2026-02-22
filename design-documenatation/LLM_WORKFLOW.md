@@ -26,7 +26,7 @@ Always anchor tasks to:
 08. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
 09. `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
 10. `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
-10. `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
+11. `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
 
 ## Implementation Plan Links
 
@@ -41,7 +41,7 @@ Always anchor tasks to:
 5. UI upgrade handover (latest):
 - `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-21.md`
 6. Style-DNA handover (latest):
-- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-21.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-22.md`
 
 
 ## New Task Start Template
@@ -51,6 +51,7 @@ Copy/paste this at the start of a new chat:
 ```text
 Use these docs as source of truth:
 - design-documenatation/DECISIONS.md
+- design-documenatation/USER_NEEDS_ANALYSIS.md
 - design-documenatation/ARCHITECTURE_AND_ERD.md
 - design-documenatation/TECHNICAL_DECISIONS.md
 - design-documenatation/MVP_PATH.md

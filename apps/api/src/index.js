@@ -53,6 +53,28 @@ const {
   insertAlignmentEvaluation,
   getAlignmentEvaluationByFeedbackId,
   listActiveStyleInfluenceCombinations,
+  ensureBaselinePromptSuiteById,
+  ensureBaselinePromptSuiteItemByPromptKey,
+  listBaselinePromptSuiteItems,
+  getBaselineRenderSetById,
+  getBaselineRenderSetByCompatibility,
+  listBaselineRenderSets,
+  insertBaselineRenderSet,
+  getBaselineRenderSetItem,
+  listBaselineRenderSetItems,
+  upsertBaselineRenderSetItem,
+  insertStyleDnaPromptJob,
+  getStyleDnaPromptJobById,
+  insertStyleDnaPromptJobItem,
+  listStyleDnaPromptJobItems,
+  getStyleDnaRunById,
+  getStyleDnaRunByIdempotencyKey,
+  listStyleDnaRuns,
+  insertStyleDnaRun,
+  updateStyleDnaRunStatus,
+  getStyleDnaRunResultByRunId,
+  getStyleDnaImageById,
+  insertStyleDnaImage,
   updateRecommendationSessionStatus,
 } = require("../../../scripts/db/repository");
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
@@ -601,6 +623,125 @@ function mapUserRow(row) {
   };
 }
 
+function mapBaselineRenderSetRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    baselineRenderSetId: row.baseline_render_set_id,
+    mjModelFamily: row.mj_model_family,
+    mjModelVersion: row.mj_model_version,
+    suiteId: row.suite_id,
+    parameterEnvelope: JSON.parse(row.parameter_envelope_json || "{}"),
+    parameterEnvelopeHash: row.parameter_envelope_hash,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function mapBaselineRenderSetItemRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    itemId: row.item_id,
+    baselineRenderSetId: row.baseline_render_set_id,
+    promptKey: row.prompt_key,
+    stylizeTier: Number(row.stylize_tier || 0),
+    gridImageId: row.grid_image_id,
+    createdAt: row.created_at,
+  };
+}
+
+function mapStyleDnaPromptJobRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    promptJobId: row.prompt_job_id,
+    styleInfluenceId: row.style_influence_id,
+    baselineRenderSetId: row.baseline_render_set_id,
+    requestedTiers: JSON.parse(row.requested_tiers_json || "[]"),
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function mapStyleDnaPromptJobItemRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    itemId: row.item_id,
+    promptJobId: row.prompt_job_id,
+    promptKey: row.prompt_key,
+    stylizeTier: Number(row.stylize_tier || 0),
+    promptTextGenerated: row.prompt_text_generated,
+    copyBlockOrder: Number(row.copy_block_order || 0),
+    createdAt: row.created_at,
+  };
+}
+
+function mapStyleDnaRunRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    styleDnaRunId: row.style_dna_run_id,
+    idempotencyKey: row.idempotency_key,
+    styleInfluenceId: row.style_influence_id,
+    baselineRenderSetId: row.baseline_render_set_id,
+    styleAdjustmentType: row.style_adjustment_type,
+    styleAdjustmentMidjourneyId: row.style_adjustment_midjourney_id,
+    promptKey: row.prompt_key,
+    stylizeTier: Number(row.stylize_tier || 0),
+    baselineGridImageId: row.baseline_grid_image_id,
+    testGridImageId: row.test_grid_image_id,
+    analysisRunId: row.analysis_run_id,
+    status: row.status,
+    lastErrorCode: row.last_error_code,
+    lastErrorMessage: row.last_error_message,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapStyleDnaImageRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    styleDnaImageId: row.style_dna_image_id,
+    imageKind: row.image_kind,
+    storageKey: row.storage_key,
+    storageUri: row.storage_uri,
+    mimeType: row.mime_type,
+    fileName: row.file_name,
+    sizeBytes: Number(row.size_bytes || 0),
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function mapStyleDnaRunResultRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    styleDnaRunResultId: row.style_dna_run_result_id,
+    styleDnaRunId: row.style_dna_run_id,
+    llmRaw: JSON.parse(row.llm_raw_json || "{}"),
+    atomicTraits: JSON.parse(row.atomic_traits_json || "{}"),
+    canonicalTraits: JSON.parse(row.canonical_traits_json || "{}"),
+    taxonomyVersion: row.taxonomy_version,
+    summary: row.summary,
+    createdAt: row.created_at,
+  };
+}
+
 function encodeUsersListCursor(row) {
   const raw = JSON.stringify({
     updatedAt: row.updated_at,
@@ -629,6 +770,193 @@ function decodeUsersListCursor(rawCursor) {
   } catch (_error) {
     return null;
   }
+}
+
+function stableStringify(value) {
+  if (value === null || value === undefined) {
+    return "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  if (typeof value === "object") {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function hashParameterEnvelope(value) {
+  return crypto.createHash("sha256").update(stableStringify(value || {})).digest("hex");
+}
+
+function parseIntegerField(value, fieldName) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${fieldName} must be an integer`);
+  }
+  return parsed;
+}
+
+const ALLOWED_STYLE_DNA_STYLIZE_TIERS = new Set([0, 100, 1000]);
+
+function ensureAllowedStyleDnaStylizeTier(value, fieldName) {
+  if (!ALLOWED_STYLE_DNA_STYLIZE_TIERS.has(value)) {
+    throw new Error(`${fieldName} must be one of: 0, 100, 1000`);
+  }
+  return value;
+}
+
+function validateStyleDnaBaselineSetPayload(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Style-DNA baseline payload must be an object");
+  }
+  if (typeof value.mjModelFamily !== "string" || value.mjModelFamily.trim() === "") {
+    throw new Error("mjModelFamily is required");
+  }
+  if (typeof value.mjModelVersion !== "string" || value.mjModelVersion.trim() === "") {
+    throw new Error("mjModelVersion is required");
+  }
+  if (typeof value.suiteId !== "string" || value.suiteId.trim() === "") {
+    throw new Error("suiteId is required");
+  }
+  if (!value.parameterEnvelope || typeof value.parameterEnvelope !== "object" || Array.isArray(value.parameterEnvelope)) {
+    throw new Error("parameterEnvelope must be an object");
+  }
+  if (value.parameterEnvelope.stylizeTier !== undefined) {
+    ensureAllowedStyleDnaStylizeTier(
+      parseIntegerField(value.parameterEnvelope.stylizeTier, "parameterEnvelope.stylizeTier"),
+      "parameterEnvelope.stylizeTier"
+    );
+  }
+
+  return {
+    mjModelFamily: value.mjModelFamily.trim(),
+    mjModelVersion: value.mjModelVersion.trim(),
+    suiteId: value.suiteId.trim(),
+    parameterEnvelope: value.parameterEnvelope,
+  };
+}
+
+function validateStyleDnaBaselineSetItemPayload(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Style-DNA baseline item payload must be an object");
+  }
+  if (typeof value.promptKey !== "string" || value.promptKey.trim() === "") {
+    throw new Error("promptKey is required");
+  }
+  if (typeof value.gridImageId !== "string" || value.gridImageId.trim() === "") {
+    throw new Error("gridImageId is required");
+  }
+  return {
+    promptKey: value.promptKey.trim(),
+    gridImageId: value.gridImageId.trim(),
+    stylizeTier: ensureAllowedStyleDnaStylizeTier(
+      value.stylizeTier === undefined ? 100 : parseIntegerField(value.stylizeTier, "stylizeTier"),
+      "stylizeTier"
+    ),
+  };
+}
+
+function validateStyleDnaPromptJobPayload(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Style-DNA prompt job payload must be an object");
+  }
+  if (typeof value.styleInfluenceId !== "string" || value.styleInfluenceId.trim() === "") {
+    throw new Error("styleInfluenceId is required");
+  }
+  if (typeof value.baselineRenderSetId !== "string" || value.baselineRenderSetId.trim() === "") {
+    throw new Error("baselineRenderSetId is required");
+  }
+  if (!Array.isArray(value.stylizeTiers) || value.stylizeTiers.length === 0) {
+    throw new Error("stylizeTiers must be a non-empty array");
+  }
+  const styleAdjustmentType = typeof value.styleAdjustmentType === "string"
+    ? value.styleAdjustmentType.trim()
+    : "";
+  if (!["sref", "profile"].includes(styleAdjustmentType)) {
+    throw new Error("styleAdjustmentType must be one of: sref, profile");
+  }
+  if (typeof value.styleAdjustmentMidjourneyId !== "string" || value.styleAdjustmentMidjourneyId.trim() === "") {
+    throw new Error("styleAdjustmentMidjourneyId is required");
+  }
+  const stylizeTiers = value.stylizeTiers.map((tier) => ensureAllowedStyleDnaStylizeTier(
+    parseIntegerField(tier, "stylizeTier"),
+    "stylizeTier"
+  ));
+  return {
+    styleInfluenceId: value.styleInfluenceId.trim(),
+    baselineRenderSetId: value.baselineRenderSetId.trim(),
+    styleAdjustmentType,
+    styleAdjustmentMidjourneyId: value.styleAdjustmentMidjourneyId.trim(),
+    stylizeTiers,
+  };
+}
+
+function validateStyleDnaRunPayload(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Style-DNA run payload must be an object");
+  }
+  if (typeof value.styleInfluenceId !== "string" || value.styleInfluenceId.trim() === "") {
+    throw new Error("styleInfluenceId is required");
+  }
+  if (typeof value.baselineRenderSetId !== "string" || value.baselineRenderSetId.trim() === "") {
+    throw new Error("baselineRenderSetId is required");
+  }
+  if (typeof value.promptKey !== "string" || value.promptKey.trim() === "") {
+    throw new Error("promptKey is required");
+  }
+  if (typeof value.testGridImageId !== "string" || value.testGridImageId.trim() === "") {
+    throw new Error("testGridImageId is required");
+  }
+  const styleAdjustmentType = typeof value.styleAdjustmentType === "string"
+    ? value.styleAdjustmentType.trim()
+    : "";
+  if (!["sref", "profile"].includes(styleAdjustmentType)) {
+    throw new Error("styleAdjustmentType must be one of: sref, profile");
+  }
+  if (typeof value.styleAdjustmentMidjourneyId !== "string" || value.styleAdjustmentMidjourneyId.trim() === "") {
+    throw new Error("styleAdjustmentMidjourneyId is required");
+  }
+  return {
+    idempotencyKey: typeof value.idempotencyKey === "string" && value.idempotencyKey.trim() !== ""
+      ? value.idempotencyKey.trim()
+      : null,
+    styleInfluenceId: value.styleInfluenceId.trim(),
+    baselineRenderSetId: value.baselineRenderSetId.trim(),
+    styleAdjustmentType,
+    styleAdjustmentMidjourneyId: value.styleAdjustmentMidjourneyId.trim(),
+    promptKey: value.promptKey.trim(),
+    stylizeTier: ensureAllowedStyleDnaStylizeTier(
+      parseIntegerField(value.stylizeTier, "stylizeTier"),
+      "stylizeTier"
+    ),
+    testGridImageId: value.testGridImageId.trim(),
+  };
+}
+
+function validateStyleDnaImageUploadPayload(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Style-DNA image upload payload must be an object");
+  }
+  if (!["baseline", "test"].includes(String(value.imageKind || "").trim())) {
+    throw new Error("imageKind must be baseline or test");
+  }
+  if (typeof value.fileName !== "string" || value.fileName.trim() === "") {
+    throw new Error("fileName is required");
+  }
+  if (!["image/png", "image/jpeg", "image/webp"].includes(String(value.mimeType || "").trim())) {
+    throw new Error("mimeType must be image/png, image/jpeg, or image/webp");
+  }
+  if (typeof value.fileBase64 !== "string" || value.fileBase64.trim() === "") {
+    throw new Error("fileBase64 is required");
+  }
+  return {
+    imageKind: value.imageKind.trim(),
+    fileName: value.fileName.trim(),
+    mimeType: value.mimeType.trim(),
+    fileBase64: value.fileBase64.trim(),
+  };
 }
 
 function createStoredJobEnvelope(job, options = {}) {
@@ -1954,6 +2282,610 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
           ? getJobById(dbPath, latest.last_job_id)
           : null),
         actions,
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-dna/images") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaImageUploadPayload(body);
+      const buffer = Buffer.from(payload.fileBase64, "base64");
+      if (!buffer || buffer.length === 0) {
+        sendError(res, 400, "INVALID_REQUEST", "Style-DNA image upload failed validation", ctx, {
+          reason: "fileBase64 decoded to empty payload",
+        });
+        return;
+      }
+      if (buffer.length > 8_000_000) {
+        sendError(res, 400, "INVALID_REQUEST", "Style-DNA image upload failed validation", ctx, {
+          reason: "decoded image exceeds 8MB limit",
+        });
+        return;
+      }
+      const styleDnaImageId = `sdimg_${crypto.randomUUID()}`;
+      const ext = extensionForMimeType(payload.mimeType);
+      const key = `style-dna/${payload.imageKind}/${styleDnaImageId}.${ext}`;
+      const put = await storageAdapter.putObject({
+        key,
+        body: buffer,
+        contentType: payload.mimeType,
+        metadata: {
+          style_dna_image_id: styleDnaImageId,
+          image_kind: payload.imageKind,
+          uploaded_by: authenticatedUserId,
+          created_at: new Date().toISOString(),
+        },
+      });
+      insertStyleDnaImage(dbPath, {
+        styleDnaImageId,
+        imageKind: payload.imageKind,
+        storageKey: put.key,
+        storageUri: put.storageUri,
+        mimeType: payload.mimeType,
+        fileName: payload.fileName,
+        sizeBytes: put.sizeBytes,
+        createdBy: authenticatedUserId,
+      });
+      sendJson(
+        res,
+        201,
+        {
+          image: mapStyleDnaImageRow(getStyleDnaImageById(dbPath, styleDnaImageId)),
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Style-DNA image upload failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-dna/baseline-sets") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaBaselineSetPayload(body);
+      const parameterEnvelopeHash = hashParameterEnvelope(payload.parameterEnvelope);
+      const existing = getBaselineRenderSetByCompatibility(dbPath, {
+        mjModelFamily: payload.mjModelFamily,
+        mjModelVersion: payload.mjModelVersion,
+        suiteId: payload.suiteId,
+        parameterEnvelopeHash,
+      });
+      if (existing) {
+        sendJson(
+          res,
+          200,
+          {
+            baselineRenderSet: mapBaselineRenderSetRow(existing),
+            duplicate: true,
+          },
+          ctx
+        );
+        return;
+      }
+
+      ensureBaselinePromptSuiteById(dbPath, {
+        suiteId: payload.suiteId,
+        name: payload.suiteId,
+        suiteVersion: payload.suiteId,
+        status: "active",
+        createdBy: authenticatedUserId,
+      });
+
+      const baselineRenderSetId = `brs_${crypto.randomUUID()}`;
+      insertBaselineRenderSet(dbPath, {
+        baselineRenderSetId,
+        mjModelFamily: payload.mjModelFamily,
+        mjModelVersion: payload.mjModelVersion,
+        suiteId: payload.suiteId,
+        parameterEnvelope: payload.parameterEnvelope,
+        parameterEnvelopeHash,
+        status: "active",
+        createdBy: authenticatedUserId,
+      });
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.baseline_set.create",
+        targetType: "style_dna_baseline_set",
+        targetId: baselineRenderSetId,
+        reason: null,
+      });
+
+      const created = getBaselineRenderSetById(dbPath, baselineRenderSetId);
+      sendJson(
+        res,
+        201,
+        {
+          baselineRenderSet: mapBaselineRenderSetRow(created),
+          duplicate: false,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Baseline set create failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path === "/v1/admin/style-dna/baseline-sets") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid baseline sets list limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..200",
+      });
+      return;
+    }
+
+    const rows = listBaselineRenderSets(dbPath, {
+      mjModelFamily: url.searchParams.get("mjModelFamily") || undefined,
+      mjModelVersion: url.searchParams.get("mjModelVersion") || undefined,
+      suiteId: url.searchParams.get("suiteId") || undefined,
+      status: url.searchParams.get("status") || undefined,
+      limit,
+    });
+    sendJson(
+      res,
+      200,
+      {
+        baselineSets: rows.map(mapBaselineRenderSetRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "GET"
+    && path.startsWith("/v1/admin/style-dna/baseline-sets/")
+    && !path.endsWith("/items")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const baselineRenderSetId = path.slice("/v1/admin/style-dna/baseline-sets/".length);
+    const baselineSet = getBaselineRenderSetById(dbPath, baselineRenderSetId);
+    if (!baselineSet) {
+      sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+      return;
+    }
+    const items = listBaselineRenderSetItems(dbPath, baselineRenderSetId);
+    sendJson(
+      res,
+      200,
+      {
+        baselineRenderSet: mapBaselineRenderSetRow(baselineSet),
+        items: items.map(mapBaselineRenderSetItemRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/style-dna/baseline-sets/")
+    && path.endsWith("/items")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const baselineRenderSetId = path.slice("/v1/admin/style-dna/baseline-sets/".length, -"/items".length);
+    const baselineSet = getBaselineRenderSetById(dbPath, baselineRenderSetId);
+    if (!baselineSet) {
+      sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaBaselineSetItemPayload(body);
+      const styleDnaImage = getStyleDnaImageById(dbPath, payload.gridImageId);
+      if (!styleDnaImage) {
+        sendError(res, 404, "NOT_FOUND", "Style-DNA image not found", ctx, {
+          imageId: payload.gridImageId,
+        });
+        return;
+      }
+      if (styleDnaImage.image_kind !== "baseline") {
+        sendError(res, 409, "INVALID_STATE", "Baseline set items require baseline image kind", ctx, {
+          imageId: payload.gridImageId,
+          imageKind: styleDnaImage.image_kind,
+        });
+        return;
+      }
+      ensureBaselinePromptSuiteItemByPromptKey(dbPath, {
+        itemId: `bpsi_${crypto.randomUUID()}`,
+        suiteId: baselineSet.suite_id,
+        promptKey: payload.promptKey,
+        promptText: payload.promptKey,
+        displayOrder: 1000,
+      });
+      const item = upsertBaselineRenderSetItem(dbPath, {
+        itemId: `brsi_${crypto.randomUUID()}`,
+        baselineRenderSetId,
+        promptKey: payload.promptKey,
+        stylizeTier: payload.stylizeTier,
+        gridImageId: payload.gridImageId,
+      });
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.baseline_set.item.upsert",
+        targetType: "style_dna_baseline_set",
+        targetId: baselineRenderSetId,
+        reason: payload.promptKey,
+      });
+      sendJson(
+        res,
+        200,
+        {
+          item: mapBaselineRenderSetItemRow(item),
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Baseline set item upsert failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-dna/prompt-jobs") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaPromptJobPayload(body);
+      const styleInfluence = getStyleInfluenceById(dbPath, payload.styleInfluenceId);
+      if (!styleInfluence) {
+        sendError(res, 404, "NOT_FOUND", "Style influence not found", ctx);
+        return;
+      }
+      if (styleInfluence.status !== "active") {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          status: styleInfluence.status,
+        });
+        return;
+      }
+      const baselineSet = getBaselineRenderSetById(dbPath, payload.baselineRenderSetId);
+      if (!baselineSet) {
+        sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+        return;
+      }
+
+      const promptItems = listBaselinePromptSuiteItems(dbPath, baselineSet.suite_id);
+      if (promptItems.length === 0) {
+        sendError(res, 409, "INVALID_STATE", "Baseline prompt suite has no prompt items", ctx, {
+          suiteId: baselineSet.suite_id,
+        });
+        return;
+      }
+
+      const promptJobId = `sdpj_${crypto.randomUUID()}`;
+      insertStyleDnaPromptJob(dbPath, {
+        promptJobId,
+        styleInfluenceId: payload.styleInfluenceId,
+        baselineRenderSetId: payload.baselineRenderSetId,
+        requestedTiers: payload.stylizeTiers,
+        status: "generated",
+        createdBy: authenticatedUserId,
+      });
+
+      let copyBlockOrder = 1;
+      const adjustmentArg = payload.styleAdjustmentType === "profile"
+        ? `--profile ${payload.styleAdjustmentMidjourneyId}`
+        : `--sref ${payload.styleAdjustmentMidjourneyId}`;
+      for (const tier of payload.stylizeTiers) {
+        for (const promptItem of promptItems) {
+          const promptTextGenerated = `${promptItem.prompt_text} ${adjustmentArg} ${styleInfluence.influence_code} --stylize ${tier}`;
+          insertStyleDnaPromptJobItem(dbPath, {
+            itemId: `sdpji_${crypto.randomUUID()}`,
+            promptJobId,
+            promptKey: promptItem.prompt_key,
+            stylizeTier: tier,
+            promptTextGenerated,
+            copyBlockOrder,
+          });
+          copyBlockOrder += 1;
+        }
+      }
+
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.prompt_job.create",
+        targetType: "style_dna_prompt_job",
+        targetId: promptJobId,
+        reason: null,
+      });
+
+      sendJson(
+        res,
+        201,
+        {
+          promptJob: mapStyleDnaPromptJobRow(getStyleDnaPromptJobById(dbPath, promptJobId)),
+          prompts: listStyleDnaPromptJobItems(dbPath, promptJobId).map(mapStyleDnaPromptJobItemRow),
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Prompt job create failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path.startsWith("/v1/admin/style-dna/prompt-jobs/")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const promptJobId = path.slice("/v1/admin/style-dna/prompt-jobs/".length);
+    const promptJob = getStyleDnaPromptJobById(dbPath, promptJobId);
+    if (!promptJob) {
+      sendError(res, 404, "NOT_FOUND", "Prompt job not found", ctx);
+      return;
+    }
+    sendJson(
+      res,
+      200,
+      {
+        promptJob: mapStyleDnaPromptJobRow(promptJob),
+        prompts: listStyleDnaPromptJobItems(dbPath, promptJobId).map(mapStyleDnaPromptJobItemRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-dna/runs") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaRunPayload(body);
+      const idempotencyKey = payload.idempotencyKey || `style-dna:${authenticatedUserId}:${crypto.randomUUID()}`;
+      const existingRun = getStyleDnaRunByIdempotencyKey(dbPath, idempotencyKey);
+      if (existingRun) {
+        sendJson(
+          res,
+          200,
+          {
+            run: mapStyleDnaRunRow(existingRun),
+            deduplicated: true,
+          },
+          ctx
+        );
+        return;
+      }
+
+      const styleInfluence = getStyleInfluenceById(dbPath, payload.styleInfluenceId);
+      if (!styleInfluence) {
+        sendError(res, 404, "NOT_FOUND", "Style influence not found", ctx);
+        return;
+      }
+      if (styleInfluence.status !== "active") {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          status: styleInfluence.status,
+        });
+        return;
+      }
+      const baselineSet = getBaselineRenderSetById(dbPath, payload.baselineRenderSetId);
+      if (!baselineSet) {
+        sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+        return;
+      }
+      const baselineItem = getBaselineRenderSetItem(
+        dbPath,
+        payload.baselineRenderSetId,
+        payload.promptKey,
+        payload.stylizeTier
+      );
+      if (!baselineItem) {
+        sendError(res, 409, "INVALID_STATE", "Baseline coverage missing for prompt key and stylize tier", ctx, {
+          promptKey: payload.promptKey,
+          stylizeTier: payload.stylizeTier,
+        });
+        return;
+      }
+      const testGridImage = getStyleDnaImageById(dbPath, payload.testGridImageId);
+      if (!testGridImage) {
+        sendError(res, 404, "NOT_FOUND", "Style-DNA test image not found", ctx, {
+          imageId: payload.testGridImageId,
+        });
+        return;
+      }
+      if (testGridImage.image_kind !== "test") {
+        sendError(res, 409, "INVALID_STATE", "Style-DNA run requires test image kind for testGridImageId", ctx, {
+          imageId: payload.testGridImageId,
+          imageKind: testGridImage.image_kind,
+        });
+        return;
+      }
+      const baselineGridImage = getStyleDnaImageById(dbPath, baselineItem.grid_image_id);
+      if (!baselineGridImage) {
+        sendError(res, 409, "INVALID_STATE", "Baseline image reference not found for baseline set item", ctx, {
+          imageId: baselineItem.grid_image_id,
+        });
+        return;
+      }
+      if (baselineGridImage.image_kind !== "baseline") {
+        sendError(res, 409, "INVALID_STATE", "Baseline image reference must be baseline image kind", ctx, {
+          imageId: baselineItem.grid_image_id,
+          imageKind: baselineGridImage.image_kind,
+        });
+        return;
+      }
+
+      const styleDnaRunId = `sdr_${crypto.randomUUID()}`;
+      const envelope = createJobEnvelope({
+        idempotencyKey,
+        runType: "style_dna",
+        imageId: payload.testGridImageId,
+        context: {
+          styleDnaRunId,
+          styleInfluenceId: payload.styleInfluenceId,
+          baselineRenderSetId: payload.baselineRenderSetId,
+          styleAdjustmentType: payload.styleAdjustmentType,
+          styleAdjustmentMidjourneyId: payload.styleAdjustmentMidjourneyId,
+          promptKey: payload.promptKey,
+          stylizeTier: payload.stylizeTier,
+          baselineGridImageId: baselineItem.grid_image_id,
+          testGridImageId: payload.testGridImageId,
+        },
+      }, {
+        requestId: ctx.requestId,
+      });
+
+      insertStyleDnaRun(dbPath, {
+        styleDnaRunId,
+        idempotencyKey,
+        styleInfluenceId: payload.styleInfluenceId,
+        baselineRenderSetId: payload.baselineRenderSetId,
+        styleAdjustmentType: payload.styleAdjustmentType,
+        styleAdjustmentMidjourneyId: payload.styleAdjustmentMidjourneyId,
+        promptKey: payload.promptKey,
+        stylizeTier: payload.stylizeTier,
+        baselineGridImageId: baselineItem.grid_image_id,
+        testGridImageId: payload.testGridImageId,
+        status: "queued",
+        createdBy: authenticatedUserId,
+      });
+      try {
+        queueAdapter.enqueue({
+          body: JSON.stringify(envelope),
+        });
+      } catch (error) {
+        updateStyleDnaRunStatus(dbPath, styleDnaRunId, {
+          status: "failed",
+          lastErrorCode: "QUEUE_UNAVAILABLE",
+          lastErrorMessage: error.message,
+        });
+        sendError(res, 503, "QUEUE_UNAVAILABLE", "Unable to enqueue style-dna run", ctx, {
+          reason: error.message,
+        });
+        return;
+      }
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.run.submit",
+        targetType: "style_dna_run",
+        targetId: styleDnaRunId,
+        reason: null,
+      });
+
+      sendJson(
+        res,
+        202,
+        {
+          run: mapStyleDnaRunRow(getStyleDnaRunById(dbPath, styleDnaRunId)),
+          deduplicated: false,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Style-DNA run submit failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path === "/v1/admin/style-dna/runs") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid style-dna runs list limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..200",
+      });
+      return;
+    }
+
+    const rows = listStyleDnaRuns(dbPath, {
+      styleInfluenceId: url.searchParams.get("styleInfluenceId") || undefined,
+      baselineRenderSetId: url.searchParams.get("baselineRenderSetId") || undefined,
+      status: url.searchParams.get("status") || undefined,
+      limit,
+    });
+    sendJson(
+      res,
+      200,
+      {
+        runs: rows.map(mapStyleDnaRunRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/v1/admin/style-dna/runs/")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const styleDnaRunId = path.slice("/v1/admin/style-dna/runs/".length);
+    const run = getStyleDnaRunById(dbPath, styleDnaRunId);
+    if (!run) {
+      sendError(res, 404, "NOT_FOUND", "Style-DNA run not found", ctx);
+      return;
+    }
+    const result = getStyleDnaRunResultByRunId(dbPath, styleDnaRunId);
+    sendJson(
+      res,
+      200,
+      {
+        run: mapStyleDnaRunRow(run),
+        result: mapStyleDnaRunResultRow(result),
       },
       ctx
     );

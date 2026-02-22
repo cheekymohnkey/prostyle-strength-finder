@@ -215,7 +215,7 @@ Scope:
 2. Accept baseline/test grid pair uploads plus shared render parameter envelope.
 3. Run vision analysis with strict JSON schema output.
 4. Persist raw extraction and normalized/canonical trait outputs.
-5. Support stylize-tiered comparison (`0`, `100`, `250`, `1000`) with same-tier delta rules.
+5. Support stylize-tiered comparison (`0`, `100`, `1000`) with same-tier delta rules.
 6. Add reusable baseline-set management keyed by MidJourney version + parameter envelope.
 7. Expose API/UI surfaces for prompt generation, pair submission, status, and results.
 

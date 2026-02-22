@@ -206,7 +206,7 @@ Recommended entity linkage (implementation-level, naming can vary):
 
 Style tier interpretation policy:
 1. `stylize=0` run: prioritize structural/core trait extraction.
-2. `stylize=100|250|1000` runs: prioritize amplification/interaction analysis with model stylization pressure.
+2. `stylize=100|1000` runs: prioritize amplification/interaction analysis with model stylization pressure.
 3. Comparisons must be interpreted within the same stylize tier only.
 4. Baseline reuse is valid only when model family/version and parameter envelope match exactly.
 

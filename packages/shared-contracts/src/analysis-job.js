@@ -1,4 +1,4 @@
-const ANALYSIS_RUN_TYPES = ["trait", "recommendation", "alignment"];
+const ANALYSIS_RUN_TYPES = ["trait", "recommendation", "alignment", "style_dna"];
 const MODEL_FAMILIES = ["standard", "niji"];
 
 function isObject(value) {

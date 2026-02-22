@@ -24,6 +24,12 @@ Ship an admin-only workflow that:
 4. Accepts returned test grids and enqueues strict-schema analysis.
 5. Persists raw and canonicalized trait outputs for retrieval and auditing.
 
+## Explicit Use Case Split
+
+1. Use Case 1: Baseline test definition management.
+2. Use Case 2: Baseline output grid upload and storage.
+3. Use Case 3: Style adjustment (`sref|profile`) comparison run against stored baseline.
+
 ## Scope
 
 In scope:
@@ -138,17 +144,20 @@ Description:
 
 Implementation tasks:
 1. Add admin-only route and access guard.
-2. Implement baseline set selector:
+2. Implement Use Case 1 UI: baseline test definition management:
 - model/version
 - prompt suite version
 - coverage/completeness indicator
-3. Implement style influence picker using stored system records.
-4. Implement prompt generation panel with copy-ready blocks.
-5. Implement test grid intake per prompt key/tier and run submission.
-6. Implement status and results panels:
+3. Implement Use Case 2 UI: baseline output upload + baseline set item attachment per prompt key/tier.
+4. Implement Use Case 3 UI: style adjustment selector:
+- adjustment type (`sref|profile`)
+- MidJourney adjustment ID
+- prompt generation panel with copy-ready blocks
+- test grid intake + run submission
+5. Implement status and results panels:
 - queued/in_progress/succeeded/failed states
 - structured trait categories
-7. Implement explicit error states for mismatch and missing prerequisites.
+6. Implement explicit error states for mismatch and missing prerequisites.
 
 Acceptance criteria:
 1. Admin can execute the full workflow in UI without manual API calls.
