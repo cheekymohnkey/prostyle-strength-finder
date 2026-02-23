@@ -362,6 +362,7 @@ async function main() {
           suiteId,
           parameterEnvelope: {
             aspectRatio: "3:4",
+            styleWeight: 0,
           },
         }),
       },
