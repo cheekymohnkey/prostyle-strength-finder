@@ -40,14 +40,18 @@ Completed in implementation:
 9. Style-DNA admin status/error messaging was hardened for operator clarity:
 - save/attach/generate/lookup actions now surface explicit multi-reason disabled-state lists (not single tooltip-only reasons)
 - API mutation errors are normalized into stable user-facing categories for `401/403/409/422` paths
-10. Frontend smoke scripts now run against Next runtime (not legacy `src/index.js`):
+10. Style-DNA operator UX readability/polish pass shipped in `/admin/style-dna`:
+- added workflow-readiness summary panel for baseline coverage, prompt generation, and run submission readiness
+- upgraded prerequisite/blocked messaging to clearer warning panels for save/attach/generate/submit/lookup
+- clarified section helper copy for faster operator flow comprehension
+11. Frontend smoke scripts now run against Next runtime (not legacy `src/index.js`):
 - `frontend:critical-flow-smoke`
 - `admin:frontend-proxy-smoke`
 - `feedback:frontend-proxy-smoke`
  - `admin:frontend-proxy-smoke` now verifies admin proxy coverage for approval policy, role management, moderation, prompt curation, style influence governance, and Style-DNA critical flow/guardrail checks via proxy (plus contributor proxy ownership/role boundaries)
  - `admin:frontend-proxy-smoke` now also asserts stable Style-DNA negative-path error contracts (`403 FORBIDDEN`, `409 INVALID_STATE`) and expected rejection reasons for non-control sref and stylize-tier mismatch submissions
-11. Full launch readiness smoke passes with Next frontend flow active.
-12. Launch readiness smoke now includes Style-DNA smoke gates in full scope:
+12. Full launch readiness smoke passes with Next frontend flow active.
+13. Launch readiness smoke now includes Style-DNA smoke gates in full scope:
 - `style-dna:tier-validation-smoke`
 - `style-dna:baseline-smoke`
 - `style-dna:prompt-generation-smoke`
@@ -55,7 +59,7 @@ Completed in implementation:
 - `style-dna:schema-failure-smoke`
 
 Remaining:
-1. Remaining Style-DNA work is non-blocking UX polish beyond current guardrail/status coverage.
+1. Remaining Style-DNA work is limited to minor visual/layout tuning; guardrail/status UX and proxy smoke coverage are complete for current scope.
 2. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
 
 ## Why Now

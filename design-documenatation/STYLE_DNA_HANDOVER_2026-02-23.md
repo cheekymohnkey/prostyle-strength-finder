@@ -77,6 +77,10 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 15. Frontend proxy smoke negative-path checks were tightened:
 - contributor access to admin style-dna baseline list now asserts `403 FORBIDDEN` with admin-role reason text
 - non-control sref and stylize-tier mismatch run submissions now assert `409 INVALID_STATE` plus expected reason text
+16. Style-DNA UI polish/readability pass shipped:
+- added workflow-readiness summary panel to `/admin/style-dna` for baseline coverage, prompt generation, and run-submit readiness
+- rendered blocked prerequisite lists in clearer warning panels for save/attach/generate/submit/lookup
+- clarified helper copy for baseline definition and comparison flow sections
 
 ## Key Files Updated This Slice
 
@@ -109,6 +113,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - `npm run typecheck --workspace=@prostyle/frontend` after guardrail/status messaging updates
  - `npm run admin:frontend-proxy-smoke` after Style-DNA proxy critical-flow + guardrail assertions
  - `npm run admin:frontend-proxy-smoke` after tightening Style-DNA negative-path code/reason assertions (`403 FORBIDDEN`, `409 INVALID_STATE`)
+ - `npm run admin:frontend-proxy-smoke` after `/admin/style-dna` readability/polish pass
 2. Local runtime verification of Next chunk behavior may still require manual local restart + hard refresh because this execution environment cannot reliably bind/check local ports.
 
 ## Open Issues / Risks

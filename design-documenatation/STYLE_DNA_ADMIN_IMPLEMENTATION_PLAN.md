@@ -51,6 +51,10 @@ Implemented in code:
  - non-run guardrail/status hardening:
    - save baseline, attach baseline, prompt generation, and run lookup now all surface explicit multi-reason disabled-state lists
    - API mutation failures now map to consistent operator-friendly categories for `401/403/409/422`
+ - operator readability/polish hardening:
+   - workflow readiness summary panel now surfaces baseline coverage, prompt generation, and run-submit readiness at a glance
+   - blocked-state prerequisite lists are now rendered in visually distinct warning panels for faster operator triage
+   - section helper copy is clarified for baseline setup and comparison-run steps
 5. Smoke scripts are implemented:
 - `style-dna:tier-validation-smoke`
 - `style-dna:baseline-smoke`
@@ -64,7 +68,7 @@ Implemented in code:
 - generated prompt jobs include `--v <mjModelVersion>`
 
 Open gaps:
-1. Remaining admin UX work is polish-level only (layout/readability refinement), not contract or guardrail coverage.
+1. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
 
 Launch/readiness status:
 1. `launch:readiness-smoke` full scope includes the full Style-DNA smoke set:

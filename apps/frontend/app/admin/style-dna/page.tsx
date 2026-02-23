@@ -1053,6 +1053,38 @@ export default function StyleDnaAdminPage() {
     return reasons;
   }, [lastStyleDnaRunId, styleDnaProbeQuery.data?.ready]);
   const lookupRunBlocker = lookupRunBlockingReasons[0] || "";
+  const workflowReadiness = useMemo(() => ([
+    {
+      label: "Baseline Set",
+      ready: Boolean(loadedBaselineSet),
+      detail: loadedBaselineSet ? "Loaded" : "Not loaded",
+    },
+    {
+      label: "Baseline Coverage",
+      ready: hasPromptDefinitions && missingPromptRows.length === 0,
+      detail: hasPromptDefinitions
+        ? `${uploadedPromptRows.length}/${requiredPromptRows.length} prompts attached`
+        : "No prompt definitions",
+    },
+    {
+      label: "Prompt Generation",
+      ready: generatePromptBlockingReasons.length === 0,
+      detail: generatePromptBlockingReasons.length === 0 ? "Ready" : `${generatePromptBlockingReasons.length} prerequisite(s)`,
+    },
+    {
+      label: "Run Submission",
+      ready: submitRunBlockingReasons.length === 0,
+      detail: submitRunBlockingReasons.length === 0 ? "Ready" : `${submitRunBlockingReasons.length} guardrail(s)`,
+    },
+  ]), [
+    generatePromptBlockingReasons.length,
+    hasPromptDefinitions,
+    loadedBaselineSet,
+    missingPromptRows.length,
+    requiredPromptRows.length,
+    submitRunBlockingReasons.length,
+    uploadedPromptRows.length,
+  ]);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
@@ -1080,7 +1112,30 @@ export default function StyleDnaAdminPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">Workflow Readiness</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Operator snapshot for baseline setup, prompt generation, and run-submit readiness.
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {workflowReadiness.map((item) => (
+            <div key={item.label} className="rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-[var(--ink)]">{item.label}</p>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${item.ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                  {item.ready ? "ready" : "blocked"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-[var(--muted)]">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--ink)]">1) Baseline Test Definition</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Create a new immutable baseline set or load an existing baseline set as an editable draft.
+        </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Model Family</span>
@@ -1166,8 +1221,8 @@ export default function StyleDnaAdminPage() {
           </p>
         ) : null}
         {createBaselineBlockingReasons.length > 0 ? (
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            <p>Save is disabled:</p>
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Save is disabled:</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               {createBaselineBlockingReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -1340,8 +1395,8 @@ export default function StyleDnaAdminPage() {
           <p className="mt-2 text-sm text-[var(--muted)]">Upload requires a selected baseline file.</p>
         ) : null}
         {attachBaselineBlockingReasons.length > 0 ? (
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            <p>Attach is disabled:</p>
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Attach is disabled:</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               {attachBaselineBlockingReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -1462,6 +1517,9 @@ export default function StyleDnaAdminPage() {
 
       <section className="mt-6 mb-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--ink)]">3) Style Adjustment Comparison</h2>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Select influence + adjustment, upload test grid, then submit and track the run.
+        </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Style Adjustment Type</span>
@@ -1477,7 +1535,7 @@ export default function StyleDnaAdminPage() {
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
             <span className="text-[var(--muted)]">Style Influence Id</span>
             <select value={styleInfluenceId} onChange={(event) => setStyleInfluenceId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
-              <option value="">select style influence</option>
+              <option value="">Select style influence</option>
               {availableInfluences.map((influence) => (
                 <option key={influence.id} value={influence.id}>{influence.label}</option>
               ))}
@@ -1580,8 +1638,8 @@ export default function StyleDnaAdminPage() {
           </button>
         </div>
         {generatePromptBlockingReasons.length > 0 ? (
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            <p>Prompt generation is disabled:</p>
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Prompt generation is disabled:</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               {generatePromptBlockingReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -1593,8 +1651,8 @@ export default function StyleDnaAdminPage() {
           <p className="mt-2 text-sm text-[var(--muted)]">Test upload requires a selected test grid file.</p>
         ) : null}
         {submitRunBlockingReasons.length > 0 ? (
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            <p>Run submit is disabled:</p>
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Run submit is disabled:</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               {submitRunBlockingReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
@@ -1605,8 +1663,8 @@ export default function StyleDnaAdminPage() {
           <p className="mt-2 text-sm text-[var(--muted)]">Run submit guardrails passed. Ready to submit.</p>
         )}
         {lookupRunBlockingReasons.length > 0 ? (
-          <div className="mt-2 text-sm text-[var(--muted)]">
-            <p>Run lookup is disabled:</p>
+          <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="font-medium">Run lookup is disabled:</p>
             <ul className="mt-1 list-disc space-y-1 pl-5">
               {lookupRunBlockingReasons.map((reason) => (
                 <li key={reason}>{reason}</li>
