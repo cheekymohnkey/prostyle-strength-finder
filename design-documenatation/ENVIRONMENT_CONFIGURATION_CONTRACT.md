@@ -106,6 +106,10 @@ To prevent accidental loss of local manual Style-DNA baseline data:
 - `DB_RESET_SKIP_CHECKPOINT=1 npm run db:reset`
 5. Checkpoints are written under:
 - `data/checkpoints/`
+6. For smoke runs that should never mutate your local working DB state, use the restore wrapper:
+- `npm run db:run-with-restore -- <command...>`
+7. Style-DNA full smoke suite with automatic DB restore:
+- `npm run style-dna:smokes:with-restore`
 
 ## Environment Template Files
 

@@ -88,6 +88,12 @@ Use this sequence for a repeatable local pre-prod verification.
 3. Run recommendation backend smoke (seeds data and validates extraction -> confirm -> session):
    `npm run recommendation:smoke`
 
+Local DB safety note:
+1. If you need smoke verification without altering your current local DB state, use:
+   `npm run db:run-with-restore -- <command...>`
+2. Full Style-DNA smoke suite with automatic DB restore:
+   `npm run style-dna:smokes:with-restore`
+
 For manual UI verification of the same flow:
 
 1. Terminal A: `npm run api`
