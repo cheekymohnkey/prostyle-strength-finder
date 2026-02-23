@@ -56,6 +56,9 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 10. Style-DNA set-producing smoke scripts now self-clean after successful verification:
 - cleanup applies to smoke-created suites, baseline sets/items, prompt jobs/items, runs/results, and uploaded smoke images
 - prevents local baseline set accumulation/noise from repeated smoke execution
+11. Launch/readiness gate status is now explicitly confirmed in source docs:
+- `launch:readiness-smoke` full scope includes all Style-DNA smoke commands (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`)
+- stale "launch/readiness hook pending" notes were removed from Style-DNA plan/task docs
 
 ## Key Files Updated This Slice
 
@@ -88,6 +91,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 ## Open Issues / Risks
 
 1. Local baseline data durability risk remains if reset is run without intended restore flow; use checkpoint+restore workflow to preserve uploaded baseline assets.
+2. Remaining feature work is primarily UI parity/polish (beyond current guardrail/status improvements), not Style-DNA backend contract gaps.
 
 ## Recommended Next Session Start
 
@@ -96,7 +100,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 2. Re-verify auth-sensitive endpoints from local browser/API:
 - `/api/proxy/admin/style-dna/baseline-sets`
 - `/api/proxy/contributor/submissions`
-3. Continue remaining UI/runtime hardening and Style-DNA UX guardrails/status messaging polish.
+3. Continue UI parity/polish slices (U4/U5) and close any remaining frontend experience gaps.
 
 ## Suggested First Commands Next Session
 
@@ -106,6 +110,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 4. `FRONTEND_VARIANT=next ENV_FILE=.env.local scripts/dev-stack.sh restart`
 5. `npm run typecheck --workspace=@prostyle/frontend`
 6. `npm run style-dna:prompt-generation-smoke`
+7. Optional readiness check: `LAUNCH_SMOKE_SCOPE=quick npm run launch:readiness-smoke`
 
 ## Handoff Summary
 
@@ -115,3 +120,4 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 4. Protect local manual baseline data by avoiding `db:reset` unless intentionally rebuilding from scratch.
 5. Use `npm run db:reset:safe` when reset is required so a local checkpoint is created first.
 6. `npm run db:reset` now also checkpoints automatically; explicit opt-out is `DB_RESET_SKIP_CHECKPOINT=1`.
+7. Launch/readiness integration for full Style-DNA smoke coverage is complete; remaining work is frontend parity/polish.

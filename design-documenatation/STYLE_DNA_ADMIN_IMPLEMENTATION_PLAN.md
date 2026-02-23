@@ -55,8 +55,15 @@ Implemented in code:
 - generated prompt jobs include `--v <mjModelVersion>`
 
 Open gaps:
-1. Launch/readiness hook for full style-dna smoke set is still pending.
-2. Additional admin UX guardrails/status messaging refinement remains.
+1. Additional admin UX guardrails/status messaging refinement remains.
+
+Launch/readiness status:
+1. `launch:readiness-smoke` full scope includes the full Style-DNA smoke set:
+- `style-dna:tier-validation-smoke`
+- `style-dna:baseline-smoke`
+- `style-dna:prompt-generation-smoke`
+- `style-dna:run-smoke`
+- `style-dna:schema-failure-smoke`
 
 ## Primary Use Cases (Explicit Split)
 
