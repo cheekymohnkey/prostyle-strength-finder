@@ -62,7 +62,7 @@ Out of scope:
 2. SD2: Partially implemented.
 - baseline, prompt-job, run, and image endpoints are implemented with admin RBAC.
 - idempotency behavior is implemented for run submission.
-- open: server-side matched-control (`--sw 0`) gating for sref policy is not fully enforced yet.
+- server-side matched-control (`--sw 0`) gating for sref policy is now enforced at run submission (`styleWeight=0` control baseline requirement).
 3. SD3: Implemented.
 - worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
 - failure path reaches dead-letter behavior in schema-failure smoke.
@@ -135,7 +135,7 @@ Acceptance criteria:
 2. Non-admin calls return `403`.
 3. Validation errors are explicit and actionable.
 4. Run submission enqueues exactly one job per idempotency key.
-5. [Open] sref comparisons are rejected when matched control baseline (`sw=0` at same `s`) is missing.
+5. [Done] sref comparisons are rejected when matched control baseline (`sw=0` at same `s`) is missing.
 
 ## SD3. Worker + Strict LLM Schema Path
 

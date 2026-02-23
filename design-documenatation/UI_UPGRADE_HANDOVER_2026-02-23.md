@@ -28,18 +28,17 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 
 ## Known UI Runtime Risk
 
-1. A local Next dev chunk error was reported (`layout.js` invalid token / chunk load timeout).
-2. Candidate fix applied: removed custom TanStack webpack alias override from `apps/frontend/next.config.js` to use package exports/default resolver path.
-3. This needs local-machine verification after `.next` cleanup and stack restart.
+1. Prior local Next dev chunk error (`layout.js` invalid token / chunk load timeout) was re-verified in this session after `.next` cleanup + stack restart.
+2. `/admin/style-dna` compiled and rendered successfully, and proxy/auth endpoints responded without chunk/runtime failures.
+3. Keep cache-clean + restart as fallback runbook if local runtime corruption recurs.
 
 ## Recommended Next Session Start
 
 1. Rebuild frontend cache and restart stack.
-2. Validate `/admin/style-dna` loads without chunk/runtime errors.
-3. Confirm contributor/admin proxy routes behave correctly under local admin bypass.
-4. If issue persists, capture generated `apps/frontend/.next/static/chunks/app/layout.js` around failing line and re-check for malformed module payload.
+2. Confirm contributor/admin proxy routes behave correctly under local admin bypass.
+3. Continue UI hardening: guardrails, state messaging, and remaining parity slices.
 
 ## Handoff Summary
 
 1. UI upgrade documentation is now current with Style-DNA save-as workflow and prompt version-tag behavior.
-2. Remaining UI risk is focused on local Next runtime chunk stability, not missing feature implementation.
+2. Next runtime chunk stability is currently verified; remaining work is UI polish and parity completion.

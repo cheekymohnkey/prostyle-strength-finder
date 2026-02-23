@@ -70,23 +70,22 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - `node --check apps/api/src/index.js`
 - `npm run typecheck --workspace=@prostyle/frontend`
 - `npm run style-dna:prompt-generation-smoke`
+- `npm run style-dna:run-smoke` (includes negative assertion that sref run submission rejects non-control baseline `styleWeight != 0`)
+- `FRONTEND_VARIANT=next ENV_FILE=.env.local scripts/dev-stack.sh restart` + local endpoint verification (`/v1/health`, `/api/auth/session`, `/api/proxy/admin/style-dna/baseline-sets`, `/admin/style-dna`) with successful Next compile/log output and no `layout.js` token error
 2. Local runtime verification of Next chunk behavior may still require manual local restart + hard refresh because this execution environment cannot reliably bind/check local ports.
 
 ## Open Issues / Risks
 
-1. Next dev runtime `layout.js` "Invalid or unexpected token" issue was reported locally and may persist until local `.next` cleanup + restart is confirmed on host machine.
-2. Matched-control sref enforcement (`--sw 0` control at same stylize tier) is still documented as required but not fully enforced server-side.
-3. Local baseline data durability risk remains if reset is run without intended restore flow; use checkpoint+restore workflow to preserve uploaded baseline assets.
+1. Local baseline data durability risk remains if reset is run without intended restore flow; use checkpoint+restore workflow to preserve uploaded baseline assets.
 
 ## Recommended Next Session Start
 
 1. Confirm local runtime health:
-- clear Next cache and restart dev stack
-- verify `layout.js` syntax error is gone
+- keep using cache-clean + restart sequence if runtime cache corruption reappears
 2. Re-verify auth-sensitive endpoints from local browser/API:
 - `/api/proxy/admin/style-dna/baseline-sets`
 - `/api/proxy/contributor/submissions`
-3. Continue with server-side matched-control enforcement task.
+3. Continue remaining UI/runtime hardening and Style-DNA UX guardrails/status messaging polish.
 
 ## Suggested First Commands Next Session
 
@@ -101,7 +100,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 
 1. Style-DNA feature and docs are aligned through the save-as baseline workflow and `--v` prompt-version emission.
 2. Local admin auth policy is now explicitly documented to prevent recurring 403 regressions.
-3. Remaining work is concentrated on Next runtime stability confirmation and matched-control policy enforcement.
+3. Server-side matched-control policy enforcement for sref runs is now active (`styleWeight=0` baseline control required at run submission).
 4. Protect local manual baseline data by avoiding `db:reset` unless intentionally rebuilding from scratch.
 5. Use `npm run db:reset:safe` when reset is required so a local checkpoint is created first.
 6. `npm run db:reset` now also checkpoints automatically; explicit opt-out is `DB_RESET_SKIP_CHECKPOINT=1`.

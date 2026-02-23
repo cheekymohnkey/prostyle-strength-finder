@@ -200,6 +200,7 @@ async function main() {
           suiteId,
           parameterEnvelope: {
             aspectRatio: "3:4",
+            styleWeight: 0,
           },
         }),
       },
@@ -227,6 +228,48 @@ async function main() {
       200
     );
     assertCondition(baselineItem?.item?.gridImageId === baselineImageId, "Baseline set item did not persist baseline image");
+
+    const nonControlBaselineSet = await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          mjModelFamily: "standard",
+          mjModelVersion: "7",
+          suiteId,
+          parameterEnvelope: {
+            aspectRatio: "3:4",
+            styleWeight: 100,
+          },
+        }),
+      },
+      201
+    );
+    const nonControlBaselineRenderSetId = nonControlBaselineSet?.baselineRenderSet?.baselineRenderSetId;
+    assertCondition(
+      typeof nonControlBaselineRenderSetId === "string" && nonControlBaselineRenderSetId !== "",
+      "Missing non-control baseline render set id"
+    );
+    await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets/${nonControlBaselineRenderSetId}/items`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey,
+          stylizeTier,
+          gridImageId: baselineImageId,
+        }),
+      },
+      200
+    );
 
     const styleAdjustmentType = "sref";
     const styleAdjustmentMidjourneyId = "sref-123456789";
@@ -271,6 +314,42 @@ async function main() {
     );
     const testGridImageId = testImageUpload?.image?.styleDnaImageId;
     assertCondition(typeof testGridImageId === "string" && testGridImageId !== "", "Missing test image id");
+
+    const missingControlResponse = await fetch(
+      `${baseUrl}/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: `style-dna-run-smoke:missing-control:${Date.now()}`,
+          styleInfluenceId: "si_style_dna_smoke",
+          baselineRenderSetId: nonControlBaselineRenderSetId,
+          styleAdjustmentType,
+          styleAdjustmentMidjourneyId,
+          promptKey,
+          stylizeTier,
+          testGridImageId,
+        }),
+      }
+    );
+    const missingControlJson = await missingControlResponse.json().catch(() => ({}));
+    assertCondition(
+      missingControlResponse.status === 409,
+      `Expected 409 when sref run baseline styleWeight is not control, got ${missingControlResponse.status}: ${JSON.stringify(missingControlJson)}`
+    );
+    const missingControlCode = String(missingControlJson?.error?.code || missingControlJson?.code || "");
+    const missingControlMessage = String(missingControlJson?.error?.message || missingControlJson?.message || "");
+    assertCondition(
+      missingControlCode === "INVALID_STATE",
+      `Expected INVALID_STATE code for missing control baseline, got ${JSON.stringify(missingControlJson)}`
+    );
+    assertCondition(
+      missingControlMessage.includes("Matched-control baseline is required"),
+      `Expected matched-control policy message, got: ${missingControlMessage || "(empty)"}`
+    );
 
     const runSubmit = await requestJson(
       `${baseUrl}/admin/style-dna/runs`,

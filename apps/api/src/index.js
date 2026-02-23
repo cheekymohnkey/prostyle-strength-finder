@@ -995,6 +995,22 @@ function validateStyleDnaImageUploadPayload(value) {
   };
 }
 
+function parseBaselineStyleWeight(parameterEnvelopeJson) {
+  try {
+    const parsed = JSON.parse(parameterEnvelopeJson || "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    if (parsed.styleWeight === undefined || parsed.styleWeight === null) {
+      return null;
+    }
+    const numeric = Number(parsed.styleWeight);
+    return Number.isFinite(numeric) ? numeric : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function createStoredJobEnvelope(job, options = {}) {
   const requestId = typeof options.requestId === "string" && options.requestId.trim() !== ""
     ? options.requestId.trim()
@@ -2911,6 +2927,25 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       if (!baselineSet) {
         sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
         return;
+      }
+      if (payload.styleAdjustmentType === "sref") {
+        const baselineStyleWeight = parseBaselineStyleWeight(baselineSet.parameter_envelope_json);
+        if (baselineStyleWeight !== 0) {
+          sendError(
+            res,
+            409,
+            "INVALID_STATE",
+            "Matched-control baseline is required for sref runs (`styleWeight=0` at same stylize tier)",
+            ctx,
+            {
+              baselineRenderSetId: payload.baselineRenderSetId,
+              promptKey: payload.promptKey,
+              stylizeTier: payload.stylizeTier,
+              baselineStyleWeight,
+            }
+          );
+          return;
+        }
       }
       const baselineItem = getBaselineRenderSetItem(
         dbPath,

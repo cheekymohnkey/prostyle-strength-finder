@@ -54,8 +54,8 @@ Implemented in code:
 - generated prompt jobs include `--v <mjModelVersion>`
 
 Open gaps:
-1. Matched-control sref policy (`--sw 0` control at same stylize tier) is documented but not fully enforced by API run submission checks yet.
-2. Launch/readiness hook for full style-dna smoke set is still pending.
+1. Launch/readiness hook for full style-dna smoke set is still pending.
+2. Additional admin UX guardrails/status messaging refinement remains.
 
 ## Primary Use Cases (Explicit Split)
 
@@ -119,7 +119,7 @@ For sref analysis validity:
 
 Implementation note:
 1. This policy is currently a required contract and operator guideline.
-2. Full server-side enforcement of matched `--sw 0` controls is still an open item.
+2. Server-side enforcement is implemented at run submission by requiring control baseline `styleWeight=0` for `sref` runs.
 
 ## Vision Extraction Contract
 
