@@ -1028,6 +1028,35 @@ export default function StyleDnaAdminPage() {
     },
   });
 
+  const removeStyleInfluenceMutation = useMutation({
+    mutationFn: async () => {
+      const selectedId = styleInfluenceId.trim();
+      if (!selectedId) {
+        throw new Error("Select a Style Influence Id first");
+      }
+      const response = await fetch(`/api/proxy/admin/style-influences/${encodeURIComponent(selectedId)}/governance`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "remove",
+          reason: "section3_type_correction",
+        }),
+      });
+      return parseApiResponse<{ styleInfluence?: { styleInfluenceId?: string } }>(response);
+    },
+    onSuccess: async () => {
+      const removedId = styleInfluenceId.trim();
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-influences"],
+      });
+      if (styleInfluenceId.trim() === removedId) {
+        setStyleInfluenceId("");
+      }
+    },
+  });
+
   const submitRunMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/proxy/admin/style-dna/runs", {
@@ -1881,15 +1910,37 @@ export default function StyleDnaAdminPage() {
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Style Adjustment Midjourney Id</span>
             <input value={styleAdjustmentMidjourneyId} onChange={(event) => setStyleAdjustmentMidjourneyId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-            <button
-              type="button"
-              onClick={() => createStyleInfluenceMutation.mutate()}
-              disabled={createStyleInfluenceMutation.isPending || !styleAdjustmentMidjourneyId.trim()}
-              title={styleAdjustmentMidjourneyId.trim() ? undefined : "Enter a Midjourney id first."}
-              className="mt-2 w-fit rounded-lg border border-[var(--line)] px-3 py-1 text-xs disabled:opacity-60"
-            >
-              {createStyleInfluenceMutation.isPending ? "Creating..." : "Create New"}
-            </button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => createStyleInfluenceMutation.mutate()}
+                disabled={createStyleInfluenceMutation.isPending || !styleAdjustmentMidjourneyId.trim()}
+                title={styleAdjustmentMidjourneyId.trim() ? undefined : "Enter a Midjourney id first."}
+                className="w-fit rounded-lg border border-[var(--line)] px-3 py-1 text-xs disabled:opacity-60"
+              >
+                {createStyleInfluenceMutation.isPending ? "Creating..." : "Create New"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!styleInfluenceId.trim()) {
+                    return;
+                  }
+                  const confirmed = window.confirm(
+                    `Remove style influence ${styleInfluenceId.trim()}? This marks it removed and it will disappear from active list.`
+                  );
+                  if (!confirmed) {
+                    return;
+                  }
+                  removeStyleInfluenceMutation.mutate();
+                }}
+                disabled={removeStyleInfluenceMutation.isPending || !styleInfluenceId.trim()}
+                title={styleInfluenceId.trim() ? undefined : "Select a Style Influence Id first."}
+                className="w-fit rounded-lg border border-red-300 px-3 py-1 text-xs text-red-700 disabled:opacity-60"
+              >
+                {removeStyleInfluenceMutation.isPending ? "Removing..." : "Remove Selected"}
+              </button>
+            </div>
           </label>
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
             <span className="text-[var(--muted)]">Style Influence Id</span>
@@ -2059,6 +2110,9 @@ export default function StyleDnaAdminPage() {
         ) : null}
         {createStyleInfluenceMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Create style influence failed: {mutationErrorMessage(createStyleInfluenceMutation.error)}</p>
+        ) : null}
+        {removeStyleInfluenceMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Remove style influence failed: {mutationErrorMessage(removeStyleInfluenceMutation.error)}</p>
         ) : null}
         {section3MatrixPreviewRows.length > 0 ? (
           <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">

@@ -38,6 +38,12 @@ Compared current requirements/planning docs against implemented code paths in AP
 ## Documentation Drift Fixed in This Change
 
 1. Old root-level implementation-plan/task document paths were moved to `design-documenatation/implementation/` and references updated.
+
+## Resolved in This Change
+
+1. `DISC-006` Section 3 remove/delete style influence gap.
+- Resolution: Section 3 now exposes `Remove Selected`, backed by admin governance remove API and active-list refresh.
+- Files: `apps/frontend/app/admin/style-dna/page.tsx`.
 2. Requirements are now documented in dedicated functional/non-functional trees.
 
 ## Recommended Resolution Order

@@ -53,6 +53,8 @@ Primary operator intent:
 - creates a new active style influence record
 - auto-selects the newly created style influence in the Style Influence selector
 15. `FR-SD3-015` Newly created style influences shall be immediately visible in the Section 3 Style Influence list without requiring manual DB edits or external workflow steps.
+16. `FR-SD3-016` Section 3 shall provide an admin `Delete/Remove` action for style influences to handle incorrect type creation (for example, accidentally created as `sref` instead of `profile`).
+17. `FR-SD3-017` When a style influence is removed, Section 3 shall allow immediate creation of a replacement style influence with the correct type and auto-select it.
 
 ## Matrix Requirements
 
@@ -97,6 +99,7 @@ Primary operator intent:
 9. Completion reporting makes missing prompts/cells unambiguous and indicates that additional completed cells increase confidence.
 10. Admin can run and store results with partial matrix coverage, while seeing the remaining recommended cells.
 11. Admin can create a new Midjourney style adjustment ID directly in Section 3 and use it immediately in prompt generation/run submission.
+12. Admin can remove an incorrectly typed style influence from Section 3 and replace it with a correctly typed new record in the same workflow.
 
 ## Decisions Captured
 
@@ -112,6 +115,7 @@ Primary operator intent:
 3. Existing result persistence contract remains authoritative (worker writes style-dna run result artifacts).
 4. Current run contract does not carry per-run `styleWeight` as an explicit field; UI matrix output includes `--sw` in generated prompts, but backend trusts uploaded-image intent.
 5. Admin-side style influence creation from Section 3 is exposed via admin create/list style influence contracts and used directly by the UI.
+6. Style influence removal should use admin governance remove semantics (status transition) so auditability is preserved.
 
 ## Implementation Status (Current)
 
@@ -129,3 +133,4 @@ Not yet fully enforced server-side:
 1. Per-run `--sw` is not validated as a first-class run field in API payload/DB schema.
 2. Cell-level run identity is UI-managed; backend currently keys runs by submitted prompt/tier/image/idempotency.
 3. Section 3 now supports direct creation of new style influences from Midjourney IDs and refreshes selector options after create.
+4. Section 3 now exposes a dedicated remove/delete control for style influences in the UI, using governance remove semantics.

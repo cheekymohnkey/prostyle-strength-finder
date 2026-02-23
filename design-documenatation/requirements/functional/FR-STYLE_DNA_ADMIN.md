@@ -26,6 +26,7 @@ Section-specific extension:
 10. `FR-SD-010` Style-DNA run lifecycle shall expose `queued`, `in_progress`, terminal (`succeeded|failed|dead_letter`).
 11. `FR-SD-011` Frontend shall gate invalid actions with explicit prerequisite reasons.
 12. `FR-SD-012` Admin workflow shall include an in-UI path to create new Style Influence records (for new Midjourney IDs) without requiring contributor submission flow or direct database edits.
+13. `FR-SD-013` Admin workflow shall include in-UI removal of incorrectly created Style Influence records, with auditable governance semantics and immediate replacement path.
 
 ## User Acceptance Criteria
 
