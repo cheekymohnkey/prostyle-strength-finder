@@ -48,6 +48,9 @@ Implemented in code:
    - stylize-tier mismatch and baseline prompt+tier coverage mismatch are blocked client-side
    - sref control-policy guardrail requires explicit `styleWeight=0` control baseline envelope
    - section-1 field drift vs loaded baseline envelope is surfaced before submit
+ - non-run guardrail/status hardening:
+   - save baseline, attach baseline, prompt generation, and run lookup now all surface explicit multi-reason disabled-state lists
+   - API mutation failures now map to consistent operator-friendly categories for `401/403/409/422`
 5. Smoke scripts are implemented:
 - `style-dna:tier-validation-smoke`
 - `style-dna:baseline-smoke`
@@ -55,12 +58,13 @@ Implemented in code:
 - `style-dna:run-smoke`
 - `style-dna:schema-failure-smoke`
  - set-producing smokes now self-clean smoke-created baseline/prompt/run/image records on success to avoid local data pollution
+ - frontend proxy smoke assertions now explicitly enforce Style-DNA negative-path API error contracts (`FORBIDDEN`, `INVALID_STATE`) and reason-text expectations
 6. Prompt generation now includes model version argument when available:
 - baseline copy prompts include `--v <mjModelVersion>`
 - generated prompt jobs include `--v <mjModelVersion>`
 
 Open gaps:
-1. Additional admin UX status messaging refinement remains outside the run-submit guardrail set.
+1. Remaining admin UX work is polish-level only (layout/readability refinement), not contract or guardrail coverage.
 
 Launch/readiness status:
 1. `launch:readiness-smoke` full scope includes the full Style-DNA smoke set:

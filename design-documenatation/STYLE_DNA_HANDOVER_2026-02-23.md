@@ -71,6 +71,12 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - prompt generation via `/api/proxy/admin/style-dna/prompt-jobs`
 - run submit + run lookup via `/api/proxy/admin/style-dna/runs`
 - negative assertions for non-control sref baseline and stylize-tier mismatch (`409 INVALID_STATE`)
+14. Style-DNA UI status/error behavior is now consistent across action groups:
+- save baseline, attach baseline, prompt generation, and run lookup disabled states now show explicit multi-reason prerequisite lists
+- API mutation errors are normalized for operator clarity (`401` unauthenticated, `403` role-gated, `409` state conflict, `422` validation)
+15. Frontend proxy smoke negative-path checks were tightened:
+- contributor access to admin style-dna baseline list now asserts `403 FORBIDDEN` with admin-role reason text
+- non-control sref and stylize-tier mismatch run submissions now assert `409 INVALID_STATE` plus expected reason text
 
 ## Key Files Updated This Slice
 
@@ -102,6 +108,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - `FRONTEND_VARIANT=next ENV_FILE=.env.local scripts/dev-stack.sh restart` + local endpoint verification (`/v1/health`, `/api/auth/session`, `/api/proxy/admin/style-dna/baseline-sets`, `/admin/style-dna`) with successful Next compile/log output and no `layout.js` token error
 - `npm run typecheck --workspace=@prostyle/frontend` after guardrail/status messaging updates
  - `npm run admin:frontend-proxy-smoke` after Style-DNA proxy critical-flow + guardrail assertions
+ - `npm run admin:frontend-proxy-smoke` after tightening Style-DNA negative-path code/reason assertions (`403 FORBIDDEN`, `409 INVALID_STATE`)
 2. Local runtime verification of Next chunk behavior may still require manual local restart + hard refresh because this execution environment cannot reliably bind/check local ports.
 
 ## Open Issues / Risks

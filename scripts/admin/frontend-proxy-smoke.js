@@ -90,6 +90,13 @@ function extractApiErrorText(payload) {
     .toLowerCase();
 }
 
+function extractApiErrorCode(payload) {
+  const top = payload || {};
+  const error = typeof top.error === "object" && top.error ? top.error : {};
+  const rawCode = error.code || top.code;
+  return typeof rawCode === "string" ? rawCode : "";
+}
+
 async function postJsonWithDbRetry(url, init, label, maxAttempts = 6) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     // eslint-disable-next-line no-await-in-loop
@@ -628,7 +635,16 @@ async function main() {
         headers: { "x-auth-token": contributorToken },
       }
     );
+    const forbiddenStyleDnaListJson = await forbiddenStyleDnaListResponse.json().catch(() => ({}));
     assertCondition(forbiddenStyleDnaListResponse.status === 403, "Expected contributor style-dna baseline list to return 403");
+    assertCondition(
+      extractApiErrorCode(forbiddenStyleDnaListJson) === "FORBIDDEN",
+      `Expected contributor style-dna baseline list error code FORBIDDEN, got ${JSON.stringify(forbiddenStyleDnaListJson)}`
+    );
+    assertCondition(
+      extractApiErrorText(forbiddenStyleDnaListJson).includes("admin role is required"),
+      "Expected contributor style-dna baseline list rejection to mention admin role"
+    );
 
     const baselineImageUploadResponse = await fetch(
       `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/images`,
@@ -752,6 +768,10 @@ async function main() {
       `Expected non-control sref run submit to return 409, got ${nonControlRunResponse.status}: ${JSON.stringify(nonControlRunJson)}`
     );
     assertCondition(
+      extractApiErrorCode(nonControlRunJson) === "INVALID_STATE",
+      `Expected non-control sref run submit to return INVALID_STATE, got ${JSON.stringify(nonControlRunJson)}`
+    );
+    assertCondition(
       extractApiErrorText(nonControlRunJson).includes("matched-control baseline"),
       "Expected non-control sref run rejection reason to mention matched-control baseline"
     );
@@ -852,8 +872,12 @@ async function main() {
     const stylizeMismatchRunJson = await stylizeMismatchRunResponse.json();
     assertCondition(stylizeMismatchRunResponse.status === 409, "Expected stylize mismatch run submit to return 409");
     assertCondition(
-      extractApiErrorText(stylizeMismatchRunJson).includes("baseline"),
-      "Expected stylize mismatch rejection reason to mention baseline coverage"
+      extractApiErrorCode(stylizeMismatchRunJson) === "INVALID_STATE",
+      `Expected stylize mismatch run submit to return INVALID_STATE, got ${JSON.stringify(stylizeMismatchRunJson)}`
+    );
+    assertCondition(
+      extractApiErrorText(stylizeMismatchRunJson).includes("baseline coverage missing for prompt key and stylize tier"),
+      "Expected stylize mismatch rejection reason to mention prompt+tier baseline coverage"
     );
 
     const controlRunResponse = await fetch(

@@ -133,6 +133,20 @@ type BaselineSetListResponse = {
   baselineSets?: BaselineSetSummary[];
 };
 
+class ApiRequestError extends Error {
+  status: number;
+  code: string;
+  reason: string;
+
+  constructor(message: string, input: { status: number; code?: string; reason?: string }) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = input.status;
+    this.code = String(input.code || "REQUEST_FAILED");
+    this.reason = String(input.reason || "");
+  }
+}
+
 async function parseApiResponse<T>(response: Response): Promise<T> {
   const json: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -140,18 +154,20 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     const error = typeof body.error === "object" && body.error !== null
       ? (body.error as Record<string, unknown>)
       : {};
+    const code = typeof error.code === "string" ? error.code : "REQUEST_FAILED";
     const details = typeof error.details === "object" && error.details !== null
       ? (error.details as Record<string, unknown>)
       : {};
-    const reason = typeof details.reason === "string" && details.reason.trim() !== ""
-      ? `: ${details.reason}`
-      : "";
+    const reason = typeof details.reason === "string" ? details.reason.trim() : "";
     const message = typeof error.message === "string"
       ? error.message
       : typeof body.message === "string"
         ? body.message
         : `Request failed (${response.status})`;
-    throw new Error(`${message}${reason}`);
+    throw new ApiRequestError(
+      reason !== "" ? `${message}: ${reason}` : message,
+      { status: response.status, code, reason }
+    );
   }
   return json as T;
 }
@@ -159,6 +175,21 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
 function mutationErrorMessage(error: unknown): string | null {
   if (!error) {
     return null;
+  }
+  if (error instanceof ApiRequestError) {
+    if (error.status === 401) {
+      return "Session is not authenticated. Sign in again and retry.";
+    }
+    if (error.status === 403) {
+      return "Access denied. Use an admin-authenticated session for this action.";
+    }
+    if (error.status === 409) {
+      return error.reason || "Request conflicts with current baseline/run state. Reload data and retry.";
+    }
+    if (error.status === 422) {
+      return error.reason || "Request validation failed. Verify required fields and input values.";
+    }
+    return `${error.message} [${error.code}]`;
   }
   if (error instanceof Error) {
     return error.message;
@@ -847,50 +878,80 @@ export default function StyleDnaAdminPage() {
   const loadedBaselineSet = baselineSetDetailQuery.data?.baselineRenderSet;
   const loadedEnvelope = loadedBaselineSet?.parameterEnvelope;
 
-  const createBaselineBlocker = useMemo(() => {
+  const createBaselineBlockingReasons = useMemo(() => {
+    const reasons: string[] = [];
     if (!mjModelFamily.trim()) {
-      return "Model family is required.";
+      reasons.push("Model family is required.");
     }
     if (!mjModelVersion.trim()) {
-      return "Model version is required.";
+      reasons.push("Model version is required.");
     }
     if (!suiteId.trim()) {
-      return "Baseline prompt suite id is required.";
+      reasons.push("Baseline prompt suite id is required.");
     }
     if (!aspectRatio.trim()) {
-      return "Aspect ratio is required.";
+      reasons.push("Aspect ratio is required.");
     }
     if (!stylizeTier.trim()) {
-      return "Stylize tier is required.";
+      reasons.push("Stylize tier is required.");
     }
-    return "";
-  }, [aspectRatio, mjModelFamily, mjModelVersion, stylizeTier, suiteId]);
+    if (!Number.isFinite(Number(stylizeTier))) {
+      reasons.push("Stylize tier must be numeric.");
+    }
+    if (!Number.isFinite(Number(quality))) {
+      reasons.push("Quality must be numeric.");
+    }
+    return reasons;
+  }, [aspectRatio, mjModelFamily, mjModelVersion, quality, stylizeTier, suiteId]);
+  const createBaselineBlocker = createBaselineBlockingReasons[0] || "";
 
-  const attachBaselineBlocker = useMemo(() => {
+  const attachBaselineBlockingReasons = useMemo(() => {
+    const reasons: string[] = [];
     if (!baselineRenderSetId.trim()) {
-      return "Baseline render set id is required.";
+      reasons.push("Baseline render set id is required.");
+    }
+    if (!loadedBaselineSet) {
+      reasons.push("Load baseline set details first.");
     }
     if (!promptKey.trim()) {
-      return "Prompt key is required.";
+      reasons.push("Prompt key is required.");
+    }
+    if (!baselinePromptDefinitions.some((item) => item.promptKey === promptKey.trim())) {
+      reasons.push("Selected prompt key must exist in the loaded prompt suite.");
     }
     if (!baselineGridImageId.trim()) {
-      return "Upload a baseline grid image first.";
+      reasons.push("Upload a baseline grid image first.");
     }
-    return "";
-  }, [baselineGridImageId, baselineRenderSetId, promptKey]);
+    return reasons;
+  }, [baselineGridImageId, baselinePromptDefinitions, baselineRenderSetId, loadedBaselineSet, promptKey]);
+  const attachBaselineBlocker = attachBaselineBlockingReasons[0] || "";
 
-  const generatePromptBlocker = useMemo(() => {
+  const generatePromptBlockingReasons = useMemo(() => {
+    const reasons: string[] = [];
     if (!styleInfluenceId.trim()) {
-      return "Style influence id is required.";
+      reasons.push("Style influence id is required.");
     }
     if (!baselineRenderSetId.trim()) {
-      return "Baseline render set id is required.";
+      reasons.push("Baseline render set id is required.");
+    }
+    if (!loadedBaselineSet) {
+      reasons.push("Load baseline set details first.");
+    }
+    if (!hasPromptDefinitions) {
+      reasons.push("Loaded baseline set has no prompt definitions.");
     }
     if (!styleAdjustmentMidjourneyId.trim()) {
-      return "Style adjustment Midjourney id is required.";
+      reasons.push("Style adjustment Midjourney id is required.");
     }
-    return "";
-  }, [baselineRenderSetId, styleAdjustmentMidjourneyId, styleInfluenceId]);
+    return reasons;
+  }, [
+    baselineRenderSetId,
+    hasPromptDefinitions,
+    loadedBaselineSet,
+    styleAdjustmentMidjourneyId,
+    styleInfluenceId,
+  ]);
+  const generatePromptBlocker = generatePromptBlockingReasons[0] || "";
 
   const submitRunBlockingReasons = useMemo(() => {
     const reasons: string[] = [];
@@ -981,12 +1042,17 @@ export default function StyleDnaAdminPage() {
   ]);
   const submitRunBlocker = submitRunBlockingReasons[0] || "";
 
-  const lookupRunBlocker = useMemo(() => {
+  const lookupRunBlockingReasons = useMemo(() => {
+    const reasons: string[] = [];
     if (!lastStyleDnaRunId.trim()) {
-      return "Enter a Style-DNA run id first.";
+      reasons.push("Enter a Style-DNA run id first.");
     }
-    return "";
-  }, [lastStyleDnaRunId]);
+    if (styleDnaProbeQuery.data?.ready === false) {
+      reasons.push("Style-DNA admin endpoints are not available.");
+    }
+    return reasons;
+  }, [lastStyleDnaRunId, styleDnaProbeQuery.data?.ready]);
+  const lookupRunBlocker = lookupRunBlockingReasons[0] || "";
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
@@ -1099,8 +1165,15 @@ export default function StyleDnaAdminPage() {
             No baseline render sets found. Create one in section 1 first.
           </p>
         ) : null}
-        {createBaselineBlocker ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">Save is disabled: {createBaselineBlocker}</p>
+        {createBaselineBlockingReasons.length > 0 ? (
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            <p>Save is disabled:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {createBaselineBlockingReasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {createBaselineMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Save failed: {mutationErrorMessage(createBaselineMutation.error)}</p>
@@ -1266,8 +1339,15 @@ export default function StyleDnaAdminPage() {
         {!baselineFile ? (
           <p className="mt-2 text-sm text-[var(--muted)]">Upload requires a selected baseline file.</p>
         ) : null}
-        {attachBaselineBlocker ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">Attach is disabled: {attachBaselineBlocker}</p>
+        {attachBaselineBlockingReasons.length > 0 ? (
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            <p>Attach is disabled:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {attachBaselineBlockingReasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {uploadBaselineImageMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Baseline upload failed: {mutationErrorMessage(uploadBaselineImageMutation.error)}</p>
@@ -1499,8 +1579,15 @@ export default function StyleDnaAdminPage() {
             {lookupRunMutation.isPending ? "Loading..." : "Get Run Status"}
           </button>
         </div>
-        {generatePromptBlocker ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">Prompt generation is disabled: {generatePromptBlocker}</p>
+        {generatePromptBlockingReasons.length > 0 ? (
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            <p>Prompt generation is disabled:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {generatePromptBlockingReasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {!testFile ? (
           <p className="mt-2 text-sm text-[var(--muted)]">Test upload requires a selected test grid file.</p>
@@ -1517,8 +1604,15 @@ export default function StyleDnaAdminPage() {
         ) : (
           <p className="mt-2 text-sm text-[var(--muted)]">Run submit guardrails passed. Ready to submit.</p>
         )}
-        {lookupRunBlocker ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">Run lookup is disabled: {lookupRunBlocker}</p>
+        {lookupRunBlockingReasons.length > 0 ? (
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            <p>Run lookup is disabled:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {lookupRunBlockingReasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
         ) : null}
         {promptJobMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Prompt generation failed: {mutationErrorMessage(promptJobMutation.error)}</p>

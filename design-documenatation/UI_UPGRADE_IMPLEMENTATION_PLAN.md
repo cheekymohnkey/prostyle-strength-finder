@@ -37,13 +37,17 @@ Completed in implementation:
 - contributor submission create/list
 - trigger/retry actions
 8. Style-DNA admin workflow route exists at `apps/frontend/app/admin/style-dna/page.tsx` with baseline/image/prompt/run flow.
-9. Frontend smoke scripts now run against Next runtime (not legacy `src/index.js`):
+9. Style-DNA admin status/error messaging was hardened for operator clarity:
+- save/attach/generate/lookup actions now surface explicit multi-reason disabled-state lists (not single tooltip-only reasons)
+- API mutation errors are normalized into stable user-facing categories for `401/403/409/422` paths
+10. Frontend smoke scripts now run against Next runtime (not legacy `src/index.js`):
 - `frontend:critical-flow-smoke`
 - `admin:frontend-proxy-smoke`
 - `feedback:frontend-proxy-smoke`
  - `admin:frontend-proxy-smoke` now verifies admin proxy coverage for approval policy, role management, moderation, prompt curation, style influence governance, and Style-DNA critical flow/guardrail checks via proxy (plus contributor proxy ownership/role boundaries)
-10. Full launch readiness smoke passes with Next frontend flow active.
-11. Launch readiness smoke now includes Style-DNA smoke gates in full scope:
+ - `admin:frontend-proxy-smoke` now also asserts stable Style-DNA negative-path error contracts (`403 FORBIDDEN`, `409 INVALID_STATE`) and expected rejection reasons for non-control sref and stylize-tier mismatch submissions
+11. Full launch readiness smoke passes with Next frontend flow active.
+12. Launch readiness smoke now includes Style-DNA smoke gates in full scope:
 - `style-dna:tier-validation-smoke`
 - `style-dna:baseline-smoke`
 - `style-dna:prompt-generation-smoke`
@@ -51,7 +55,7 @@ Completed in implementation:
 - `style-dna:schema-failure-smoke`
 
 Remaining:
-1. Improve Style-DNA admin UX guardrails/polish and tighten state/error messaging.
+1. Remaining Style-DNA work is non-blocking UX polish beyond current guardrail/status coverage.
 2. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
 
 ## Why Now
