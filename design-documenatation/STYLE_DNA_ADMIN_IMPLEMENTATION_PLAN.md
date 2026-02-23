@@ -63,6 +63,7 @@ Implemented in code:
 - `style-dna:schema-failure-smoke`
  - set-producing smokes now self-clean smoke-created baseline/prompt/run/image records on success to avoid local data pollution
  - frontend proxy smoke assertions now explicitly enforce Style-DNA negative-path API error contracts (`FORBIDDEN`, `INVALID_STATE`) and reason-text expectations
+ - run smoke now explicitly verifies run-submission idempotency deduplication (`POST /admin/style-dna/runs` returns deduplicated existing run on repeated idempotency key)
 6. Prompt generation now includes model version argument when available:
 - baseline copy prompts include `--v <mjModelVersion>`
 - generated prompt jobs include `--v <mjModelVersion>`

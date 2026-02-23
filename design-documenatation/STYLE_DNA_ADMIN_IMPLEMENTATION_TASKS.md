@@ -76,6 +76,7 @@ Out of scope:
 - prompt generation verification includes model version flag emission (`--v`).
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
 - launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.
+- style-dna run smoke now explicitly verifies idempotent run-submit behavior (same idempotency key returns deduplicated existing run id).
 
 ## SD1. Persistence + Shared Contracts
 

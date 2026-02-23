@@ -429,6 +429,7 @@ async function main() {
       `Expected matched-control policy message, got: ${missingControlMessage || "(empty)"}`
     );
 
+    const runIdempotencyKey = `style-dna-run-smoke:${Date.now()}`;
     const runSubmit = await requestJson(
       `${baseUrl}/admin/style-dna/runs`,
       {
@@ -438,7 +439,7 @@ async function main() {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          idempotencyKey: `style-dna-run-smoke:${Date.now()}`,
+          idempotencyKey: runIdempotencyKey,
           styleInfluenceId: "si_style_dna_smoke",
           baselineRenderSetId,
           styleAdjustmentType,
@@ -453,6 +454,33 @@ async function main() {
     const styleDnaRunId = runSubmit?.run?.styleDnaRunId;
     assertCondition(typeof styleDnaRunId === "string" && styleDnaRunId !== "", "Missing style-dna run id");
     assertCondition(runSubmit?.run?.status === "queued", `Expected queued run status, got ${runSubmit?.run?.status}`);
+
+    const deduplicatedRunSubmit = await requestJson(
+      `${baseUrl}/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: runIdempotencyKey,
+          styleInfluenceId: "si_style_dna_smoke",
+          baselineRenderSetId,
+          styleAdjustmentType,
+          styleAdjustmentMidjourneyId,
+          promptKey,
+          stylizeTier,
+          testGridImageId,
+        }),
+      },
+      200
+    );
+    assertCondition(deduplicatedRunSubmit?.deduplicated === true, "Expected second idempotent run submit to be deduplicated");
+    assertCondition(
+      deduplicatedRunSubmit?.run?.styleDnaRunId === styleDnaRunId,
+      `Expected deduplicated run id to match original run id, got ${deduplicatedRunSubmit?.run?.styleDnaRunId}`
+    );
 
     const worker = spawnProcess("node", ["apps/worker/src/index.js"], {
       ...process.env,
