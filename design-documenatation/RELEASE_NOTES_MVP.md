@@ -16,11 +16,11 @@ MVP scope is implemented across Epics A-E with launch-readiness smoke gates pass
 5. Epic E: Hardening and launch readiness (role management hardening, cache invalidation, backup/restore + queue recovery, operational checks, launch gate smoke).
 
 Primary evidence:
-1. `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
-2. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
-3. `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
-4. `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
-5. `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
+1. `design-documenatation/implementation/EPIC_A_IMPLEMENTATION_TASKS.md`
+2. `design-documenatation/implementation/EPIC_B_IMPLEMENTATION_TASKS.md`
+3. `design-documenatation/implementation/EPIC_C_IMPLEMENTATION_TASKS.md`
+4. `design-documenatation/implementation/EPIC_D_IMPLEMENTATION_TASKS.md`
+5. `design-documenatation/implementation/EPIC_E_IMPLEMENTATION_TASKS.md`
 
 ## Launch Gate Status
 
@@ -41,7 +41,7 @@ Runbook references:
 2. PNG metadata parsing is dependent on available MidJourney text/XMP metadata patterns; broader variant coverage is still needed.
 
 Reference:
-1. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+1. `design-documenatation/implementation/EPIC_B_IMPLEMENTATION_TASKS.md`
 
 ## Deferred / Post-MVP Backlog
 

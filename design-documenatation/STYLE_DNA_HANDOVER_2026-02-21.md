@@ -13,9 +13,9 @@ Capture the current Style-DNA feature state and provide a direct, executable sta
 1. `design-documenatation/DECISIONS.md`
 2. `design-documenatation/TECHNICAL_DECISIONS.md`
 3. `design-documenatation/ARCHITECTURE_AND_ERD.md`
-4. `design-documenatation/IMPLEMENTATION_PLAN.md`
-5. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-6. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+4. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+5. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 7. `design-documenatation/TRAIT_TAXONOMY_SCHEMA_DRAFT.json`
 8. `design-documenatation/TRAIT_TAXONOMY_SQL_DRAFT.sql`
 
@@ -40,9 +40,9 @@ Capture the current Style-DNA feature state and provide a direct, executable sta
 ## What Was Completed So Far
 
 1. Dedicated feature plan created:
-- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
 2. Dedicated executable task breakdown created:
-- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 3. Feature decisions and architecture contract updates are documented in source-of-truth docs.
 4. Workflow docs now reference Style-DNA implementation plan and tasks.
 

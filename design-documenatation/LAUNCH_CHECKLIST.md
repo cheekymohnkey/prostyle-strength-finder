@@ -13,7 +13,7 @@ Source docs:
 1. `design-documenatation/DECISIONS.md`
 2. `design-documenatation/TECHNICAL_DECISIONS.md`
 3. `design-documenatation/MVP_PATH.md`
-4. `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
+4. `design-documenatation/implementation/EPIC_E_IMPLEMENTATION_TASKS.md`
 5. `design-documenatation/EPIC_E_LAUNCH_RUNBOOK.md`
 
 ## Preconditions
@@ -52,7 +52,7 @@ Recorded latest full-scope gate:
 2. Result: `ok: true`, `scope: full`, `failedStep: null` (16/16 checks passed)
 
 Evidence:
-1. `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
+1. `design-documenatation/implementation/EPIC_E_IMPLEMENTATION_TASKS.md`
 2. `design-documenatation/EPIC_E_CLOSEOUT_HANDOVER.md`
 
 ## Sign-Off

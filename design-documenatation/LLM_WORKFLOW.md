@@ -20,13 +20,16 @@ Always anchor tasks to:
 02. `design-documenatation/USER_NEEDS_ANALYSIS.md`
 03. `design-documenatation/ARCHITECTURE_AND_ERD.md`
 04. `design-documenatation/TECHNICAL_DECISIONS.md`
-05. `design-documenatation/MVP_PATH.md`
-06. `design-documenatation/IMPLEMENTATION_PLAN.md`
-07. `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
-08. `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
-09. `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
-10. `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
-11. `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
+05. `design-documenatation/requirements/REQUIREMENTS_INDEX.md`
+06. `design-documenatation/requirements/PRODUCT_REQUIREMENTS_HIGH_LEVEL.md`
+07. `design-documenatation/requirements/functional/FR-RECOMMENDATION_AND_FEEDBACK.md`
+08. `design-documenatation/requirements/functional/FR-ADMIN_AND_CONTRIBUTOR_OPERATIONS.md`
+09. `design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md`
+10. `design-documenatation/requirements/non-functional/NFR-SECURITY_AND_ACCESS.md`
+11. `design-documenatation/requirements/non-functional/NFR-RELIABILITY_AND_OPERATIONS.md`
+12. `design-documenatation/requirements/non-functional/NFR-PERFORMANCE_AND_QUALITY.md`
+13. `design-documenatation/MVP_PATH.md`
+14. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
 
 ## Implementation Plan Links
 
@@ -34,13 +37,13 @@ Current frontend runtime contract:
 1. UI is Next.js App Router in `apps/frontend/app/*` (legacy frontend fallback has been retired).
 
 1. Master implementation plan:
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
 2. UI upgrade implementation plan:
-- `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
 3. Style-DNA admin implementation plan:
-- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
 4. Style-DNA admin implementation tasks:
-- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 5. UI upgrade handover (latest):
 - `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-23.md`
 6. Style-DNA handover (latest):
@@ -57,13 +60,16 @@ Use these docs as source of truth:
 - design-documenatation/USER_NEEDS_ANALYSIS.md
 - design-documenatation/ARCHITECTURE_AND_ERD.md
 - design-documenatation/TECHNICAL_DECISIONS.md
+- design-documenatation/requirements/REQUIREMENTS_INDEX.md
+- design-documenatation/requirements/PRODUCT_REQUIREMENTS_HIGH_LEVEL.md
+- design-documenatation/requirements/functional/FR-RECOMMENDATION_AND_FEEDBACK.md
+- design-documenatation/requirements/functional/FR-ADMIN_AND_CONTRIBUTOR_OPERATIONS.md
+- design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md
+- design-documenatation/requirements/non-functional/NFR-SECURITY_AND_ACCESS.md
+- design-documenatation/requirements/non-functional/NFR-RELIABILITY_AND_OPERATIONS.md
+- design-documenatation/requirements/non-functional/NFR-PERFORMANCE_AND_QUALITY.md
 - design-documenatation/MVP_PATH.md
-- design-documenatation/IMPLEMENTATION_PLAN.md
-- design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md
-- design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md
-- design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md
-- design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md
-- design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md
+- design-documenatation/implementation/IMPLEMENTATION_PLAN.md
 
 Task objective:
 <one concrete objective>
@@ -149,7 +155,7 @@ Pause and re-scope when:
 Keep feature implementation contracts out of this workflow doc.
 
 Style-DNA extraction and taxonomy policy references:
-1. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-2. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+2. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 3. `design-documenatation/TRAIT_TAXONOMY_SCHEMA_DRAFT.json`
 4. `design-documenatation/TRAIT_TAXONOMY_SQL_DRAFT.sql`

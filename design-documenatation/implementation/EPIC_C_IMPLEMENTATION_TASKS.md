@@ -7,8 +7,8 @@ Depends on:
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
 - `design-documenatation/TECHNICAL_DECISIONS.md`
 - `design-documenatation/MVP_PATH.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/EPIC_B_IMPLEMENTATION_TASKS.md`
 
 ## Purpose
 
@@ -379,5 +379,5 @@ Outcome:
 3. Keep source-of-truth linkage explicit in all handoffs:
 - `design-documenatation/DECISIONS.md`
 - `design-documenatation/MVP_PATH.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/EPIC_C_IMPLEMENTATION_TASKS.md`

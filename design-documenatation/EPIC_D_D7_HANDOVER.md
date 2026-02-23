@@ -83,8 +83,8 @@ Use these docs as source of truth:
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
 - `design-documenatation/TECHNICAL_DECISIONS.md`
 - `design-documenatation/MVP_PATH.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/EPIC_D_IMPLEMENTATION_TASKS.md`
 - `design-documenatation/EPIC_D_D7_HANDOVER.md`
 
 Task objective:

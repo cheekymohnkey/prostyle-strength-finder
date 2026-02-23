@@ -7,8 +7,8 @@ Depends on:
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
 - `design-documenatation/TECHNICAL_DECISIONS.md`
 - `design-documenatation/MVP_PATH.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/EPIC_A_IMPLEMENTATION_TASKS.md`
 
 ## Purpose
 
@@ -626,5 +626,5 @@ Outcome:
 2. Stop and re-scope if >5 files change unexpectedly or architecture changes are needed.
 3. Maintain source-of-truth linkage in all handoffs:
 - `design-documenatation/DECISIONS.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/EPIC_B_IMPLEMENTATION_TASKS.md`

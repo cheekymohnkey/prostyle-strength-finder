@@ -15,10 +15,10 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 3. `design-documenatation/ARCHITECTURE_AND_ERD.md`
 4. `design-documenatation/TECHNICAL_DECISIONS.md`
 5. `design-documenatation/MVP_PATH.md`
-6. `design-documenatation/IMPLEMENTATION_PLAN.md`
-7. `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
-8. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-9. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+6. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+7. `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+8. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+9. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 10. `design-documenatation/LLM_WORKFLOW.md`
 11. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 
@@ -101,12 +101,12 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 9. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 10. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-22.md`
 11. `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-22.md`
-12. `design-documenatation/IMPLEMENTATION_PLAN.md`
-13. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-14. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+12. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+13. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+14. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 15. `scripts/admin/frontend-proxy-smoke.js`
 16. `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-23.md`
-17. `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+17. `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
 
 ## Verification Notes
 

@@ -6,8 +6,8 @@ Depends on:
 - `design-documenatation/DECISIONS.md`
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
 - `design-documenatation/TECHNICAL_DECISIONS.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
 - `design-documenatation/LLM_WORKFLOW.md`
 
 ## Purpose

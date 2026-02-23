@@ -41,10 +41,10 @@ Do not re-implement completed UI features unless regression is confirmed.
 3. `design-documenatation/ARCHITECTURE_AND_ERD.md`
 4. `design-documenatation/TECHNICAL_DECISIONS.md`
 5. `design-documenatation/MVP_PATH.md`
-6. `design-documenatation/IMPLEMENTATION_PLAN.md`
-7. `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
-8. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-9. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+6. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+7. `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+8. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+9. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 10. `design-documenatation/LLM_WORKFLOW.md`
 
 ## Session Outcome Summary
@@ -126,16 +126,16 @@ Do not re-implement completed UI features unless regression is confirmed.
 
 ### Documentation
 
-1. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
 - Added explicit 3-use-case framing and updated tier references.
 
-2. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+2. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 - Aligned tasks to 3-use-case split.
 
 3. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-21.md`
 - Updated stale pre-implementation statements to in-progress state.
 
-4. `design-documenatation/IMPLEMENTATION_PLAN.md`
+4. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
 5. `design-documenatation/TECHNICAL_DECISIONS.md`
 6. `design-documenatation/ARCHITECTURE_AND_ERD.md`
 - Removed stylize tier `250` references in style-dna context.

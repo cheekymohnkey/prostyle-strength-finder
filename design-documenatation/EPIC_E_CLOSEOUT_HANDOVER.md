@@ -70,7 +70,7 @@ Non-blocking follow-ups after Epic E:
 ## Artifact Index
 
 Primary Epic E task ledger:
-- `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/EPIC_E_IMPLEMENTATION_TASKS.md`
 
 Epic E runbooks:
 - `design-documenatation/EPIC_E_BACKUP_RESTORE_RUNBOOK.md`

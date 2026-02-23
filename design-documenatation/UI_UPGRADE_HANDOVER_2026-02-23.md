@@ -10,10 +10,10 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 
 ## Source-of-Truth References
 
-1. `design-documenatation/IMPLEMENTATION_PLAN.md`
-2. `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
-3. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-4. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+1. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+2. `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+3. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+4. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 5. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-23.md`
 
 ## Current State

@@ -7,7 +7,7 @@ Depends on:
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
 - `design-documenatation/TECHNICAL_DECISIONS.md`
 - `design-documenatation/MVP_PATH.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
 
 ## Purpose
 
@@ -26,7 +26,7 @@ Translate Implementation Epic A into concrete, executable engineering tasks with
 - `.env.uat.example`
 - `.env.prod.example`
 6. Next execution focus:
-- Epic B (MVP-1 Core Recommendation Flow) and first vertical-slice completion criteria from `design-documenatation/IMPLEMENTATION_PLAN.md`.
+- Epic B (MVP-1 Core Recommendation Flow) and first vertical-slice completion criteria from `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`.
 
 ## Epic A - Platform Foundation
 

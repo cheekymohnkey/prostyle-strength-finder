@@ -20,13 +20,13 @@ Primary design and planning docs:
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
 - `design-documenatation/TECHNICAL_DECISIONS.md`
 - `design-documenatation/MVP_PATH.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
-- `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
-- `design-documenatation/EPIC_C_IMPLEMENTATION_TASKS.md`
-- `design-documenatation/EPIC_D_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/EPIC_A_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/EPIC_B_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/EPIC_C_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/EPIC_D_IMPLEMENTATION_TASKS.md`
 - `design-documenatation/EPIC_D_D8_HANDOVER.md`
-- `design-documenatation/EPIC_E_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/EPIC_E_IMPLEMENTATION_TASKS.md`
 - `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 
 ## Environment Set
@@ -210,7 +210,7 @@ All endpoints below require:
 - `Authorization: Bearer <jwt>`
 
 Full examples and context:
-- `design-documenatation/EPIC_B_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/EPIC_B_IMPLEMENTATION_TASKS.md`
 
 ### 1) Create extraction
 

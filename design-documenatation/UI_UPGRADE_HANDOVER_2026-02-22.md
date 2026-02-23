@@ -15,10 +15,10 @@ Capture current UI upgrade implementation state after Style-DNA admin workflow i
 
 1. `design-documenatation/DECISIONS.md`
 2. `design-documenatation/TECHNICAL_DECISIONS.md`
-3. `design-documenatation/IMPLEMENTATION_PLAN.md`
-4. `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
-5. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-6. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+3. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+4. `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+5. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 7. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-22.md`
 
 ## What Is Implemented
@@ -63,7 +63,7 @@ Capture current UI upgrade implementation state after Style-DNA admin workflow i
 1. Add focused UI assertions for Style-DNA prerequisite gating and state transitions.
 2. Add launch-readiness inclusion for Style-DNA smoke commands.
 3. Decide and document legacy frontend retirement criteria/date.
-   - Status update: completed in `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`.
+   - Status update: completed in `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`.
 
 ## Suggested First Commands Next Session
 

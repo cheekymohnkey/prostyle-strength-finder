@@ -64,7 +64,7 @@ Rationale: Enables consistent low-confidence handling and ranking behavior.
 12. Remaining technical blockers from `design-documenatation/TECHNICAL_DECISIONS.md` are resolved.
 Rationale: Build can proceed without unresolved technical prerequisites.
 
-13. Implementation sequence is documented in `design-documenatation/IMPLEMENTATION_PLAN.md`.
+13. Implementation sequence is documented in `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`.
 Rationale: Execution can proceed with an agreed epic/task dependency structure.
 
 14. Active environment strategy is `local` + `prod`; `uat` remains an optional future environment.

@@ -14,10 +14,10 @@ Capture current UI upgrade implementation state for immediate continuation in th
 
 1. `design-documenatation/DECISIONS.md`
 2. `design-documenatation/TECHNICAL_DECISIONS.md`
-3. `design-documenatation/IMPLEMENTATION_PLAN.md`
-4. `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
-5. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-6. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+3. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+4. `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+5. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
 ## What Was Completed This Session
 
@@ -80,8 +80,8 @@ All executed with local env loading from `.env.local.example`.
 2. Style-DNA admin UI flow is not yet implemented.
 - Target route: `/admin/style-dna`
 - Plan/task references:
-  - `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-  - `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+  - `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+  - `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
 3. Legacy frontend retirement decision still pending.
 - Historical (as-of this handover): `apps/frontend/src/index.js` remained available via `dev:legacy`.

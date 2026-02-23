@@ -47,11 +47,11 @@ Convert agreed design artifacts into executable engineering work with clear sequ
 7. Style-DNA Delta Track: Controlled baseline-vs-test grid analysis
 
 UI Upgrade reference:
-- `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
 Style-DNA dedicated reference:
-- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
 Style-DNA execution tasks:
-- `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
 ## Epic A: Platform Foundation
 

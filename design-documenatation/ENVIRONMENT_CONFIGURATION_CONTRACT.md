@@ -4,8 +4,8 @@ Status: Agreed for Epic A baseline
 Date: 2026-02-18  
 Depends on:
 - `design-documenatation/TECHNICAL_DECISIONS.md`
-- `design-documenatation/IMPLEMENTATION_PLAN.md`
-- `design-documenatation/EPIC_A_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/EPIC_A_IMPLEMENTATION_TASKS.md`
 
 ## Purpose
 
