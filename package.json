@@ -10,13 +10,15 @@
     "api": "npm run dev --workspace=@prostyle/api",
     "worker": "npm run dev --workspace=@prostyle/worker",
     "frontend": "npm run dev --workspace=@prostyle/frontend",
-    "frontend:next": "npm run dev:next --workspace=@prostyle/frontend",
+    "frontend:next": "PORT=${FRONTEND_PORT:-3000} npm run dev:next --workspace=@prostyle/frontend",
     "contracts": "npm run build --workspace=@prostyle/shared-contracts",
     "db:migrate": "node scripts/db/migrate.js apply",
     "db:status": "node scripts/db/migrate.js status",
     "db:create": "node scripts/db/migrate.js create",
     "db:rollback": "node scripts/db/migrate.js rollback",
+    "db:checkpoint-local": "node scripts/db/local-data-checkpoint.js",
     "db:reset": "node scripts/db/migrate.js reset",
+    "db:reset:safe": "npm run db:reset",
     "backup:create": "node scripts/backup/create-and-upload.js",
     "backup:restore": "node scripts/backup/restore.js",
     "backup:restore-smoke": "node scripts/backup/restore-smoke.js",
@@ -38,6 +40,11 @@
     "cache:invalidation-smoke": "node scripts/admin/cache-invalidation-smoke.js",
     "admin:frontend-proxy-smoke": "node scripts/admin/frontend-proxy-smoke.js",
     "contributor:essentials-smoke": "node scripts/contributor/essentials-smoke.js",
-    "style-dna:tier-validation-smoke": "node scripts/style-dna/tier-validation-smoke.js"
+    "style-dna:tier-validation-smoke": "node scripts/style-dna/tier-validation-smoke.js",
+    "style-dna:baseline-smoke": "node scripts/style-dna/baseline-smoke.js",
+    "style-dna:seed-canonical-baselines": "node scripts/style-dna/seed-canonical-baselines.js",
+    "style-dna:prompt-generation-smoke": "node scripts/style-dna/prompt-generation-smoke.js",
+    "style-dna:run-smoke": "node scripts/style-dna/run-smoke.js",
+    "style-dna:schema-failure-smoke": "node scripts/style-dna/schema-failure-smoke.js"
   }
 }

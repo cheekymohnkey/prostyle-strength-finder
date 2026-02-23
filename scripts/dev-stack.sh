@@ -66,6 +66,46 @@ is_running() {
   return 1
 }
 
+get_listener_pid() {
+  local port="$1"
+  lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true
+}
+
+get_pid_command() {
+  local pid="$1"
+  ps -p "$pid" -o command= 2>/dev/null || true
+}
+
+ensure_port_ready_for_stack() {
+  local name="$1"
+  local port="$2"
+  local listener_pid
+  listener_pid="$(get_listener_pid "$port")"
+  if [[ -z "$listener_pid" ]]; then
+    return
+  fi
+
+  local listener_cmd
+  listener_cmd="$(get_pid_command "$listener_pid")"
+  if [[ "$listener_cmd" == *"prostyle-strength-finder"* ]]; then
+    echo "$name port $port already in use by prostyle process (pid $listener_pid); stopping stale listener"
+    kill "$listener_pid" 2>/dev/null || true
+    sleep 1
+    local remaining
+    remaining="$(get_listener_pid "$port")"
+    if [[ -n "$remaining" ]]; then
+      echo "unable to free $name port $port (pid $remaining still listening)"
+      exit 1
+    fi
+    return
+  fi
+
+  echo "$name port $port is in use by non-prostyle process (pid $listener_pid)"
+  echo "command: ${listener_cmd:-unknown}"
+  echo "stop that process or change ports before starting the prostyle stack"
+  exit 1
+}
+
 start_one() {
   local name="$1"
   local cmd="$2"
@@ -115,6 +155,9 @@ status_one() {
 start_all() {
   local frontend_cmd
   frontend_cmd="$(resolve_frontend_cmd)"
+
+  ensure_port_ready_for_stack "api" "3001"
+  ensure_port_ready_for_stack "frontend" "3000"
 
   start_one "api" "npm run api" "$API_PID_FILE" "$API_LOG"
   start_one "worker" "npm run worker" "$WORKER_PID_FILE" "$WORKER_LOG"

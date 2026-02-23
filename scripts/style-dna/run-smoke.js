@@ -1,0 +1,373 @@
+const { spawn } = require("child_process");
+const { parseDatabaseUrl, ensureDbParentDir, ensureMigrationsTable, runSql } = require("../db/lib");
+const { assertDatabaseReady } = require("../db/runtime");
+
+const ONE_PIXEL_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9VE6zJkAAAAASUVORK5CYII=";
+
+function requireEnv(key) {
+  const value = process.env[key];
+  if (!value || value.trim() === "") {
+    throw new Error(`Missing environment variable: ${key}`);
+  }
+  return value.trim();
+}
+
+function quote(value) {
+  if (value === null || value === undefined) {
+    return "NULL";
+  }
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function assertCondition(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function base64UrlJson(value) {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function buildToken(sub) {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64UrlJson({ alg: "none", typ: "JWT" });
+  const payload = base64UrlJson({
+    iss: process.env.COGNITO_ISSUER,
+    aud: process.env.COGNITO_AUDIENCE,
+    sub,
+    exp: now + 3600,
+  });
+  return `${header}.${payload}.sig`;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForHealth(baseUrl, token) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      const response = await fetch(`${baseUrl}/health`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        return;
+      }
+    } catch (_error) {
+      // API not ready yet.
+    }
+    await sleep(200);
+  }
+  throw new Error("API healthcheck did not become ready in time");
+}
+
+async function requestJson(url, options, expectedStatus) {
+  const response = await fetch(url, options);
+  const json = await response.json().catch(() => ({}));
+  if (response.status !== expectedStatus) {
+    throw new Error(`Expected ${expectedStatus} for ${options.method || "GET"} ${url}, got ${response.status}: ${JSON.stringify(json)}`);
+  }
+  return json;
+}
+
+function seedData(dbPath) {
+  const now = new Date().toISOString();
+  runSql(
+    dbPath,
+    `
+    INSERT INTO users (user_id, role, status, created_at, updated_at)
+    VALUES ('admin-style-dna-run-smoke-user', 'admin', 'active', ${quote(now)}, ${quote(now)})
+    ON CONFLICT(user_id) DO UPDATE SET role = 'admin', status = 'active', updated_at = ${quote(now)};
+
+    INSERT INTO style_influence_types (
+      style_influence_type_id, type_key, label, parameter_prefix, related_parameter_name, description, enabled_flag
+    ) VALUES (
+      'sit_style_dna_smoke',
+      'sref_style_dna_smoke',
+      'SREF Style-DNA Smoke',
+      '--sref',
+      '--stylize',
+      'Style-DNA run smoke test type',
+      1
+    )
+    ON CONFLICT(style_influence_type_id) DO UPDATE SET enabled_flag = 1;
+
+    INSERT INTO style_influences (
+      style_influence_id, style_influence_type_id, influence_code, status, pinned_flag, created_by, created_at
+    ) VALUES (
+      'si_style_dna_smoke',
+      'sit_style_dna_smoke',
+      'sref-smoke-influence',
+      'active',
+      0,
+      'admin-style-dna-run-smoke-user',
+      ${quote(now)}
+    )
+    ON CONFLICT(style_influence_id) DO UPDATE SET status = 'active';
+    `
+  );
+}
+
+function spawnProcess(command, args, env) {
+  const proc = spawn(command, args, {
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let stderr = "";
+  proc.stdout.on("data", (chunk) => {
+    stdout += chunk.toString("utf8");
+  });
+  proc.stderr.on("data", (chunk) => {
+    stderr += chunk.toString("utf8");
+  });
+  return { proc, getLogs: () => ({ stdout, stderr }) };
+}
+
+async function waitForProcessExit(proc, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      proc.kill("SIGTERM");
+      setTimeout(() => proc.kill("SIGKILL"), 200);
+      reject(new Error(`Process timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    proc.once("exit", (code, signal) => {
+      clearTimeout(timeout);
+      resolve({ code, signal });
+    });
+  });
+}
+
+async function main() {
+  const databaseUrl = requireEnv("DATABASE_URL");
+  requireEnv("COGNITO_ISSUER");
+  requireEnv("COGNITO_AUDIENCE");
+  const dbPath = parseDatabaseUrl(databaseUrl);
+  ensureDbParentDir(dbPath);
+  ensureMigrationsTable(dbPath);
+  assertDatabaseReady(databaseUrl);
+  seedData(dbPath);
+
+  const adminToken = buildToken("admin-style-dna-run-smoke-user");
+  const smokePort = process.env.SMOKE_API_PORT || "3024";
+  const baseUrl = `http://127.0.0.1:${smokePort}/v1`;
+  const suiteId = `suite_style_dna_run_smoke_${Date.now()}`;
+
+  const api = spawnProcess("node", ["apps/api/src/index.js"], {
+    ...process.env,
+    PORT: smokePort,
+    TRAIT_INFERENCE_MODE: process.env.TRAIT_INFERENCE_MODE || "deterministic",
+    STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "deterministic",
+  });
+
+  try {
+    await waitForHealth(baseUrl, adminToken);
+
+    const baselineImageUpload = await requestJson(
+      `${baseUrl}/admin/style-dna/images`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          imageKind: "baseline",
+          fileName: "run-smoke-baseline.png",
+          mimeType: "image/png",
+          fileBase64: ONE_PIXEL_PNG_BASE64,
+        }),
+      },
+      201
+    );
+    const baselineImageId = baselineImageUpload?.image?.styleDnaImageId;
+    assertCondition(typeof baselineImageId === "string" && baselineImageId !== "", "Missing baseline image id");
+
+    const baselineSet = await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          mjModelFamily: "standard",
+          mjModelVersion: "7",
+          suiteId,
+          parameterEnvelope: {
+            aspectRatio: "3:4",
+          },
+        }),
+      },
+      201
+    );
+    const baselineRenderSetId = baselineSet?.baselineRenderSet?.baselineRenderSetId;
+    assertCondition(typeof baselineRenderSetId === "string" && baselineRenderSetId !== "", "Missing baseline render set id");
+
+    const promptKey = "portrait_primary";
+    const stylizeTier = 100;
+    const baselineItem = await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets/${baselineRenderSetId}/items`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey,
+          stylizeTier,
+          gridImageId: baselineImageId,
+        }),
+      },
+      200
+    );
+    assertCondition(baselineItem?.item?.gridImageId === baselineImageId, "Baseline set item did not persist baseline image");
+
+    const styleAdjustmentType = "sref";
+    const styleAdjustmentMidjourneyId = "sref-123456789";
+    const promptJob = await requestJson(
+      `${baseUrl}/admin/style-dna/prompt-jobs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          styleInfluenceId: "si_style_dna_smoke",
+          baselineRenderSetId,
+          styleAdjustmentType,
+          styleAdjustmentMidjourneyId,
+          stylizeTiers: [stylizeTier],
+        }),
+      },
+      201
+    );
+    const generatedPrompt = promptJob?.prompts?.[0]?.promptTextGenerated || "";
+    assertCondition(generatedPrompt.includes("--sref sref-123456789"), `Generated prompt missing sref adjustment: ${generatedPrompt}`);
+    assertCondition(generatedPrompt.includes("--stylize 100"), `Generated prompt missing stylize tier: ${generatedPrompt}`);
+
+    const testImageUpload = await requestJson(
+      `${baseUrl}/admin/style-dna/images`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          imageKind: "test",
+          fileName: "run-smoke-test.png",
+          mimeType: "image/png",
+          fileBase64: ONE_PIXEL_PNG_BASE64,
+        }),
+      },
+      201
+    );
+    const testGridImageId = testImageUpload?.image?.styleDnaImageId;
+    assertCondition(typeof testGridImageId === "string" && testGridImageId !== "", "Missing test image id");
+
+    const runSubmit = await requestJson(
+      `${baseUrl}/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: `style-dna-run-smoke:${Date.now()}`,
+          styleInfluenceId: "si_style_dna_smoke",
+          baselineRenderSetId,
+          styleAdjustmentType,
+          styleAdjustmentMidjourneyId,
+          promptKey,
+          stylizeTier,
+          testGridImageId,
+        }),
+      },
+      202
+    );
+    const styleDnaRunId = runSubmit?.run?.styleDnaRunId;
+    assertCondition(typeof styleDnaRunId === "string" && styleDnaRunId !== "", "Missing style-dna run id");
+    assertCondition(runSubmit?.run?.status === "queued", `Expected queued run status, got ${runSubmit?.run?.status}`);
+
+    const worker = spawnProcess("node", ["apps/worker/src/index.js"], {
+      ...process.env,
+      TRAIT_INFERENCE_MODE: "deterministic",
+      STYLE_DNA_INFERENCE_MODE: "deterministic",
+      WORKER_RUN_ONCE: "true",
+    });
+
+    const workerExit = await waitForProcessExit(worker.proc, 20000);
+    if (workerExit.code !== 0) {
+      const workerLogs = worker.getLogs();
+      throw new Error(
+        `Worker exited with code ${workerExit.code} signal ${workerExit.signal || "none"}\nSTDOUT:\n${workerLogs.stdout}\nSTDERR:\n${workerLogs.stderr}`
+      );
+    }
+
+    let runDetail = null;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      runDetail = await requestJson(
+        `${baseUrl}/admin/style-dna/runs/${styleDnaRunId}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+          },
+        },
+        200
+      );
+      if (runDetail?.run?.status === "succeeded" && runDetail?.result) {
+        break;
+      }
+      await sleep(250);
+    }
+
+    assertCondition(runDetail?.run?.status === "succeeded", `Expected succeeded run status, got ${runDetail?.run?.status}`);
+    assertCondition(Boolean(runDetail?.run?.analysisRunId), "Expected analysisRunId on succeeded run");
+    assertCondition(Boolean(runDetail?.result?.styleDnaRunResultId), "Expected run result row");
+    assertCondition(runDetail?.result?.taxonomyVersion === "style_dna_v1", `Unexpected taxonomyVersion: ${runDetail?.result?.taxonomyVersion}`);
+    assertCondition(
+      Number(runDetail?.result?.canonicalTraits?.deltaStrength?.score_1_to_10 || 0) >= 1,
+      `Invalid canonical deltaStrength score: ${JSON.stringify(runDetail?.result?.canonicalTraits?.deltaStrength)}`
+    );
+
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          smokePort,
+          baselineRenderSetId,
+          styleDnaRunId,
+          runStatus: runDetail.run.status,
+          resultId: runDetail.result.styleDnaRunResultId,
+          providerSummary: runDetail.result.summary,
+        },
+        null,
+        2
+      )
+    );
+  } finally {
+    api.proc.kill("SIGTERM");
+    await sleep(200);
+    if (!api.proc.killed) {
+      api.proc.kill("SIGKILL");
+    }
+    const apiLogs = api.getLogs();
+    if (apiLogs.stderr.trim() !== "") {
+      process.stderr.write(apiLogs.stderr);
+    }
+  }
+}
+
+main().catch((error) => {
+  console.error(error.message);
+  process.exitCode = 1;
+});

@@ -15,7 +15,7 @@ Upgrade the frontend implementation to the documented stack and interaction mode
 3. TanStack Query for async server state.
 4. Cognito Hosted UI + Google IdP sign-in flow (PKCE), replacing manual token entry for normal user flows.
 
-## Current Execution Snapshot (2026-02-21)
+## Current Execution Snapshot (2026-02-22)
 
 Completed in implementation:
 1. Next.js App Router + TypeScript foundation is active in `apps/frontend`.
@@ -32,15 +32,16 @@ Completed in implementation:
 - approval policy get/update
 - contributor submission create/list
 - trigger/retry actions
-8. Frontend smoke scripts now run against Next runtime (not legacy `src/index.js`):
+8. Style-DNA admin workflow route exists at `apps/frontend/app/admin/style-dna/page.tsx` with baseline/image/prompt/run flow.
+9. Frontend smoke scripts now run against Next runtime (not legacy `src/index.js`):
 - `frontend:critical-flow-smoke`
 - `admin:frontend-proxy-smoke`
 - `feedback:frontend-proxy-smoke`
-9. Full launch readiness smoke passes with Next frontend flow active.
+10. Full launch readiness smoke passes with Next frontend flow active.
 
 Remaining:
 1. Complete U4/U5 parity coverage beyond current initial slices.
-2. Implement Style-DNA admin UI workflow (`/admin/style-dna`) per dedicated plan/tasks docs.
+2. Improve Style-DNA admin UX guardrails/polish and tighten state/error messaging.
 3. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
 
 ## Why Now

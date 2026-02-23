@@ -464,6 +464,7 @@ function updateStyleInfluenceGovernance(dbPath, styleInfluenceId, action) {
 
 function insertAdminActionAudit(dbPath, input) {
   const createdAt = input.createdAt || nowIso();
+  const reason = input.reason === null || input.reason === undefined ? "" : String(input.reason);
   exec(
     dbPath,
     `INSERT INTO admin_actions_audit (
@@ -474,7 +475,7 @@ function insertAdminActionAudit(dbPath, input) {
        ${quote(input.actionType)},
        ${quote(input.targetType)},
        ${quote(input.targetId)},
-       ${quote(input.reason)},
+       ${quote(reason)},
        ${quote(createdAt)}
      );`
   );
@@ -1038,6 +1039,54 @@ function ensureBaselinePromptSuiteItemByPromptKey(dbPath, input) {
   return getBaselinePromptSuiteItemByPromptKey(dbPath, input.suiteId, input.promptKey);
 }
 
+function getBaselinePromptSuiteItemMetadataByPromptKey(dbPath, suiteId, promptKey) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT metadata_id, suite_id, prompt_key, domain, what_it_tests, created_at, updated_at
+     FROM baseline_prompt_suite_item_metadata
+     WHERE suite_id = ${quote(suiteId)}
+       AND prompt_key = ${quote(promptKey)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listBaselinePromptSuiteItemMetadata(dbPath, suiteId) {
+  return queryJson(
+    dbPath,
+    `SELECT metadata_id, suite_id, prompt_key, domain, what_it_tests, created_at, updated_at
+     FROM baseline_prompt_suite_item_metadata
+     WHERE suite_id = ${quote(suiteId)}
+     ORDER BY prompt_key ASC;`
+  );
+}
+
+function upsertBaselinePromptSuiteItemMetadata(dbPath, input) {
+  const existing = getBaselinePromptSuiteItemMetadataByPromptKey(dbPath, input.suiteId, input.promptKey);
+  const createdAt = existing?.created_at || input.createdAt || nowIso();
+  const updatedAt = input.updatedAt || nowIso();
+  const metadataId = existing?.metadata_id || input.metadataId;
+  exec(
+    dbPath,
+    `INSERT INTO baseline_prompt_suite_item_metadata (
+       metadata_id, suite_id, prompt_key, domain, what_it_tests, created_at, updated_at
+     ) VALUES (
+       ${quote(metadataId)},
+       ${quote(input.suiteId)},
+       ${quote(input.promptKey)},
+       ${quote(input.domain)},
+       ${quote(input.whatItTests)},
+       ${quote(createdAt)},
+       ${quote(updatedAt)}
+     )
+     ON CONFLICT(suite_id, prompt_key) DO UPDATE SET
+       domain = excluded.domain,
+       what_it_tests = excluded.what_it_tests,
+       updated_at = excluded.updated_at;`
+  );
+  return getBaselinePromptSuiteItemMetadataByPromptKey(dbPath, input.suiteId, input.promptKey);
+}
+
 function getBaselineRenderSetById(dbPath, baselineRenderSetId) {
   const rows = queryJson(
     dbPath,
@@ -1170,6 +1219,16 @@ function upsertBaselineRenderSetItem(dbPath, input) {
   }
   insertBaselineRenderSetItem(dbPath, input);
   return getBaselineRenderSetItem(dbPath, input.baselineRenderSetId, input.promptKey, input.stylizeTier);
+}
+
+function deleteBaselineRenderSetItem(dbPath, baselineRenderSetId, promptKey, stylizeTier) {
+  exec(
+    dbPath,
+    `DELETE FROM baseline_render_set_items
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+       AND prompt_key = ${quote(promptKey)}
+       AND stylize_tier = ${Number(stylizeTier)};`
+  );
 }
 
 function insertStyleDnaPromptJob(dbPath, input) {
@@ -1462,6 +1521,9 @@ module.exports = {
   listBaselinePromptSuiteItems,
   insertBaselinePromptSuiteItem,
   ensureBaselinePromptSuiteItemByPromptKey,
+  getBaselinePromptSuiteItemMetadataByPromptKey,
+  listBaselinePromptSuiteItemMetadata,
+  upsertBaselinePromptSuiteItemMetadata,
   getBaselineRenderSetById,
   getBaselineRenderSetByCompatibility,
   listBaselineRenderSets,
@@ -1470,6 +1532,7 @@ module.exports = {
   listBaselineRenderSetItems,
   insertBaselineRenderSetItem,
   upsertBaselineRenderSetItem,
+  deleteBaselineRenderSetItem,
   insertStyleDnaPromptJob,
   getStyleDnaPromptJobById,
   insertStyleDnaPromptJobItem,

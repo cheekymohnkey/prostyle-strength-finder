@@ -12,6 +12,34 @@ const {
   getPendingMigrations,
 } = require("./lib");
 
+function makeCheckpointTimestamp() {
+  const iso = new Date().toISOString();
+  return iso.replace(/[-:]/g, "").replace("T", "-").replace(/\..+$/, "Z");
+}
+
+function maybeCheckpointBeforeReset(dbPath) {
+  if (!fs.existsSync(dbPath)) {
+    return null;
+  }
+
+  const skipCheckpoint = String(process.env.DB_RESET_SKIP_CHECKPOINT || "").trim() === "1";
+  if (skipCheckpoint) {
+    return null;
+  }
+
+  const checkpointsDir = path.join(path.dirname(dbPath), "checkpoints");
+  fs.mkdirSync(checkpointsDir, { recursive: true });
+
+  const dbExt = path.extname(dbPath) || ".sqlite3";
+  const dbBase = path.basename(dbPath, dbExt);
+  const checkpointPath = path.join(
+    checkpointsDir,
+    `${dbBase}.pre-reset.${makeCheckpointTimestamp()}${dbExt}`
+  );
+  fs.copyFileSync(dbPath, checkpointPath);
+  return checkpointPath;
+}
+
 function loadDatabasePath() {
   return parseDatabaseUrl(process.env.DATABASE_URL);
 }
@@ -117,6 +145,7 @@ function commandRollback() {
 
 function commandReset() {
   const dbPath = loadDatabasePath();
+  const checkpointPath = maybeCheckpointBeforeReset(dbPath);
   if (fs.existsSync(dbPath)) {
     fs.rmSync(dbPath, { force: true });
   }
@@ -131,6 +160,7 @@ function commandReset() {
     JSON.stringify(
       {
         databasePath: dbPath,
+        checkpointPath,
         reset: true,
         appliedMigrations: pending,
       },

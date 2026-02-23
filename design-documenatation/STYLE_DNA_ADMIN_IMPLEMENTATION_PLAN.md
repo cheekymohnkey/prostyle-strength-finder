@@ -1,7 +1,7 @@
 # Prostyle Strength Finder - Style-DNA Admin Implementation Plan
 
-Status: Draft  
-Date: 2026-02-21  
+Status: In Progress  
+Date: 2026-02-22  
 Depends on:
 - `design-documenatation/DECISIONS.md`
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
@@ -22,6 +22,40 @@ Define a dedicated, execution-ready implementation plan for the admin-only Style
 ## Feature Objective
 
 Enable administrators to run rigorous, repeatable baseline-vs-test aesthetic delta analysis with minimal manual overhead and strong auditability.
+
+## Current Execution Snapshot (2026-02-22)
+
+Implemented in code:
+1. Persistence foundation is live:
+- `baseline_prompt_suites`, `baseline_prompt_suite_items`, `baseline_render_sets`, `baseline_render_set_items`
+- `style_dna_prompt_jobs`, `style_dna_prompt_job_items`, `style_dna_runs`, `style_dna_run_results`, `style_dna_images`
+- prompt metadata table `baseline_prompt_suite_item_metadata`
+2. Admin API surface is live for core workflow:
+- baseline set create/list/get
+- baseline set item upsert/delete
+- style-dna image upload and image content retrieval
+- prompt job create/get
+- run submit/list/get
+3. Worker path is live for strict-schema style-dna run processing and result persistence.
+4. Admin UI route `/admin/style-dna` is live with:
+- baseline set selection and prompt coverage indicators
+- loaded-set draft hydration with save-as baseline set workflow
+- clipboard/file image intake, previews, and clear controls
+- prompt copy helpers and uploaded prompt deletion flow
+- prompt generation, run submit, run lookup panels
+5. Smoke scripts are implemented:
+- `style-dna:tier-validation-smoke`
+- `style-dna:baseline-smoke`
+- `style-dna:prompt-generation-smoke`
+- `style-dna:run-smoke`
+- `style-dna:schema-failure-smoke`
+6. Prompt generation now includes model version argument when available:
+- baseline copy prompts include `--v <mjModelVersion>`
+- generated prompt jobs include `--v <mjModelVersion>`
+
+Open gaps:
+1. Matched-control sref policy (`--sw 0` control at same stylize tier) is documented but not fully enforced by API run submission checks yet.
+2. Launch/readiness hook for full style-dna smoke set is still pending.
 
 ## Primary Use Cases (Explicit Split)
 
@@ -76,6 +110,17 @@ A baseline grid can be reused only when all match:
 
 If any key differs, baseline set is treated as incompatible and a new set is required.
 
+### sref Control-Policy Rule
+
+For sref analysis validity:
+1. Control images must be produced with `--sw 0` (reference-enabled baseline).
+2. Test images must be compared only against controls with the same stylize tier (`--s`) and same locked envelope.
+3. "No sref" controls must not be used for sref delta extraction.
+
+Implementation note:
+1. This policy is currently a required contract and operator guideline.
+2. Full server-side enforcement of matched `--sw 0` controls is still an open item.
+
 ## Vision Extraction Contract
 
 Use this contract for baseline-vs-test grid analysis tasks.
@@ -122,6 +167,18 @@ Use this contract for baseline-vs-test grid analysis tasks.
 - LLM outputs open atomic traits
 - backend handles canonical mapping, alias merging, and taxonomy version assignment
 - do not force full taxonomy enums in vision prompt
+
+## Recommended sref Matrix (Research-Grounded)
+
+Per prompt and fixed seed, capture at minimum:
+1. Control A: `--sw 0 --s 0`
+2. Raw DNA: `--sw 1000 --s 0`
+3. Control B: `--sw 0 --s 100`
+4. Functional DNA: `--sw 1000 --s 100`
+
+Optional stress:
+1. `--sw 1000 --s 1000` for persistence under max stylization.
+2. `--sw 100 --s 100` for default-user equilibrium behavior.
 
 ## Trait Synonym Squashing Policy
 

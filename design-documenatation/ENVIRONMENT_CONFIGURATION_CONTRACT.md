@@ -74,6 +74,39 @@ For the current phase, these are the only supported environments beyond local: `
 3. SQLite DB path points to local file under repository tree.
 4. Queue and object storage endpoints may point to LocalStack or isolated dev AWS resources.
 
+## Local Admin Auth Policy (Required)
+
+This policy applies when testing any admin-only frontend/API routes (including Style-DNA).
+
+1. Local frontend auth bypass must run with an admin subject:
+- `FRONTEND_AUTH_MODE=disabled`
+- `LOCAL_AUTH_BYPASS_SUBJECT=<admin-subject>`
+2. Local API JWT mode must remain local-only insecure mode for bypass compatibility:
+- `AUTH_JWT_VERIFICATION_MODE=insecure`
+3. The bypass subject must exist in `users` with:
+- `role=admin`
+- `status=active`
+4. Regression guardrail:
+- if admin screens show repeated `403` in local dev (for example baseline set load failures), first verify bypass subject role before debugging feature code.
+
+Reference local default currently used in this repo:
+1. `.env.local`
+2. `.env.local.example`
+
+## Local DB Safety Checkpoint (Required Before Reset)
+
+To prevent accidental loss of local manual Style-DNA baseline data:
+
+1. `db:reset` now creates a DB checkpoint automatically before deleting local DB files.
+2. Manual checkpoint remains available:
+- `npm run db:checkpoint-local`
+3. Safe reset wrapper remains available (alias to default reset):
+- `npm run db:reset:safe`
+4. To intentionally skip checkpointing for a specific reset:
+- `DB_RESET_SKIP_CHECKPOINT=1 npm run db:reset`
+5. Checkpoints are written under:
+- `data/checkpoints/`
+
 ## Environment Template Files
 
 Use these templates as the baseline:

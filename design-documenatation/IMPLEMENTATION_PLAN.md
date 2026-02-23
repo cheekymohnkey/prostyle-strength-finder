@@ -14,7 +14,7 @@ Approved on: 2026-02-18
 
 Convert agreed design artifacts into executable engineering work with clear sequencing, dependencies, and done criteria.
 
-## Current Status Snapshot (2026-02-20)
+## Current Status Snapshot (2026-02-22)
 
 1. Epic A foundation scope is complete in implementation.
 2. Non-local infrastructure baseline is provisioned via Terraform:
@@ -29,6 +29,12 @@ Convert agreed design artifacts into executable engineering work with clear sequ
 - Next.js frontend is now default local frontend entrypoint.
 - Legacy frontend is retained as fallback during migration window.
 - Launch readiness smoke currently passes with Next frontend flow.
+6. Style-DNA delta track status:
+- admin baseline/prompt/run API surfaces are implemented.
+- worker strict-schema style-dna processing is implemented.
+- `/admin/style-dna` workflow is implemented in Next frontend.
+- style-dna smoke scripts are implemented (`baseline`, `prompt-generation`, `run`, `schema-failure`, `tier-validation`).
+- matched-control sref policy enforcement (`--sw 0` baseline at same `--s`) remains an open enforcement gap.
 
 ## Delivery Structure
 

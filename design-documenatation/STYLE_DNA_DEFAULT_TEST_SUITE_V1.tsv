@@ -1,0 +1,11 @@
+Prompt Key	Domain	Baseline Prompt	What It Tests in the SREF DNA	Display Order
+pk_001	Portraiture	a person looking at the camera	How the style renders human skin tones, eyes, and facial structure.	10
+pk_002	Architecture	the exterior of a house	How the style handles rigid geometry, straight lines, and structural lighting.	20
+pk_003	Landscape	a mountain range and a lake	How the style interprets sky, atmospheric perspective, and organic textures.	30
+pk_004	Macro/Object	a coffee cup on a table	How the style renders material reflections (ceramic/glass), shadows, and close-up depth of field.	40
+pk_005	Interior	a living room with a sofa	How the style handles indoor, bounced, or artificial lighting.	50
+pk_006	Action	a dog running	How the style renders motion and fur/hair textures.	60
+pk_007	Vehicle	a car parked on a street	How the style handles metallic surfaces and sharp specular highlights.	70
+pk_008	Food	a bowl of fruit	How the style handles vibrant color palettes and organic, soft lighting.	80
+pk_009	Flora	a single flower in bloom	How the style handles delicate, translucent details and micro-textures.	90
+pk_010	Apparel	a jacket hanging on a hook	How the style interprets fabric folds, drapery, and textile textures.	100

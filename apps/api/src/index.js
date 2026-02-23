@@ -53,9 +53,11 @@ const {
   insertAlignmentEvaluation,
   getAlignmentEvaluationByFeedbackId,
   listActiveStyleInfluenceCombinations,
+  getBaselinePromptSuiteById,
   ensureBaselinePromptSuiteById,
   ensureBaselinePromptSuiteItemByPromptKey,
   listBaselinePromptSuiteItems,
+  listBaselinePromptSuiteItemMetadata,
   getBaselineRenderSetById,
   getBaselineRenderSetByCompatibility,
   listBaselineRenderSets,
@@ -63,6 +65,7 @@ const {
   getBaselineRenderSetItem,
   listBaselineRenderSetItems,
   upsertBaselineRenderSetItem,
+  deleteBaselineRenderSetItem,
   insertStyleDnaPromptJob,
   getStyleDnaPromptJobById,
   insertStyleDnaPromptJobItem,
@@ -654,6 +657,39 @@ function mapBaselineRenderSetItemRow(row) {
   };
 }
 
+function mapBaselinePromptSuiteRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    suiteId: row.suite_id,
+    name: row.name,
+    suiteVersion: row.suite_version,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function buildPromptDefinitionRows(dbPath, suiteId) {
+  const promptItems = listBaselinePromptSuiteItems(dbPath, suiteId);
+  const metadataRows = listBaselinePromptSuiteItemMetadata(dbPath, suiteId);
+  const metadataByPromptKey = new Map();
+  for (const row of metadataRows) {
+    metadataByPromptKey.set(row.prompt_key, row);
+  }
+  return promptItems.map((item) => {
+    const metadata = metadataByPromptKey.get(item.prompt_key);
+    return {
+      promptKey: item.prompt_key,
+      promptText: item.prompt_text,
+      displayOrder: Number(item.display_order || 0),
+      domain: metadata?.domain || null,
+      whatItTests: metadata?.what_it_tests || null,
+    };
+  });
+}
+
 function mapStyleDnaPromptJobRow(row) {
   if (!row) {
     return null;
@@ -989,7 +1025,36 @@ function createStoredJobEnvelope(job, options = {}) {
 
 const SUPPRESSED_ANALYSIS_MODERATION_STATUSES = new Set(["flagged", "removed"]);
 
+function ensureLocalBypassAdmin(dbPath, userId) {
+  if (process.env.APP_ENV !== "local") {
+    return;
+  }
+  if (process.env.AUTH_JWT_VERIFICATION_MODE !== "insecure") {
+    return;
+  }
+  const bypassSubject = String(process.env.LOCAL_AUTH_BYPASS_SUBJECT || "").trim();
+  if (!bypassSubject || bypassSubject !== userId) {
+    return;
+  }
+  const existing = getUserById(dbPath, userId);
+  if (!existing) {
+    ensureUser(dbPath, {
+      userId,
+      role: "admin",
+      status: "active",
+    });
+    return;
+  }
+  if (existing.role !== "admin" || existing.status !== "active") {
+    updateUserRoleStatus(dbPath, userId, {
+      role: "admin",
+      status: "active",
+    });
+  }
+}
+
 function requireAdminUser(dbPath, userId) {
+  ensureLocalBypassAdmin(dbPath, userId);
   const user = ensureUser(dbPath, {
     userId,
     role: "consumer",
@@ -1004,7 +1069,9 @@ function requireContributorUser(dbPath, userId) {
     role: "consumer",
     status: "active",
   });
-  return user && user.role === "contributor" && user.status === "active";
+  return user
+    && user.status === "active"
+    && (user.role === "contributor" || user.role === "admin");
 }
 
 const RECOMMENDATION_CACHE_KEYS = {
@@ -1090,6 +1157,15 @@ function sendJson(res, statusCode, payload, ctx) {
     "x-request-id": ctx.requestId,
   });
   res.end(JSON.stringify(payload));
+}
+
+function sendBinary(res, statusCode, body, contentType, ctx) {
+  res.writeHead(statusCode, {
+    "content-type": contentType || "application/octet-stream",
+    "x-request-id": ctx.requestId,
+    "cache-control": "no-store",
+  });
+  res.end(body);
 }
 
 function sendError(res, statusCode, code, message, ctx, details) {
@@ -2311,7 +2387,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       }
       const styleDnaImageId = `sdimg_${crypto.randomUUID()}`;
       const ext = extensionForMimeType(payload.mimeType);
-      const key = `style-dna/${payload.imageKind}/${styleDnaImageId}.${ext}`;
+      const key = `uploads/style-dna/${payload.imageKind}/${styleDnaImageId}.${ext}`;
       const put = await storageAdapter.putObject({
         key,
         body: buffer,
@@ -2344,6 +2420,42 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       return;
     } catch (error) {
       sendError(res, 400, "INVALID_REQUEST", "Style-DNA image upload failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET"
+    && path.startsWith("/v1/admin/style-dna/images/")
+    && path.endsWith("/content")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const styleDnaImageId = path.slice("/v1/admin/style-dna/images/".length, -"/content".length);
+    const styleDnaImage = getStyleDnaImageById(dbPath, styleDnaImageId);
+    if (!styleDnaImage) {
+      sendError(res, 404, "NOT_FOUND", "Style-DNA image not found", ctx, {
+        imageId: styleDnaImageId,
+      });
+      return;
+    }
+    try {
+      const object = await storageAdapter.getObject({
+        key: styleDnaImage.storage_key,
+      });
+      sendBinary(
+        res,
+        200,
+        object.body,
+        object.contentType || styleDnaImage.mime_type || "application/octet-stream",
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 404, "NOT_FOUND", "Style-DNA image object not found", ctx, {
+        imageId: styleDnaImageId,
         reason: error.message,
       });
       return;
@@ -2444,6 +2556,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       return;
     }
 
+    const includePromptDefinitions = ["1", "true", "yes"].includes(
+      String(url.searchParams.get("includePromptDefinitions") || "").trim().toLowerCase()
+    );
     const rows = listBaselineRenderSets(dbPath, {
       mjModelFamily: url.searchParams.get("mjModelFamily") || undefined,
       mjModelVersion: url.searchParams.get("mjModelVersion") || undefined,
@@ -2455,7 +2570,16 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       res,
       200,
       {
-        baselineSets: rows.map(mapBaselineRenderSetRow),
+        baselineSets: rows.map((row) => {
+          const mapped = mapBaselineRenderSetRow(row);
+          if (!includePromptDefinitions) {
+            return mapped;
+          }
+          return {
+            ...mapped,
+            promptDefinitions: buildPromptDefinitionRows(dbPath, row.suite_id),
+          };
+        }),
       },
       ctx
     );
@@ -2482,7 +2606,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       200,
       {
         baselineRenderSet: mapBaselineRenderSetRow(baselineSet),
+        baselinePromptSuite: mapBaselinePromptSuiteRow(getBaselinePromptSuiteById(dbPath, baselineSet.suite_id)),
         items: items.map(mapBaselineRenderSetItemRow),
+        promptDefinitions: buildPromptDefinitionRows(dbPath, baselineSet.suite_id),
       },
       ctx
     );
@@ -2560,6 +2686,75 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
     }
   }
 
+  if (method === "DELETE"
+    && path.startsWith("/v1/admin/style-dna/baseline-sets/")
+    && path.endsWith("/items")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const baselineRenderSetId = path.slice("/v1/admin/style-dna/baseline-sets/".length, -"/items".length);
+    const baselineSet = getBaselineRenderSetById(dbPath, baselineRenderSetId);
+    if (!baselineSet) {
+      sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const promptKey = String(body.promptKey || "").trim();
+      const stylizeTier = Number(body.stylizeTier);
+      if (!promptKey) {
+        sendError(res, 400, "INVALID_REQUEST", "Baseline set item delete failed validation", ctx, {
+          reason: "promptKey is required",
+        });
+        return;
+      }
+      if (!Number.isInteger(stylizeTier)) {
+        sendError(res, 400, "INVALID_REQUEST", "Baseline set item delete failed validation", ctx, {
+          reason: "stylizeTier must be an integer",
+        });
+        return;
+      }
+      const existing = getBaselineRenderSetItem(dbPath, baselineRenderSetId, promptKey, stylizeTier);
+      if (!existing) {
+        sendError(res, 404, "NOT_FOUND", "Baseline set item not found", ctx, {
+          baselineRenderSetId,
+          promptKey,
+          stylizeTier,
+        });
+        return;
+      }
+      deleteBaselineRenderSetItem(dbPath, baselineRenderSetId, promptKey, stylizeTier);
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.baseline_set.item.delete",
+        targetType: "style_dna_baseline_set",
+        targetId: baselineRenderSetId,
+        reason: `${promptKey}:${stylizeTier}`,
+      });
+      sendJson(
+        res,
+        200,
+        {
+          deleted: true,
+          baselineRenderSetId,
+          promptKey,
+          stylizeTier,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Baseline set item delete failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
   if (method === "POST" && path === "/v1/admin/style-dna/prompt-jobs") {
     if (!requireAdminUser(dbPath, authenticatedUserId)) {
       sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
@@ -2608,9 +2803,11 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       const adjustmentArg = payload.styleAdjustmentType === "profile"
         ? `--profile ${payload.styleAdjustmentMidjourneyId}`
         : `--sref ${payload.styleAdjustmentMidjourneyId}`;
+      const modelVersion = String(baselineSet.mj_model_version || "").trim();
+      const versionArg = modelVersion !== "" ? ` --v ${modelVersion}` : "";
       for (const tier of payload.stylizeTiers) {
         for (const promptItem of promptItems) {
-          const promptTextGenerated = `${promptItem.prompt_text} ${adjustmentArg} ${styleInfluence.influence_code} --stylize ${tier}`;
+          const promptTextGenerated = `${promptItem.prompt_text} ${adjustmentArg} ${styleInfluence.influence_code} --stylize ${tier}${versionArg}`;
           insertStyleDnaPromptJobItem(dbPath, {
             itemId: `sdpji_${crypto.randomUUID()}`,
             promptJobId,

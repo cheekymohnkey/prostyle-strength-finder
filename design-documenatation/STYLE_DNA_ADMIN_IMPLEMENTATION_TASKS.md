@@ -1,7 +1,7 @@
 # Prostyle Strength Finder - Style-DNA Admin Implementation Tasks
 
-Status: Planned  
-Date: 2026-02-21  
+Status: In Progress  
+Date: 2026-02-22  
 Depends on:
 - `design-documenatation/DECISIONS.md`
 - `design-documenatation/ARCHITECTURE_AND_ERD.md`
@@ -23,6 +23,7 @@ Ship an admin-only workflow that:
 3. Generates copy-ready MidJourney prompts.
 4. Accepts returned test grids and enqueues strict-schema analysis.
 5. Persists raw and canonicalized trait outputs for retrieval and auditing.
+6. Enforces sref control-policy baselines so deltas are measured against `--sw 0` controls at the same stylize tier.
 
 ## Explicit Use Case Split
 
@@ -51,6 +52,28 @@ Out of scope:
 3. SD3 Worker + strict LLM integration.
 4. SD4 Admin UI flow.
 5. SD5 Verification and hardening.
+
+## Current Execution Snapshot (2026-02-22)
+
+1. SD1: Implemented.
+- style-dna persistence migrations are present and applied in smoke runs.
+- repository methods for baseline/prompt/run/image/result entities are in place.
+- baseline prompt metadata persistence support is in place.
+2. SD2: Partially implemented.
+- baseline, prompt-job, run, and image endpoints are implemented with admin RBAC.
+- idempotency behavior is implemented for run submission.
+- open: server-side matched-control (`--sw 0`) gating for sref policy is not fully enforced yet.
+3. SD3: Implemented.
+- worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
+- failure path reaches dead-letter behavior in schema-failure smoke.
+4. SD4: Implemented (with polish remaining).
+- `/admin/style-dna` supports baseline setup, image intake, prompt copy/generation, submit, and result lookup.
+- loaded baseline sets can be used as editable drafts and saved as new baseline sets.
+- open: additional UX guardrails and status messaging refinement.
+5. SD5: Mostly implemented.
+- style-dna smoke scripts exist and have passed in prior session verification.
+- prompt generation verification includes model version flag emission (`--v`).
+- open: launch/readiness gate integration for full style-dna smoke set.
 
 ## SD1. Persistence + Shared Contracts
 
@@ -103,12 +126,16 @@ Implementation tasks:
 - required baseline prompt coverage exists
 - selected style influence is eligible
 6. Add idempotency-key handling for run submissions.
+7. Enforce and surface control-baseline policy for sref runs:
+- comparisons require baseline coverage produced under `--sw 0`
+- baseline and test must match stylize tier (`s`) and locked envelope fields
 
 Acceptance criteria:
 1. All endpoints are contract-validated and role-protected.
 2. Non-admin calls return `403`.
 3. Validation errors are explicit and actionable.
 4. Run submission enqueues exactly one job per idempotency key.
+5. [Open] sref comparisons are rejected when matched control baseline (`sw=0` at same `s`) is missing.
 
 ## SD3. Worker + Strict LLM Schema Path
 
@@ -175,18 +202,23 @@ Implementation tasks:
 - `npm run style-dna:prompt-generation-smoke`
 - `npm run style-dna:run-smoke`
 - `npm run style-dna:schema-failure-smoke`
-2. Add focused integration tests for:
-- baseline compatibility checks
+2. Extend style-dna smoke design coverage for sref matrix:
+- control pair: `sw=0` at `s=0` and `s=100`
+- functional pair: `sw=1000` at `s=0` and `s=100`
+- optional stress pair: `sw=1000` at `s=1000`
+3. Add focused integration tests for:
+- matched-control gating (`sw=0`, same `s`)
 - RBAC enforcement
 - idempotency behavior
 - run lifecycle transitions
-3. Add README runbook section for style-dna admin flow.
-4. Add launch/readiness gate hook to include style-dna smokes when enabled.
+4. Add README runbook section for style-dna admin flow.
+5. Add launch/readiness gate hook to include style-dna smokes when enabled.
 
 Acceptance criteria:
 1. Smoke scripts run from clean state and return `ok: true`.
 2. Failure-path smoke proves strict-schema invalid responses are handled safely.
 3. Existing critical smokes remain green (no regressions).
+4. Prompt-generation smoke verifies deterministic prompt blocks for selected `sw`/`s` matrix tiers.
 
 ## Suggested Ticket Breakdown
 
@@ -226,6 +258,7 @@ Expected:
 
 1. Risk: Baseline misuse due to compatibility mismatch.
 Control: strict model/version + envelope hash validation and UI indicators.
+Also require matched control baseline policy (`sw=0` at same stylize tier).
 
 2. Risk: JSON schema drift causes worker breakage.
 Control: shared schema constants + strict provider format + schema-failure smoke.

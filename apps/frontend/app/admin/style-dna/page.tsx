@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 type SessionStateResponse =
   | { authenticated: false }
@@ -78,7 +78,58 @@ type StyleDnaRunLookupResponse = {
 type StyleDnaImageUploadResponse = {
   image?: {
     styleDnaImageId?: string;
+    storageUri?: string;
+    mimeType?: string;
   };
+};
+
+type BaselinePromptDefinition = {
+  promptKey: string;
+  promptText: string;
+  displayOrder: number;
+  domain?: string | null;
+  whatItTests?: string | null;
+};
+
+type BaselineSetDetailResponse = {
+  baselineRenderSet?: {
+    baselineRenderSetId?: string;
+    mjModelFamily?: string;
+    mjModelVersion?: string;
+    suiteId?: string;
+    parameterEnvelope?: {
+      seed?: number | string;
+      stylizeTier?: number | string;
+      quality?: number | string;
+      aspectRatio?: string;
+      styleRaw?: boolean;
+    };
+  };
+  baselinePromptSuite?: {
+    suiteId?: string;
+    name?: string;
+    suiteVersion?: string;
+  };
+  items?: Array<{
+    promptKey?: string;
+    stylizeTier?: number;
+    gridImageId?: string;
+  }>;
+  promptDefinitions?: BaselinePromptDefinition[];
+};
+
+type BaselineSetSummary = {
+  baselineRenderSetId: string;
+  suiteId: string;
+  mjModelFamily: string;
+  mjModelVersion: string;
+  parameterEnvelope?: {
+    stylizeTier?: number | string;
+  };
+};
+
+type BaselineSetListResponse = {
+  baselineSets?: BaselineSetSummary[];
 };
 
 async function parseApiResponse<T>(response: Response): Promise<T> {
@@ -149,10 +200,81 @@ async function probeStyleDnaApi(): Promise<EndpointProbe> {
   };
 }
 
+async function fetchBaselineSetDetail(baselineRenderSetId: string): Promise<BaselineSetDetailResponse> {
+  const response = await fetch(`/api/proxy/admin/style-dna/baseline-sets/${encodeURIComponent(baselineRenderSetId)}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseApiResponse<BaselineSetDetailResponse>(response);
+}
+
+async function fetchBaselineSetList(): Promise<BaselineSetListResponse> {
+  const response = await fetch("/api/proxy/admin/style-dna/baseline-sets?limit=200", {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseApiResponse<BaselineSetListResponse>(response);
+}
+
+function fileExtensionForMimeType(mimeType: string): string {
+  if (mimeType === "image/png") {
+    return "png";
+  }
+  if (mimeType === "image/jpeg") {
+    return "jpg";
+  }
+  if (mimeType === "image/webp") {
+    return "webp";
+  }
+  return "bin";
+}
+
+async function readClipboardImageFile(fileNamePrefix: string): Promise<File> {
+  if (typeof navigator === "undefined" || !navigator.clipboard || typeof navigator.clipboard.read !== "function") {
+    throw new Error("Clipboard image read is not supported in this browser");
+  }
+
+  const items = await navigator.clipboard.read();
+  for (const item of items) {
+    const imageType = item.types.find((type) => type.startsWith("image/"));
+    if (!imageType) {
+      continue;
+    }
+    const blob = await item.getType(imageType);
+    if (!blob || blob.size === 0) {
+      continue;
+    }
+    const extension = fileExtensionForMimeType(imageType);
+    return new File([blob], `${fileNamePrefix}-${Date.now()}.${extension}`, {
+      type: imageType,
+    });
+  }
+
+  throw new Error("Clipboard does not contain an image");
+}
+
+function readImageFileFromClipboardData(data: DataTransfer | null, fileNamePrefix: string): File | null {
+  if (!data) {
+    return null;
+  }
+  const file = Array.from(data.files || []).find((entry) => entry.type.startsWith("image/"));
+  if (!file) {
+    return null;
+  }
+  const extension = fileExtensionForMimeType(file.type || "image/png");
+  return new File([file], `${fileNamePrefix}-${Date.now()}.${extension}`, {
+    type: file.type || "image/png",
+  });
+}
+
+function styleDnaImageContentPath(styleDnaImageId: string): string {
+  return `/api/proxy/admin/style-dna/images/${encodeURIComponent(styleDnaImageId)}/content`;
+}
+
 export default function StyleDnaAdminPage() {
   const [mjModelFamily, setMjModelFamily] = useState("standard");
   const [mjModelVersion, setMjModelVersion] = useState("6.1");
-  const [suiteId, setSuiteId] = useState("bps_default_v1");
+  const [suiteId, setSuiteId] = useState("suite_style_dna_sref_control_v1");
   const [seed, setSeed] = useState("42");
   const [quality, setQuality] = useState("1");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -173,6 +295,16 @@ export default function StyleDnaAdminPage() {
 
   const [lastPromptJobId, setLastPromptJobId] = useState("");
   const [lastStyleDnaRunId, setLastStyleDnaRunId] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
+  const [copiedRemainingPromptKeys, setCopiedRemainingPromptKeys] = useState<Record<string, boolean>>({});
+  const [baselineClipboardStatus, setBaselineClipboardStatus] = useState("");
+  const [testClipboardStatus, setTestClipboardStatus] = useState("");
+  const [brokenUploadedThumbnailIds, setBrokenUploadedThumbnailIds] = useState<Record<string, boolean>>({});
+  const [uploadedBaselinePreviewUrl, setUploadedBaselinePreviewUrl] = useState("");
+  const [uploadedTestPreviewUrl, setUploadedTestPreviewUrl] = useState("");
+  const [baselineFilePreviewUrl, setBaselineFilePreviewUrl] = useState("");
+  const [testFilePreviewUrl, setTestFilePreviewUrl] = useState("");
+  const queryClient = useQueryClient();
 
   const sessionStateQuery = useQuery({
     queryKey: ["auth", "session"],
@@ -190,6 +322,265 @@ export default function StyleDnaAdminPage() {
     queryFn: probeStyleDnaApi,
     retry: false,
   });
+
+  const baselineSetListQuery = useQuery({
+    queryKey: ["admin", "style-dna", "baseline-sets"],
+    queryFn: fetchBaselineSetList,
+    enabled: styleDnaProbeQuery.data?.ready === true,
+  });
+
+  const baselineSetDetailQuery = useQuery({
+    queryKey: ["admin", "style-dna", "baseline-set", baselineRenderSetId.trim()],
+    queryFn: () => fetchBaselineSetDetail(baselineRenderSetId.trim()),
+    enabled: baselineRenderSetId.trim() !== "" && styleDnaProbeQuery.data?.ready === true,
+  });
+
+  const baselinePromptDefinitions = useMemo(() => (
+    [...(baselineSetDetailQuery.data?.promptDefinitions || [])]
+      .sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0))
+  ), [baselineSetDetailQuery.data?.promptDefinitions]);
+
+  const baselineItems = baselineSetDetailQuery.data?.items || [];
+  const baselineEnvelope = baselineSetDetailQuery.data?.baselineRenderSet?.parameterEnvelope;
+  const baselineModelVersion = String(baselineSetDetailQuery.data?.baselineRenderSet?.mjModelVersion || "").trim();
+  const envelopeStylizeTier = baselineEnvelope?.stylizeTier !== undefined
+    ? Number(baselineEnvelope.stylizeTier)
+    : Number.NaN;
+  const activeBaselineStylizeTier = Number.isFinite(envelopeStylizeTier)
+    ? envelopeStylizeTier
+    : Number(stylizeTier);
+
+  const requiredPromptRows = useMemo(() => baselinePromptDefinitions.map((definition) => {
+    const matchedItem = baselineItems.find((item) => (
+      item.promptKey === definition.promptKey && Number(item.stylizeTier || 0) === Number(activeBaselineStylizeTier || 0)
+    ));
+    return {
+      definition,
+      complete: Boolean(matchedItem?.gridImageId),
+      attachedGridImageId: matchedItem?.gridImageId || "",
+    };
+  }), [activeBaselineStylizeTier, baselineItems, baselinePromptDefinitions]);
+
+  const missingPromptRows = requiredPromptRows.filter((row) => !row.complete);
+  const uploadedPromptRows = requiredPromptRows.filter((row) => row.complete);
+  const missingPromptKeySignature = useMemo(
+    () => missingPromptRows.map((row) => row.definition.promptKey).join("|"),
+    [missingPromptRows]
+  );
+  const hasPromptDefinitions = baselinePromptDefinitions.length > 0;
+  const selectedPromptDefinition = baselinePromptDefinitions.find((item) => item.promptKey === promptKey) || null;
+
+  const baselinePromptLines = useMemo(() => missingPromptRows.map(({ definition }) => {
+    const parts = [definition.promptText];
+    const ratio = String(baselineEnvelope?.aspectRatio || "").trim();
+    const seedValue = String(baselineEnvelope?.seed || "").trim();
+    const qualityValue = String(baselineEnvelope?.quality || "").trim();
+    if (ratio !== "") {
+      parts.push(`--ar ${ratio}`);
+    }
+    if (seedValue !== "") {
+      parts.push(`--seed ${seedValue}`);
+    }
+    if (baselineEnvelope?.styleRaw !== false) {
+      parts.push("--raw");
+    }
+    parts.push(`--stylize ${Number(activeBaselineStylizeTier || 0)}`);
+    if (baselineModelVersion !== "") {
+      parts.push(`--v ${baselineModelVersion}`);
+    }
+    if (qualityValue !== "") {
+      parts.push(`--q ${qualityValue}`);
+    }
+    return parts.join(" ");
+  }), [activeBaselineStylizeTier, baselineEnvelope?.aspectRatio, baselineEnvelope?.quality, baselineEnvelope?.seed, baselineEnvelope?.styleRaw, baselineModelVersion, missingPromptRows]);
+  const selectedPromptLine = useMemo(() => {
+    if (!selectedPromptDefinition) {
+      return "";
+    }
+    const row = missingPromptRows.find((entry) => entry.definition.promptKey === selectedPromptDefinition.promptKey);
+    if (!row) {
+      return selectedPromptDefinition.promptText;
+    }
+    const index = missingPromptRows.findIndex((entry) => entry.definition.promptKey === selectedPromptDefinition.promptKey);
+    return baselinePromptLines[index] || selectedPromptDefinition.promptText;
+  }, [baselinePromptLines, missingPromptRows, selectedPromptDefinition]);
+  const missingPromptLineByKey = useMemo(() => {
+    const linesByKey: Record<string, string> = {};
+    missingPromptRows.forEach((row, index) => {
+      linesByKey[row.definition.promptKey] = baselinePromptLines[index] || row.definition.promptText;
+    });
+    return linesByKey;
+  }, [baselinePromptLines, missingPromptRows]);
+
+  useEffect(() => {
+    const loaded = baselineSetDetailQuery.data?.baselineRenderSet;
+    if (!loaded) {
+      return;
+    }
+    const loadedEnvelope = loaded.parameterEnvelope || {};
+    const loadedTier = loadedEnvelope.stylizeTier;
+    setMjModelFamily(String(loaded.mjModelFamily || "").trim() || "standard");
+    setMjModelVersion(String(loaded.mjModelVersion || "").trim());
+    setSuiteId(String(loaded.suiteId || "").trim());
+    setSeed(loadedEnvelope.seed === undefined || loadedEnvelope.seed === null ? "" : String(loadedEnvelope.seed));
+    setQuality(loadedEnvelope.quality === undefined || loadedEnvelope.quality === null ? "" : String(loadedEnvelope.quality));
+    setAspectRatio(String(loadedEnvelope.aspectRatio || "").trim());
+    if (loadedTier !== undefined && loadedTier !== null) {
+      setStylizeTier(String(loadedTier));
+    }
+  }, [
+    baselineSetDetailQuery.data?.baselineRenderSet?.baselineRenderSetId,
+    baselineSetDetailQuery.data?.baselineRenderSet?.mjModelFamily,
+    baselineSetDetailQuery.data?.baselineRenderSet?.mjModelVersion,
+    baselineSetDetailQuery.data?.baselineRenderSet?.suiteId,
+    baselineSetDetailQuery.data?.baselineRenderSet?.parameterEnvelope,
+  ]);
+
+  useEffect(() => {
+    if (baselinePromptDefinitions.length === 0) {
+      return;
+    }
+    const currentExists = baselinePromptDefinitions.some((row) => row.promptKey === promptKey);
+    if (currentExists) {
+      return;
+    }
+    const firstMissing = missingPromptRows[0]?.definition?.promptKey;
+    const fallback = baselinePromptDefinitions[0]?.promptKey;
+    const next = firstMissing || fallback;
+    if (next) {
+      setPromptKey(next);
+    }
+  }, [baselinePromptDefinitions, missingPromptRows, promptKey]);
+
+  useEffect(() => {
+    setCopiedRemainingPromptKeys((previous) => {
+      const next: Record<string, boolean> = {};
+      for (const row of missingPromptRows) {
+        if (previous[row.definition.promptKey]) {
+          next[row.definition.promptKey] = true;
+        }
+      }
+      const previousKeys = Object.keys(previous);
+      const nextKeys = Object.keys(next);
+      if (
+        previousKeys.length === nextKeys.length
+        && previousKeys.every((key) => next[key] === previous[key])
+      ) {
+        return previous;
+      }
+      return next;
+    });
+  }, [missingPromptKeySignature, missingPromptRows]);
+
+  useEffect(() => {
+    if (!baselineFile) {
+      setBaselineFilePreviewUrl("");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(baselineFile);
+    setBaselineFilePreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [baselineFile]);
+
+  useEffect(() => {
+    if (!testFile) {
+      setTestFilePreviewUrl("");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(testFile);
+    setTestFilePreviewUrl(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [testFile]);
+
+  async function copyMissingBaselinePrompts() {
+    if (baselinePromptLines.length === 0) {
+      setCopyStatus("No remaining prompts to copy.");
+      return;
+    }
+    await navigator.clipboard.writeText(baselinePromptLines.join("\n"));
+    setCopyStatus(`Copied ${baselinePromptLines.length} baseline prompt(s).`);
+  }
+
+  async function copySelectedPromptLine() {
+    if (!selectedPromptLine || selectedPromptLine.trim() === "") {
+      setCopyStatus("No selected prompt available to copy.");
+      return;
+    }
+    await navigator.clipboard.writeText(selectedPromptLine);
+    setCopyStatus("Copied selected prompt.");
+  }
+
+  async function copyRemainingPromptLine(promptKeyToCopy: string) {
+    const line = missingPromptLineByKey[promptKeyToCopy];
+    if (!line) {
+      setCopyStatus("Prompt line is not available to copy.");
+      return;
+    }
+    await navigator.clipboard.writeText(line);
+    setCopiedRemainingPromptKeys((previous) => ({
+      ...previous,
+      [promptKeyToCopy]: true,
+    }));
+    setCopyStatus(`Copied prompt ${promptKeyToCopy}.`);
+  }
+
+  async function pasteBaselineImageFromClipboard() {
+    setBaselineClipboardStatus("");
+    try {
+      const file = await readClipboardImageFile("baseline-grid");
+      setBaselineFile(file);
+      setBaselineClipboardStatus(`Image pasted: ${file.name}`);
+    } catch (error) {
+      setBaselineClipboardStatus(error instanceof Error ? error.message : "Clipboard paste failed");
+    }
+  }
+
+  async function pasteTestImageFromClipboard() {
+    setTestClipboardStatus("");
+    try {
+      const file = await readClipboardImageFile("test-grid");
+      setTestFile(file);
+      setTestClipboardStatus(`Image pasted: ${file.name}`);
+    } catch (error) {
+      setTestClipboardStatus(error instanceof Error ? error.message : "Clipboard paste failed");
+    }
+  }
+
+  function handleBaselinePasteEvent(event: React.ClipboardEvent<HTMLDivElement>) {
+    const file = readImageFileFromClipboardData(event.clipboardData, "baseline-grid");
+    if (!file) {
+      return;
+    }
+    event.preventDefault();
+    setBaselineFile(file);
+    setBaselineClipboardStatus(`Image pasted: ${file.name}`);
+  }
+
+  function handleTestPasteEvent(event: React.ClipboardEvent<HTMLDivElement>) {
+    const file = readImageFileFromClipboardData(event.clipboardData, "test-grid");
+    if (!file) {
+      return;
+    }
+    event.preventDefault();
+    setTestFile(file);
+    setTestClipboardStatus(`Image pasted: ${file.name}`);
+  }
+
+  function clearBaselineImageSelection() {
+    setBaselineFile(null);
+    setBaselineFilePreviewUrl("");
+    setUploadedBaselinePreviewUrl("");
+    setBaselineGridImageId("");
+    setBaselineClipboardStatus("Baseline image selection cleared.");
+  }
+
+  function clearTestImageSelection() {
+    setTestFile(null);
+    setTestFilePreviewUrl("");
+    setUploadedTestPreviewUrl("");
+    setTestGridImageId("");
+    setTestClipboardStatus("Test image selection cleared.");
+  }
 
   const createBaselineMutation = useMutation({
     mutationFn: async () => {
@@ -248,7 +639,9 @@ export default function StyleDnaAdminPage() {
       const id = data.image?.styleDnaImageId || "";
       if (id) {
         setBaselineGridImageId(id);
+        setUploadedBaselinePreviewUrl(styleDnaImageContentPath(id));
       }
+      setBaselineClipboardStatus(id ? `Upload succeeded: ${id}` : "Upload succeeded");
     },
   });
 
@@ -270,11 +663,48 @@ export default function StyleDnaAdminPage() {
         },
         body: JSON.stringify({
           promptKey: promptKey.trim(),
-          stylizeTier: Number(stylizeTier),
+          stylizeTier: Number(activeBaselineStylizeTier),
           gridImageId: baselineGridImageId.trim(),
         }),
       });
       return parseApiResponse<Record<string, unknown>>(response);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "baseline-set", baselineRenderSetId.trim()],
+      });
+
+      const currentIndex = baselinePromptDefinitions.findIndex((definition) => definition.promptKey === promptKey);
+      if (currentIndex >= 0 && currentIndex < baselinePromptDefinitions.length - 1) {
+        const nextPromptKey = baselinePromptDefinitions[currentIndex + 1]?.promptKey;
+        if (nextPromptKey) {
+          setPromptKey(nextPromptKey);
+        }
+      }
+    },
+  });
+
+  const deleteBaselineItemMutation = useMutation({
+    mutationFn: async (input: { promptKey: string; stylizeTier: number }) => {
+      if (!baselineRenderSetId.trim()) {
+        throw new Error("Baseline render set id is required");
+      }
+      const response = await fetch(`/api/proxy/admin/style-dna/baseline-sets/${encodeURIComponent(baselineRenderSetId.trim())}/items`, {
+        method: "DELETE",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey: input.promptKey,
+          stylizeTier: input.stylizeTier,
+        }),
+      });
+      return parseApiResponse<Record<string, unknown>>(response);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "baseline-set", baselineRenderSetId.trim()],
+      });
     },
   });
 
@@ -301,7 +731,9 @@ export default function StyleDnaAdminPage() {
       const id = data.image?.styleDnaImageId || "";
       if (id) {
         setTestGridImageId(id);
+        setUploadedTestPreviewUrl(styleDnaImageContentPath(id));
       }
+      setTestClipboardStatus(id ? `Upload succeeded: ${id}` : "Upload succeeded");
     },
   });
 
@@ -396,6 +828,9 @@ export default function StyleDnaAdminPage() {
     return sessionStateQuery.data?.authenticated ? "authenticated" : "unauthenticated";
   }, [sessionStateQuery.data, sessionStateQuery.isError, sessionStateQuery.isLoading]);
 
+  const baselinePreviewUrl = baselineFilePreviewUrl || uploadedBaselinePreviewUrl;
+  const testPreviewUrl = testFilePreviewUrl || uploadedTestPreviewUrl;
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
       <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
@@ -424,17 +859,38 @@ export default function StyleDnaAdminPage() {
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--ink)]">1) Baseline Test Definition</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <input value={mjModelFamily} onChange={(event) => setMjModelFamily(event.target.value)} placeholder="model family" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input value={mjModelVersion} onChange={(event) => setMjModelVersion(event.target.value)} placeholder="model version" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input value={suiteId} onChange={(event) => setSuiteId(event.target.value)} placeholder="suite id" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <select value={stylizeTier} onChange={(event) => setStylizeTier(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
-            <option value="0">0</option>
-            <option value="100">100</option>
-            <option value="1000">1000</option>
-          </select>
-          <input value={seed} onChange={(event) => setSeed(event.target.value)} placeholder="seed" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input value={quality} onChange={(event) => setQuality(event.target.value)} placeholder="quality" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)} placeholder="aspect ratio" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm md:col-span-2" />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Model Family</span>
+            <input value={mjModelFamily} onChange={(event) => setMjModelFamily(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Model Version</span>
+            <input value={mjModelVersion} onChange={(event) => setMjModelVersion(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Baseline Prompt Suite Id</span>
+            <input value={suiteId} onChange={(event) => setSuiteId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Stylize Tier</span>
+            <select value={stylizeTier} onChange={(event) => setStylizeTier(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
+              <option value="0">0</option>
+              <option value="100">100</option>
+              <option value="1000">1000</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Seed</span>
+            <input value={seed} onChange={(event) => setSeed(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Quality</span>
+            <input value={quality} onChange={(event) => setQuality(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm md:col-span-2">
+            <span className="text-[var(--muted)]">Aspect Ratio</span>
+            <input value={aspectRatio} onChange={(event) => setAspectRatio(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <button
@@ -443,19 +899,186 @@ export default function StyleDnaAdminPage() {
             disabled={createBaselineMutation.isPending}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {createBaselineMutation.isPending ? "Creating..." : "Create Baseline Set"}
+            {createBaselineMutation.isPending ? "Saving..." : "Save As New Baseline Set"}
           </button>
-          <input value={baselineRenderSetId} onChange={(event) => setBaselineRenderSetId(event.target.value)} placeholder="baseline render set id" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          <label className="flex min-w-[280px] flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Baseline Render Set Id</span>
+            <input value={baselineRenderSetId} onChange={(event) => setBaselineRenderSetId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
         </div>
+        {styleDnaProbeQuery.isError ? (
+          <p className="mt-2 text-sm text-red-600">
+            Style-DNA API probe failed. Ensure API is running and reachable at `/v1/admin/style-dna/*`.
+          </p>
+        ) : null}
+        {styleDnaProbeQuery.data && styleDnaProbeQuery.data.ready === false ? (
+          <p className="mt-2 text-sm text-red-600">
+            Style-DNA admin endpoints are not available (404). Verify backend version and route registration.
+          </p>
+        ) : null}
+        <label className="mt-3 flex flex-col gap-1 text-sm">
+          <span className="text-[var(--muted)]">Load Existing Baseline Set</span>
+          <select
+            value={baselineRenderSetId}
+            onChange={(event) => setBaselineRenderSetId(event.target.value)}
+            className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm"
+          >
+            <option value="">Select baseline render set</option>
+            {(baselineSetListQuery.data?.baselineSets || []).map((set) => (
+              <option key={set.baselineRenderSetId} value={set.baselineRenderSetId}>
+                {set.baselineRenderSetId} | {set.suiteId} | {set.mjModelFamily} {set.mjModelVersion} | s {set.parameterEnvelope?.stylizeTier ?? "-"}
+              </option>
+            ))}
+          </select>
+        </label>
+        {baselineSetListQuery.isError ? (
+          <p className="mt-2 text-sm text-red-600">
+            Could not load baseline sets. Verify you are authenticated as admin and backend is running.
+          </p>
+        ) : null}
+        {baselineSetListQuery.data && (baselineSetListQuery.data.baselineSets || []).length === 0 ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            No baseline render sets found. Create one in section 1 first.
+          </p>
+        ) : null}
+        {baselineRenderSetId.trim() ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Loaded sets are immutable baseline references. Editing section 1 values and saving creates a new baseline set id.
+          </p>
+        ) : null}
+        {baselineSetDetailQuery.data?.promptDefinitions?.length ? (
+          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--line)]">
+            <table className="min-w-full border-collapse text-left text-sm">
+              <thead className="bg-[var(--surface-muted)] text-[var(--muted)]">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Prompt Key</th>
+                  <th className="px-3 py-2 font-medium">Prompt</th>
+                  <th className="px-3 py-2 font-medium">Domain</th>
+                  <th className="px-3 py-2 font-medium">What It Tests</th>
+                </tr>
+              </thead>
+              <tbody>
+                {baselineSetDetailQuery.data.promptDefinitions.map((item) => (
+                  <tr key={item.promptKey} className="border-t border-[var(--line)]">
+                    <td className="px-3 py-2 font-mono text-xs text-[var(--muted)]">{item.promptKey}</td>
+                    <td className="px-3 py-2">{item.promptText}</td>
+                    <td className="px-3 py-2">{item.domain || "-"}</td>
+                    <td className="px-3 py-2 text-[var(--muted)]">{item.whatItTests || "-"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
       </section>
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--ink)]">2) Baseline Grid Capture</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <input value={promptKey} onChange={(event) => setPromptKey(event.target.value)} placeholder="prompt key" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input value={baselineGridImageId} onChange={(event) => setBaselineGridImageId(event.target.value)} placeholder="baseline style_dna_image_id" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setBaselineFile(event.target.files?.[0] || null)} className="md:col-span-2 text-sm" />
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          Select a prompt from this baseline set and upload the baseline grid for the set&apos;s stylize tier.
+        </p>
+        {!baselineRenderSetId.trim() ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Select or enter a baseline render set id above to load suite prompts.
+          </p>
+        ) : null}
+        <div className="mt-3 flex flex-wrap gap-4 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3 text-sm">
+          <p>
+            <span className="font-medium">Suite:</span>{" "}
+            {baselineSetDetailQuery.data?.baselinePromptSuite?.name
+              ? `${baselineSetDetailQuery.data.baselinePromptSuite.name} (${baselineSetDetailQuery.data.baselinePromptSuite.suiteId || ""})`
+              : baselineSetDetailQuery.data?.baselineRenderSet?.suiteId || "-"}
+          </p>
+          <p><span className="font-medium">Stylize Tier:</span> {Number.isFinite(activeBaselineStylizeTier) ? activeBaselineStylizeTier : "-"}</p>
+          <p><span className="font-medium">Model Version:</span> {baselineModelVersion || "-"}</p>
+          <p><span className="font-medium">Seed:</span> {baselineEnvelope?.seed ?? "-"}</p>
+          <p><span className="font-medium">Aspect Ratio:</span> {baselineEnvelope?.aspectRatio || "-"}</p>
         </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Prompt</span>
+            <select value={promptKey} onChange={(event) => setPromptKey(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
+              {baselinePromptDefinitions.length === 0 ? <option value="">No prompts loaded</option> : null}
+              {baselinePromptDefinitions.map((item) => (
+                <option key={item.promptKey} value={item.promptKey}>
+                  {item.promptKey} - {item.promptText}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Uploaded Baseline Image Id</span>
+            <input value={baselineGridImageId} onChange={(event) => setBaselineGridImageId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <div
+            className="md:col-span-2 rounded-lg border border-[var(--line)] p-3"
+            tabIndex={0}
+            onPaste={handleBaselinePasteEvent}
+            title="Focus this panel and press Cmd/Ctrl+V to paste an image grid"
+          >
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-[var(--muted)]">Baseline Grid File</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setBaselineFile(event.target.files?.[0] || null)} className="text-sm" />
+            </label>
+            <p className="mt-2 text-xs text-[var(--muted)]">Tip: click this panel then press Cmd/Ctrl+V to paste from clipboard.</p>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+          <button
+            type="button"
+            onClick={() => pasteBaselineImageFromClipboard()}
+            className="rounded-lg border border-[var(--line)] px-3 py-1"
+          >
+            Paste Baseline Grid
+          </button>
+          <button
+            type="button"
+            onClick={() => clearBaselineImageSelection()}
+            className="rounded-lg border border-[var(--line)] px-3 py-1"
+          >
+            Clear Baseline Grid
+          </button>
+          {baselineFile ? <p className="text-[var(--muted)]">Selected: {baselineFile.name}</p> : null}
+          {baselineClipboardStatus ? <p className="text-[var(--muted)]">{baselineClipboardStatus}</p> : null}
+        </div>
+        {(baselinePreviewUrl || baselineGridImageId) ? (
+          <div className="mt-3 flex flex-wrap items-start gap-4 rounded-lg border border-[var(--line)] p-3">
+            {baselinePreviewUrl ? (
+              <img
+                src={baselinePreviewUrl}
+                alt="Baseline grid preview"
+                className="h-24 w-24 rounded border border-[var(--line)] object-cover"
+              />
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded border border-[var(--line)] text-xs text-[var(--muted)]">
+                no preview
+              </div>
+            )}
+            <div className="text-sm">
+              <p><span className="font-medium">Baseline Image Id:</span> {baselineGridImageId || "(not uploaded yet)"}</p>
+              <p className="text-[var(--muted)]">Preview remains visible after upload for confirmation.</p>
+            </div>
+          </div>
+        ) : null}
+        {selectedPromptDefinition ? (
+          <div className="mt-3 rounded-lg border border-[var(--line)] p-3 text-sm">
+            <p><span className="font-medium">Domain:</span> {selectedPromptDefinition.domain || "-"}</p>
+            <p><span className="font-medium">What It Tests:</span> {selectedPromptDefinition.whatItTests || "-"}</p>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">Baseline Prompt To Copy</p>
+              <button
+                type="button"
+                onClick={() => copySelectedPromptLine()}
+                className="rounded-lg border border-[var(--line)] px-3 py-1 text-xs"
+              >
+                Copy Prompt
+              </button>
+            </div>
+            <p className="mt-1 rounded bg-[var(--surface-muted)] px-2 py-1 font-mono text-xs text-[var(--ink)]">
+              {selectedPromptLine}
+            </p>
+          </div>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
           <button type="button" onClick={() => uploadBaselineImageMutation.mutate()} disabled={uploadBaselineImageMutation.isPending} className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm">
             {uploadBaselineImageMutation.isPending ? "Uploading..." : "Upload Baseline Grid"}
@@ -464,26 +1087,189 @@ export default function StyleDnaAdminPage() {
             {attachBaselineItemMutation.isPending ? "Saving..." : "Attach Baseline Grid to Set"}
           </button>
         </div>
+        <div className="mt-4 rounded-lg border border-[var(--line)] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-[var(--ink)]">
+              Remaining Baseline Prompts ({missingPromptRows.length})
+            </p>
+            <button type="button" onClick={() => copyMissingBaselinePrompts()} className="rounded-lg border border-[var(--line)] px-3 py-1 text-xs">
+              Copy Remaining Prompts
+            </button>
+          </div>
+          {copyStatus ? <p className="mt-2 text-xs text-[var(--muted)]">{copyStatus}</p> : null}
+          {!hasPromptDefinitions ? (
+            <p className="mt-2 text-sm text-[var(--muted)]">No prompt definitions are loaded for this baseline set.</p>
+          ) : missingPromptRows.length === 0 ? (
+            <p className="mt-2 text-sm text-[var(--muted)]">Baseline set coverage is complete for stylize {activeBaselineStylizeTier}.</p>
+          ) : (
+            <ul className="mt-2 space-y-2 text-sm">
+              {missingPromptRows.map(({ definition }) => (
+                <li
+                  key={definition.promptKey}
+                  className={`rounded border p-2 ${copiedRemainingPromptKeys[definition.promptKey]
+                    ? "border-emerald-300 bg-emerald-50"
+                    : "border-[var(--line)]"}`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-mono text-xs text-[var(--muted)]">{definition.promptKey}</p>
+                      <p>{definition.promptText}</p>
+                      <p className="text-xs text-[var(--muted)]">{definition.domain || "Unspecified domain"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyRemainingPromptLine(definition.promptKey)}
+                      className="rounded-lg border border-[var(--line)] px-3 py-1 text-xs"
+                    >
+                      Copy Prompt
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="mt-4 rounded-lg border border-[var(--line)] p-3">
+          <p className="text-sm font-medium text-[var(--ink)]">
+            Uploaded Prompts ({uploadedPromptRows.length})
+          </p>
+          {uploadedPromptRows.length === 0 ? (
+            <p className="mt-2 text-sm text-[var(--muted)]">No baseline grids attached yet for this stylize tier.</p>
+          ) : (
+            <ul className="mt-2 space-y-2 text-sm">
+              {uploadedPromptRows.map(({ definition, attachedGridImageId }) => (
+                <li key={definition.promptKey} className="rounded border border-[var(--line)] p-2">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      {brokenUploadedThumbnailIds[attachedGridImageId] ? (
+                        <div className="flex h-16 w-16 items-center justify-center rounded border border-[var(--line)] text-xs text-[var(--muted)]">
+                          no preview
+                        </div>
+                      ) : (
+                        <img
+                          src={styleDnaImageContentPath(attachedGridImageId)}
+                          alt={`${definition.promptKey} baseline thumbnail`}
+                          className="h-16 w-16 rounded border border-[var(--line)] object-cover"
+                          onError={() => setBrokenUploadedThumbnailIds((previous) => ({
+                            ...previous,
+                            [attachedGridImageId]: true,
+                          }))}
+                        />
+                      )}
+                      <div>
+                        <p className="font-mono text-xs text-[var(--muted)]">{definition.promptKey}</p>
+                        <p>{definition.promptText}</p>
+                        <p className="text-xs text-[var(--muted)]">Image Id: {attachedGridImageId}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const confirmed = window.confirm(
+                          `Delete uploaded baseline for ${definition.promptKey} at stylize ${Number(activeBaselineStylizeTier || 0)}?`
+                        );
+                        if (!confirmed) {
+                          return;
+                        }
+                        deleteBaselineItemMutation.mutate({
+                          promptKey: definition.promptKey,
+                          stylizeTier: Number(activeBaselineStylizeTier || 0),
+                        });
+                      }}
+                      disabled={deleteBaselineItemMutation.isPending}
+                      className="rounded-lg border border-[var(--line)] px-3 py-1 text-xs"
+                    >
+                      {deleteBaselineItemMutation.isPending ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
       <section className="mt-6 mb-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-[var(--ink)]">3) Style Adjustment Comparison</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <select value={styleAdjustmentType} onChange={(event) => setStyleAdjustmentType(event.target.value as "sref" | "profile")} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
-            <option value="sref">sref</option>
-            <option value="profile">profile</option>
-          </select>
-          <input value={styleAdjustmentMidjourneyId} onChange={(event) => setStyleAdjustmentMidjourneyId(event.target.value)} placeholder="midjourney id" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <select value={styleInfluenceId} onChange={(event) => setStyleInfluenceId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm md:col-span-2">
-            <option value="">select style influence</option>
-            {availableInfluences.map((influence) => (
-              <option key={influence.id} value={influence.id}>{influence.label}</option>
-            ))}
-          </select>
-          <input value={testGridImageId} onChange={(event) => setTestGridImageId(event.target.value)} placeholder="test style_dna_image_id" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input value={lastStyleDnaRunId} onChange={(event) => setLastStyleDnaRunId(event.target.value)} placeholder="style_dna_run_id" className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
-          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setTestFile(event.target.files?.[0] || null)} className="md:col-span-2 text-sm" />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Style Adjustment Type</span>
+            <select value={styleAdjustmentType} onChange={(event) => setStyleAdjustmentType(event.target.value as "sref" | "profile")} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
+              <option value="sref">sref</option>
+              <option value="profile">profile</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Style Adjustment Midjourney Id</span>
+            <input value={styleAdjustmentMidjourneyId} onChange={(event) => setStyleAdjustmentMidjourneyId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm md:col-span-2">
+            <span className="text-[var(--muted)]">Style Influence Id</span>
+            <select value={styleInfluenceId} onChange={(event) => setStyleInfluenceId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
+              <option value="">select style influence</option>
+              {availableInfluences.map((influence) => (
+                <option key={influence.id} value={influence.id}>{influence.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Test Grid Image Id</span>
+            <input value={testGridImageId} onChange={(event) => setTestGridImageId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Style-DNA Run Id</span>
+            <input value={lastStyleDnaRunId} onChange={(event) => setLastStyleDnaRunId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+          </label>
+          <div
+            className="md:col-span-2 rounded-lg border border-[var(--line)] p-3"
+            tabIndex={0}
+            onPaste={handleTestPasteEvent}
+            title="Focus this panel and press Cmd/Ctrl+V to paste an image grid"
+          >
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-[var(--muted)]">Test Grid File</span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setTestFile(event.target.files?.[0] || null)} className="text-sm" />
+            </label>
+            <p className="mt-2 text-xs text-[var(--muted)]">Tip: click this panel then press Cmd/Ctrl+V to paste from clipboard.</p>
+          </div>
         </div>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+          <button
+            type="button"
+            onClick={() => pasteTestImageFromClipboard()}
+            className="rounded-lg border border-[var(--line)] px-3 py-1"
+          >
+            Paste Test Grid
+          </button>
+          <button
+            type="button"
+            onClick={() => clearTestImageSelection()}
+            className="rounded-lg border border-[var(--line)] px-3 py-1"
+          >
+            Clear Test Grid
+          </button>
+          {testFile ? <p className="text-[var(--muted)]">Selected: {testFile.name}</p> : null}
+          {testClipboardStatus ? <p className="text-[var(--muted)]">{testClipboardStatus}</p> : null}
+        </div>
+        {(testPreviewUrl || testGridImageId) ? (
+          <div className="mt-3 flex flex-wrap items-start gap-4 rounded-lg border border-[var(--line)] p-3">
+            {testPreviewUrl ? (
+              <img
+                src={testPreviewUrl}
+                alt="Test grid preview"
+                className="h-24 w-24 rounded border border-[var(--line)] object-cover"
+              />
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded border border-[var(--line)] text-xs text-[var(--muted)]">
+                no preview
+              </div>
+            )}
+            <div className="text-sm">
+              <p><span className="font-medium">Test Image Id:</span> {testGridImageId || "(not uploaded yet)"}</p>
+              <p className="text-[var(--muted)]">Use this to confirm the intended grid is selected/uploaded.</p>
+            </div>
+          </div>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
           <button type="button" onClick={() => promptJobMutation.mutate()} disabled={promptJobMutation.isPending} className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm">
             {promptJobMutation.isPending ? "Generating..." : "Generate Prompt"}
