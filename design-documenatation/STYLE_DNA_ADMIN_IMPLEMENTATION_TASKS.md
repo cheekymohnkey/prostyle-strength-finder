@@ -53,7 +53,7 @@ Out of scope:
 4. SD4 Admin UI flow.
 5. SD5 Verification and hardening.
 
-## Current Execution Snapshot (2026-02-22)
+## Current Execution Snapshot (2026-02-23)
 
 1. SD1: Implemented.
 - style-dna persistence migrations are present and applied in smoke runs.
@@ -69,7 +69,8 @@ Out of scope:
 4. SD4: Implemented (with polish remaining).
 - `/admin/style-dna` supports baseline setup, image intake, prompt copy/generation, submit, and result lookup.
 - loaded baseline sets can be used as editable drafts and saved as new baseline sets.
-- open: additional UX guardrails and status messaging refinement.
+- run-submit guardrails now block and explain: stylize-tier mismatch, missing prompt+tier baseline coverage, sref control baseline requirements (`styleWeight=0`), and section-1 envelope drift vs loaded set.
+- open: additional non-blocking UX status messaging refinement.
 5. SD5: Mostly implemented.
 - style-dna smoke scripts exist and have passed in prior session verification.
 - prompt generation verification includes model version flag emission (`--v`).

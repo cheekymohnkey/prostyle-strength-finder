@@ -38,6 +38,11 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 - prompt curation
 - style influence governance
 - plus contributor ownership/role boundary checks
+12. `/admin/style-dna` run-submit guardrails are hardened with explicit multi-reason blocking for:
+- stylize-tier mismatch
+- missing prompt+tier baseline coverage
+- sref control baseline requirement (`styleWeight=0`)
+- section-1 field drift vs loaded baseline envelope
 
 ## Verification Notes
 
@@ -47,6 +52,7 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 4. `npm run admin:prompt-curation-smoke`
 5. `npm run admin:governance-smoke`
 6. `npm run admin:frontend-proxy-smoke`
+7. `npm run style-dna:run-smoke`
 
 ## Known UI Runtime Risk
 

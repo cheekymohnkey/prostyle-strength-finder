@@ -23,7 +23,7 @@ Define a dedicated, execution-ready implementation plan for the admin-only Style
 
 Enable administrators to run rigorous, repeatable baseline-vs-test aesthetic delta analysis with minimal manual overhead and strong auditability.
 
-## Current Execution Snapshot (2026-02-22)
+## Current Execution Snapshot (2026-02-23)
 
 Implemented in code:
 1. Persistence foundation is live:
@@ -43,6 +43,11 @@ Implemented in code:
 - clipboard/file image intake, previews, and clear controls
 - prompt copy helpers and uploaded prompt deletion flow
 - prompt generation, run submit, run lookup panels
+ - run submission guardrail hardening:
+   - multi-reason disabled state explains all missing prerequisites before submit
+   - stylize-tier mismatch and baseline prompt+tier coverage mismatch are blocked client-side
+   - sref control-policy guardrail requires explicit `styleWeight=0` control baseline envelope
+   - section-1 field drift vs loaded baseline envelope is surfaced before submit
 5. Smoke scripts are implemented:
 - `style-dna:tier-validation-smoke`
 - `style-dna:baseline-smoke`
@@ -55,7 +60,7 @@ Implemented in code:
 - generated prompt jobs include `--v <mjModelVersion>`
 
 Open gaps:
-1. Additional admin UX guardrails/status messaging refinement remains.
+1. Additional admin UX status messaging refinement remains outside the run-submit guardrail set.
 
 Launch/readiness status:
 1. `launch:readiness-smoke` full scope includes the full Style-DNA smoke set:

@@ -844,6 +844,8 @@ export default function StyleDnaAdminPage() {
   const baselineStyleWeight = baselineEnvelope?.styleWeight !== undefined
     ? Number(baselineEnvelope.styleWeight)
     : Number.NaN;
+  const loadedBaselineSet = baselineSetDetailQuery.data?.baselineRenderSet;
+  const loadedEnvelope = loadedBaselineSet?.parameterEnvelope;
 
   const createBaselineBlocker = useMemo(() => {
     if (!mjModelFamily.trim()) {
@@ -890,35 +892,94 @@ export default function StyleDnaAdminPage() {
     return "";
   }, [baselineRenderSetId, styleAdjustmentMidjourneyId, styleInfluenceId]);
 
-  const submitRunBlocker = useMemo(() => {
+  const submitRunBlockingReasons = useMemo(() => {
+    const reasons: string[] = [];
+    const runStylizeTier = Number(stylizeTier);
+    const loadedStylizeTier = loadedEnvelope?.stylizeTier !== undefined
+      ? Number(loadedEnvelope.stylizeTier)
+      : Number.NaN;
+    const promptDefinitionExists = baselinePromptDefinitions.some((definition) => definition.promptKey === promptKey.trim());
+    const baselineCoverageForPromptAndTier = baselineItems.some((item) => (
+      item.promptKey === promptKey.trim() && Number(item.stylizeTier || 0) === runStylizeTier
+    ));
+
     if (!styleInfluenceId.trim()) {
-      return "Style influence id is required.";
+      reasons.push("Style influence id is required.");
     }
     if (!baselineRenderSetId.trim()) {
-      return "Baseline render set id is required.";
+      reasons.push("Baseline render set id is required.");
+    }
+    if (!loadedBaselineSet) {
+      reasons.push("Loaded baseline set details are required.");
     }
     if (!promptKey.trim()) {
-      return "Prompt key is required.";
+      reasons.push("Prompt key is required.");
+    }
+    if (!promptDefinitionExists) {
+      reasons.push("Selected prompt key is not part of the loaded baseline prompt suite.");
+    }
+    if (!Number.isFinite(runStylizeTier)) {
+      reasons.push("Stylize tier must be a valid number.");
+    }
+    if (Number.isFinite(loadedStylizeTier) && Number.isFinite(runStylizeTier) && runStylizeTier !== loadedStylizeTier) {
+      reasons.push(`Run stylize tier (${runStylizeTier}) must match loaded baseline stylize tier (${loadedStylizeTier}).`);
+    }
+    if (Number.isFinite(runStylizeTier) && !baselineCoverageForPromptAndTier) {
+      reasons.push(`Baseline coverage is missing for prompt ${promptKey.trim() || "(none)"} at stylize ${runStylizeTier}.`);
     }
     if (!styleAdjustmentMidjourneyId.trim()) {
-      return "Style adjustment Midjourney id is required.";
+      reasons.push("Style adjustment Midjourney id is required.");
     }
     if (!testGridImageId.trim()) {
-      return "Upload a test grid image first.";
+      reasons.push("Upload a test grid image first.");
+    }
+    if (styleAdjustmentType === "sref" && !Number.isFinite(baselineStyleWeight)) {
+      reasons.push("sref runs require a baseline set with explicit styleWeight=0 control envelope.");
     }
     if (styleAdjustmentType === "sref" && Number.isFinite(baselineStyleWeight) && baselineStyleWeight !== 0) {
-      return "sref runs require a control baseline with styleWeight=0.";
+      reasons.push("sref runs require a control baseline with styleWeight=0.");
     }
-    return "";
+
+    // Guardrail: if section-1 fields drift from loaded baseline set, operator intent is ambiguous.
+    if (
+      loadedBaselineSet
+      && (
+        String(loadedBaselineSet.mjModelFamily || "").trim() !== mjModelFamily.trim()
+        || String(loadedBaselineSet.mjModelVersion || "").trim() !== mjModelVersion.trim()
+        || String(loadedBaselineSet.suiteId || "").trim() !== suiteId.trim()
+        || String(loadedEnvelope?.seed ?? "").trim() !== seed.trim()
+        || String(loadedEnvelope?.quality ?? "").trim() !== quality.trim()
+        || String(loadedEnvelope?.aspectRatio || "").trim() !== aspectRatio.trim()
+      )
+    ) {
+      reasons.push("Section 1 fields do not match the loaded baseline set envelope. Save as a new baseline set or reload before submit.");
+    }
+
+    return reasons;
   }, [
+    aspectRatio,
+    baselineItems,
     baselineRenderSetId,
     baselineStyleWeight,
+    baselinePromptDefinitions,
+    loadedBaselineSet,
+    loadedEnvelope?.aspectRatio,
+    loadedEnvelope?.quality,
+    loadedEnvelope?.seed,
+    loadedEnvelope?.stylizeTier,
+    mjModelFamily,
+    mjModelVersion,
     promptKey,
+    quality,
+    seed,
     styleAdjustmentMidjourneyId,
     styleAdjustmentType,
     styleInfluenceId,
+    stylizeTier,
+    suiteId,
     testGridImageId,
   ]);
+  const submitRunBlocker = submitRunBlockingReasons[0] || "";
 
   const lookupRunBlocker = useMemo(() => {
     if (!lastStyleDnaRunId.trim()) {
@@ -1444,9 +1505,18 @@ export default function StyleDnaAdminPage() {
         {!testFile ? (
           <p className="mt-2 text-sm text-[var(--muted)]">Test upload requires a selected test grid file.</p>
         ) : null}
-        {submitRunBlocker ? (
-          <p className="mt-2 text-sm text-[var(--muted)]">Run submit is disabled: {submitRunBlocker}</p>
-        ) : null}
+        {submitRunBlockingReasons.length > 0 ? (
+          <div className="mt-2 text-sm text-[var(--muted)]">
+            <p>Run submit is disabled:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {submitRunBlockingReasons.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-[var(--muted)]">Run submit guardrails passed. Ready to submit.</p>
+        )}
         {lookupRunBlocker ? (
           <p className="mt-2 text-sm text-[var(--muted)]">Run lookup is disabled: {lookupRunBlocker}</p>
         ) : null}
