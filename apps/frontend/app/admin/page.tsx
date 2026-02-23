@@ -123,6 +123,28 @@ type PromptCurationMutationResponse = {
   cache?: unknown;
 };
 
+type StyleInfluenceRecord = {
+  styleInfluenceId: string;
+  styleInfluenceTypeId: string;
+  influenceCode: string;
+  status: "active" | "disabled" | "removed";
+  pinned: boolean;
+  createdBy?: string | null;
+  createdAt?: string | null;
+};
+
+type StyleInfluenceGovernanceAuditResponse = {
+  targetType: "style_influence";
+  targetId: string;
+  actions: AdminActionAudit[];
+};
+
+type StyleInfluenceGovernanceMutationResponse = {
+  styleInfluence: StyleInfluenceRecord;
+  audit: AdminActionAudit | null;
+  cache?: unknown;
+};
+
 type ContributorSubmission = {
   submissionId: string;
   ownerUserId?: string;
@@ -244,6 +266,17 @@ async function fetchPromptCuration(promptId: string): Promise<PromptCurationResp
   return parseApiResponse<PromptCurationResponse>(response);
 }
 
+async function fetchStyleInfluenceAudit(styleInfluenceId: string): Promise<StyleInfluenceGovernanceAuditResponse> {
+  const response = await fetch(
+    `/api/proxy/admin/style-influences/${encodeURIComponent(styleInfluenceId)}/audit`,
+    {
+      method: "GET",
+      cache: "no-store",
+    }
+  );
+  return parseApiResponse<StyleInfluenceGovernanceAuditResponse>(response);
+}
+
 export default function AdminOperationsPage() {
   const [approvalMode, setApprovalMode] = useState<"auto-approve" | "manual">("auto-approve");
   const [approvalReason, setApprovalReason] = useState("manual policy adjustment");
@@ -265,6 +298,10 @@ export default function AdminOperationsPage() {
   const [curationPromptId, setCurationPromptId] = useState("");
   const [curationStatus, setCurationStatus] = useState<"active" | "deprecated" | "experimental">("active");
   const [curationReason, setCurationReason] = useState("prompt lifecycle update");
+
+  const [styleInfluenceId, setStyleInfluenceId] = useState("");
+  const [governanceAction, setGovernanceAction] = useState<"disable" | "pin" | "unpin" | "remove">("pin");
+  const [governanceReason, setGovernanceReason] = useState("governance review");
 
   const [influenceType, setInfluenceType] = useState<"profile" | "sref">("profile");
   const [influenceCode, setInfluenceCode] = useState("");
@@ -324,6 +361,12 @@ export default function AdminOperationsPage() {
     queryKey: ["admin", "prompt-curation", curationPromptId.trim()],
     queryFn: () => fetchPromptCuration(curationPromptId.trim()),
     enabled: curationPromptId.trim() !== "",
+  });
+
+  const styleInfluenceAuditQuery = useQuery({
+    queryKey: ["admin", "style-influence-audit", styleInfluenceId.trim()],
+    queryFn: () => fetchStyleInfluenceAudit(styleInfluenceId.trim()),
+    enabled: styleInfluenceId.trim() !== "",
   });
 
   const updatePolicyMutation = useMutation({
@@ -430,6 +473,34 @@ export default function AdminOperationsPage() {
     },
     onSuccess: () => {
       void promptCurationQuery.refetch();
+    },
+  });
+
+  const updateStyleInfluenceGovernanceMutation = useMutation({
+    mutationFn: async () => {
+      if (!styleInfluenceId.trim()) {
+        throw new Error("Style influence id is required");
+      }
+      if (!governanceReason.trim()) {
+        throw new Error("Governance reason is required");
+      }
+      const response = await fetch(
+        `/api/proxy/admin/style-influences/${encodeURIComponent(styleInfluenceId.trim())}/governance`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            action: governanceAction,
+            reason: governanceReason.trim(),
+          }),
+        }
+      );
+      return parseApiResponse<StyleInfluenceGovernanceMutationResponse>(response);
+    },
+    onSuccess: () => {
+      void styleInfluenceAuditQuery.refetch();
     },
   });
 
@@ -998,7 +1069,90 @@ export default function AdminOperationsPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[var(--ink)]">5) Contributor Submission</h2>
+        <h2 className="text-lg font-semibold text-[var(--ink)]">5) Style Influence Governance</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <label className="grid gap-1 text-sm text-[var(--muted)] md:col-span-3">
+            Style Influence Id
+            <input
+              type="text"
+              value={styleInfluenceId}
+              onChange={(event) => setStyleInfluenceId(event.target.value)}
+              placeholder="si_..."
+              className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink)]"
+            />
+          </label>
+          <label className="grid gap-1 text-sm text-[var(--muted)]">
+            Action
+            <select
+              value={governanceAction}
+              onChange={(event) => setGovernanceAction(event.target.value as "disable" | "pin" | "unpin" | "remove")}
+              className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink)]"
+            >
+              <option value="disable">disable</option>
+              <option value="pin">pin</option>
+              <option value="unpin">unpin</option>
+              <option value="remove">remove</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm text-[var(--muted)] md:col-span-2">
+            Reason
+            <input
+              type="text"
+              value={governanceReason}
+              onChange={(event) => setGovernanceReason(event.target.value)}
+              placeholder="required by governance audit policy"
+              className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--ink)]"
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => updateStyleInfluenceGovernanceMutation.mutate()}
+            disabled={
+              updateStyleInfluenceGovernanceMutation.isPending
+              || !styleInfluenceId.trim()
+              || !governanceReason.trim()
+            }
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
+            {updateStyleInfluenceGovernanceMutation.isPending ? "Applying..." : "Apply Governance Action"}
+          </button>
+          <button
+            type="button"
+            onClick={() => styleInfluenceAuditQuery.refetch()}
+            disabled={!styleInfluenceId.trim()}
+            className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm font-medium text-[var(--ink)] disabled:opacity-60"
+          >
+            Refresh Audit
+          </button>
+        </div>
+        {updateStyleInfluenceGovernanceMutation.isError ? (
+          <p className="mt-2 text-sm text-red-700">{(updateStyleInfluenceGovernanceMutation.error as Error).message}</p>
+        ) : null}
+        {styleInfluenceAuditQuery.isError ? (
+          <p className="mt-2 text-sm text-red-700">{(styleInfluenceAuditQuery.error as Error).message}</p>
+        ) : null}
+        {updateStyleInfluenceGovernanceMutation.data?.styleInfluence ? (
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            current status: <span className="text-[var(--ink)]">{updateStyleInfluenceGovernanceMutation.data.styleInfluence.status}</span>
+            {" "} | pinned: <span className="text-[var(--ink)]">{String(updateStyleInfluenceGovernanceMutation.data.styleInfluence.pinned)}</span>
+          </p>
+        ) : null}
+        <div className="mt-4 grid gap-2">
+          {(styleInfluenceAuditQuery.data?.actions || []).slice(0, 5).map((action) => (
+            <div key={action.adminActionAuditId} className="rounded-lg border border-[var(--line)] p-2">
+              <p className="text-xs font-medium text-[var(--ink)]">{action.actionType}</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                reason: <span className="text-[var(--ink)]">{action.reason || "(none)"}</span>
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">6) Contributor Submission</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-sm text-[var(--muted)]">
             Influence Type
@@ -1055,7 +1209,7 @@ export default function AdminOperationsPage() {
       </section>
 
       <section className="mt-6 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[var(--ink)]">6) Trigger / Retry</h2>
+        <h2 className="text-lg font-semibold text-[var(--ink)]">7) Trigger / Retry</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-sm text-[var(--muted)]">
             Submission Id
@@ -1104,7 +1258,7 @@ export default function AdminOperationsPage() {
       </section>
 
       <section className="mt-6 mb-8 rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-[var(--ink)]">7) Submissions</h2>
+        <h2 className="text-lg font-semibold text-[var(--ink)]">8) Submissions</h2>
         {contributorListQuery.isError ? (
           <p className="mt-2 text-sm text-red-700">{(contributorListQuery.error as Error).message}</p>
         ) : null}
@@ -1120,6 +1274,9 @@ export default function AdminOperationsPage() {
                   setSelectedSubmissionId(submission.submissionId);
                   if (submission.lastJobId) {
                     setModerationJobId(submission.lastJobId);
+                  }
+                  if (submission.styleInfluenceId) {
+                    setStyleInfluenceId(submission.styleInfluenceId);
                   }
                 }}
                 className="rounded-lg border border-[var(--line)] p-3 text-left hover:border-[var(--primary)]"

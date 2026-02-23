@@ -29,7 +29,8 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 - user role management list/filter/update with required audit reason
 - analysis moderation (`flag`, `remove`, `re-run`) with audit visibility
 - prompt curation status updates (`active`, `deprecated`, `experimental`) with audit visibility
-9. Approval-policy update flow now sends required admin audit `reason` payload.
+9. `/admin` now also includes style influence governance controls (`disable`, `pin`, `unpin`, `remove`) with required audit reason and audit visibility.
+10. Approval-policy update flow now sends required admin audit `reason` payload.
 
 ## Verification Notes
 
@@ -37,6 +38,7 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 2. `npm run admin:role-management-smoke`
 3. `npm run admin:moderation-smoke`
 4. `npm run admin:prompt-curation-smoke`
+5. `npm run admin:governance-smoke`
 
 ## Known UI Runtime Risk
 
@@ -53,5 +55,5 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 ## Handoff Summary
 
 1. UI upgrade documentation is now current with Style-DNA save-as workflow and prompt version-tag behavior.
-2. Admin operations parity advanced with role-management, moderation, and prompt-curation UI controls in Next frontend.
-3. Next runtime chunk stability is currently verified; remaining work is UI polish and final parity completion.
+2. Admin operations parity advanced with governance, role-management, moderation, and prompt-curation UI controls in Next frontend.
+3. Next runtime chunk stability is currently verified; remaining work is UI polish and final parity/cutover completion.

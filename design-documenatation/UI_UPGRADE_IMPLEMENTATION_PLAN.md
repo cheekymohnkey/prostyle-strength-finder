@@ -30,6 +30,7 @@ Completed in implementation:
 6. U3 recommendation + feedback migrated page exists (`apps/frontend/app/page.tsx`).
 7. Expanded U5 operations console exists (`apps/frontend/app/admin/page.tsx`) for:
 - approval policy get/update
+- admin style influence governance actions (`disable|pin|unpin|remove`) + audit visibility
 - admin user role management list/filter/update + audit visibility
 - admin analysis moderation actions (`flag|remove|re-run`) + audit visibility
 - admin prompt curation status updates + audit visibility
@@ -49,9 +50,8 @@ Completed in implementation:
 - `style-dna:schema-failure-smoke`
 
 Remaining:
-1. Complete remaining U5 parity coverage (notably style influence governance controls).
-2. Improve Style-DNA admin UX guardrails/polish and tighten state/error messaging.
-3. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
+1. Improve Style-DNA admin UX guardrails/polish and tighten state/error messaging.
+2. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
 
 ## Why Now
 
