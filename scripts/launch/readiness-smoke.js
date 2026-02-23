@@ -1,4 +1,60 @@
 const { spawnSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const { parseDatabaseUrl } = require("../db/lib");
+
+function makeSnapshotTimestamp() {
+  const iso = new Date().toISOString();
+  return iso.replace(/[-:]/g, "").replace("T", "-").replace(/\..+$/, "Z");
+}
+
+function createDbSnapshotIfConfigured() {
+  const preserveDb = String(process.env.LAUNCH_SMOKE_PRESERVE_DB || "1").trim() !== "0";
+  if (!preserveDb) {
+    return null;
+  }
+
+  const databaseUrl = String(process.env.DATABASE_URL || "").trim();
+  if (!databaseUrl) {
+    return null;
+  }
+
+  const dbPath = parseDatabaseUrl(databaseUrl);
+  const existedBefore = fs.existsSync(dbPath);
+  if (!existedBefore) {
+    return { dbPath, snapshotPath: null, existedBefore, restored: false };
+  }
+
+  const checkpointsDir = path.join(path.dirname(dbPath), "checkpoints");
+  fs.mkdirSync(checkpointsDir, { recursive: true });
+  const dbExt = path.extname(dbPath) || ".sqlite3";
+  const dbBase = path.basename(dbPath, dbExt);
+  const snapshotPath = path.join(
+    checkpointsDir,
+    `${dbBase}.pre-launch-smoke.${makeSnapshotTimestamp()}${dbExt}`
+  );
+  fs.copyFileSync(dbPath, snapshotPath);
+  return { dbPath, snapshotPath, existedBefore, restored: false };
+}
+
+function restoreDbSnapshot(snapshot) {
+  if (!snapshot) {
+    return null;
+  }
+  if (snapshot.existedBefore) {
+    if (snapshot.snapshotPath && fs.existsSync(snapshot.snapshotPath)) {
+      fs.copyFileSync(snapshot.snapshotPath, snapshot.dbPath);
+      return { ...snapshot, restored: true };
+    }
+    return { ...snapshot, restored: false };
+  }
+
+  // If DB did not exist before this smoke run, remove any DB created by the run.
+  if (fs.existsSync(snapshot.dbPath)) {
+    fs.rmSync(snapshot.dbPath, { force: true });
+  }
+  return { ...snapshot, restored: true };
+}
 
 function runStep(step) {
   const startedAt = Date.now();
@@ -19,6 +75,7 @@ function runStep(step) {
 
 function main() {
   const scope = (process.env.LAUNCH_SMOKE_SCOPE || "full").trim();
+  const snapshot = createDbSnapshotIfConfigured();
   const baseSteps = [
     { name: "contracts", cmd: "npm run contracts" },
     { name: "db_reset", cmd: "npm run db:reset" },
@@ -58,12 +115,17 @@ function main() {
     : baseSteps;
 
   const results = [];
-  for (const step of steps) {
-    const result = runStep(step);
-    results.push(result);
-    if (!result.ok) {
-      break;
+  let restoredSnapshot = null;
+  try {
+    for (const step of steps) {
+      const result = runStep(step);
+      results.push(result);
+      if (!result.ok) {
+        break;
+      }
     }
+  } finally {
+    restoredSnapshot = restoreDbSnapshot(snapshot);
   }
 
   const failed = results.find((step) => step.ok === false);
@@ -72,6 +134,14 @@ function main() {
       {
         ok: !failed,
         scope,
+        dbRestore: restoredSnapshot
+          ? {
+              enabled: true,
+              existedBefore: restoredSnapshot.existedBefore,
+              restored: restoredSnapshot.restored,
+              snapshotPath: restoredSnapshot.snapshotPath,
+            }
+          : { enabled: false },
         failedStep: failed ? failed.name : null,
         steps: results.map((step) => ({
           name: step.name,
