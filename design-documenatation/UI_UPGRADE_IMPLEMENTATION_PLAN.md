@@ -38,6 +38,12 @@ Completed in implementation:
 - `admin:frontend-proxy-smoke`
 - `feedback:frontend-proxy-smoke`
 10. Full launch readiness smoke passes with Next frontend flow active.
+11. Launch readiness smoke now includes Style-DNA smoke gates in full scope:
+- `style-dna:tier-validation-smoke`
+- `style-dna:baseline-smoke`
+- `style-dna:prompt-generation-smoke`
+- `style-dna:run-smoke`
+- `style-dna:schema-failure-smoke`
 
 Remaining:
 1. Complete U4/U5 parity coverage beyond current initial slices.

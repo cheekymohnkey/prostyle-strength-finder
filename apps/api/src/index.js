@@ -1064,6 +1064,7 @@ function requireAdminUser(dbPath, userId) {
 }
 
 function requireContributorUser(dbPath, userId) {
+  ensureLocalBypassAdmin(dbPath, userId);
   const user = ensureUser(dbPath, {
     userId,
     role: "consumer",

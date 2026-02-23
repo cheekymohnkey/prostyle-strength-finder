@@ -22,6 +22,11 @@ function main() {
   const baseSteps = [
     { name: "contracts", cmd: "npm run contracts" },
     { name: "db_reset", cmd: "npm run db:reset" },
+    { name: "style_dna_tier_validation_smoke", cmd: "npm run style-dna:tier-validation-smoke" },
+    { name: "style_dna_baseline_smoke", cmd: "npm run style-dna:baseline-smoke" },
+    { name: "style_dna_prompt_generation_smoke", cmd: "npm run style-dna:prompt-generation-smoke" },
+    { name: "style_dna_run_smoke", cmd: "npm run style-dna:run-smoke" },
+    { name: "style_dna_schema_failure_smoke", cmd: "npm run style-dna:schema-failure-smoke" },
     { name: "admin_governance_smoke", cmd: "npm run admin:governance-smoke" },
     { name: "admin_moderation_smoke", cmd: "npm run admin:moderation-smoke" },
     { name: "admin_prompt_curation_smoke", cmd: "npm run admin:prompt-curation-smoke" },
@@ -42,6 +47,7 @@ function main() {
     ? baseSteps.filter((step) => [
       "contracts",
       "db_reset",
+      "style_dna_tier_validation_smoke",
       "admin_role_management_smoke",
       "cache_invalidation_smoke",
       "backup_restore_smoke",

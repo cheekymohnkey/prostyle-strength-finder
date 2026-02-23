@@ -42,18 +42,27 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 6. Baseline attach UX improvement shipped:
 - after successful baseline item attach, prompt selection auto-advances to the next prompt key in list order
 - if current prompt is last in list, selection remains unchanged
+7. Contributor-proxy local auth hardening:
+- `requireContributorUser` now also executes local bypass admin promotion guard (`ensureLocalBypassAdmin`) before role checks
+- prevents local `403` regressions on `/api/proxy/contributor/submissions` when bypass subject has not yet been promoted in current DB state
+8. Data recovery workflow validated in practice:
+- restored local DB from pre-reset checkpoint `data/checkpoints/prostyle.local.pre-reset.20260223-050935Z.db`
+- recovered baseline/image linkage (`baseline_render_set_items` and `style_dna_images`) without re-upload
+- removed duplicate seeded baseline sets that had `0` attached items after restore
 
 ## Key Files Updated This Slice
 
 1. `apps/frontend/app/admin/style-dna/page.tsx`
 2. `apps/api/src/index.js`
-3. `scripts/style-dna/prompt-generation-smoke.js`
-4. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
-5. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-22.md`
-6. `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-22.md`
-7. `design-documenatation/IMPLEMENTATION_PLAN.md`
-8. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-9. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+3. `apps/frontend/next.config.js`
+4. `scripts/launch/readiness-smoke.js`
+5. `scripts/style-dna/prompt-generation-smoke.js`
+6. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
+7. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-22.md`
+8. `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-22.md`
+9. `design-documenatation/IMPLEMENTATION_PLAN.md`
+10. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+11. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
 ## Verification Notes
 
@@ -67,8 +76,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 
 1. Next dev runtime `layout.js` "Invalid or unexpected token" issue was reported locally and may persist until local `.next` cleanup + restart is confirmed on host machine.
 2. Matched-control sref enforcement (`--sw 0` control at same stylize tier) is still documented as required but not fully enforced server-side.
-3. Launch readiness gate does not yet require the full Style-DNA smoke suite.
-4. Local baseline data durability risk: `db:reset` clears all local baseline sets/items/images. Current local DB state contains only smoke-created Style-DNA records (v7, stylize 100).
+3. Local baseline data durability risk remains if reset is run without intended restore flow; use checkpoint+restore workflow to preserve uploaded baseline assets.
 
 ## Recommended Next Session Start
 
