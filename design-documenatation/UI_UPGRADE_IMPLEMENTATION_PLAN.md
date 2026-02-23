@@ -62,6 +62,15 @@ Remaining:
 1. Remaining Style-DNA work is limited to minor visual/layout tuning; guardrail/status UX and proxy smoke coverage are complete for current scope.
 2. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
 
+## Legacy Frontend Removal Gate
+
+Before removing `dev:legacy` fallback, require all of:
+1. Full `launch:readiness-smoke` scope passes on current `master`.
+2. Full Style-DNA smoke set passes (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`).
+3. `admin:frontend-proxy-smoke` and `frontend:critical-flow-smoke` pass in the same verification window.
+4. No open P1/P2 regressions tied to Next runtime auth/proxy/admin flows.
+5. Rollback runbook remains valid for one release window after defaulting to Next frontend.
+
 ## Why Now
 
 1. Current frontend implementation diverges from agreed technical decisions.

@@ -80,6 +80,7 @@ Launch/readiness status:
 - `style-dna:prompt-generation-smoke`
 - `style-dna:run-smoke`
 - `style-dna:schema-failure-smoke`
+2. Full `launch:readiness-smoke` scope was re-run after schema-failure fixture alignment and is currently green end-to-end.
 
 ## Primary Use Cases (Explicit Split)
 
