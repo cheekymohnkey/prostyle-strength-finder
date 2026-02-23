@@ -52,6 +52,7 @@ Policy:
 1. Ensure Node.js 20 is installed and on `PATH`.
 2. Export environment variables from local template:
    `set -a && source .env.local.example && set +a`
+   - If you run API/worker from different working directories, set `STORAGE_LOCAL_DIR` to an absolute path (for example `<repo>/data/storage`) to keep both services on the same local storage tree.
 3. Apply database migrations:
    `npm run db:migrate`
 4. Run shared-contracts build check:

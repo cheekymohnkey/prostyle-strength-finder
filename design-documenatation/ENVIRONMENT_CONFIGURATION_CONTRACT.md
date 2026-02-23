@@ -34,6 +34,7 @@ For the current phase, these are the only supported environments beyond local: `
 | `S3_BUCKET` | Yes | API, Worker | string | Bucket for image/artifact object storage. |
 | `AWS_REGION` | Yes | API, Worker | AWS region | Example: `us-east-1`. |
 | `S3_ENDPOINT_OVERRIDE` | No | API, Worker | URL | Local simulation endpoint (for LocalStack/dev). |
+| `STORAGE_LOCAL_DIR` | No | API, Worker | path | Local-disk storage root when `APP_ENV=local`; should be absolute to avoid cwd drift between processes. |
 | `COGNITO_USER_POOL_ID` | Yes | API, Worker | string | Cognito user pool identifier. |
 | `COGNITO_CLIENT_ID` | Yes | API, Worker | string | Cognito app client identifier. |
 | `COGNITO_ISSUER` | Yes | API, Worker | URL | JWT issuer expected by API. |

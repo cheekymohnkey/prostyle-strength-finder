@@ -46,6 +46,8 @@ fi
 
 export PATH="${NODE_PATH_PREFIX}:$PATH"
 export WORKER_RUN_ONCE=false
+# Keep API and worker on the same absolute local storage root regardless of process cwd.
+export STORAGE_LOCAL_DIR="${STORAGE_LOCAL_DIR:-$ROOT_DIR/data/storage}"
 
 is_running() {
   local pid_file="$1"
