@@ -38,7 +38,13 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 - prompt curation
 - style influence governance
 - plus contributor ownership/role boundary checks
-12. `/admin/style-dna` run-submit guardrails are hardened with explicit multi-reason blocking for:
+12. `admin:frontend-proxy-smoke` now also verifies Style-DNA proxy critical flow and guardrail paths:
+- baseline/test image upload via proxy
+- baseline set create + baseline item attach via proxy
+- prompt generation via proxy
+- run submit + lookup via proxy
+- negative guardrail assertions for non-control sref baseline and stylize-tier mismatch
+13. `/admin/style-dna` run-submit guardrails are hardened with explicit multi-reason blocking for:
 - stylize-tier mismatch
 - missing prompt+tier baseline coverage
 - sref control baseline requirement (`styleWeight=0`)

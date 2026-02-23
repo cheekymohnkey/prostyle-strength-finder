@@ -3,6 +3,8 @@ const net = require("net");
 const { parseDatabaseUrl, ensureDbParentDir, ensureMigrationsTable, runSql } = require("../db/lib");
 const { assertDatabaseReady } = require("../db/runtime");
 
+const ONE_PIXEL_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9VE6zJkAAAAASUVORK5CYII=";
+
 function quote(value) {
   if (value === null || value === undefined) {
     return "NULL";
@@ -70,6 +72,22 @@ function hasDatabaseLockedError(payload) {
   const message = payload?.message;
   const merged = [detailReason, message].filter(Boolean).join(" | ").toLowerCase();
   return merged.includes("database is locked");
+}
+
+function extractApiErrorText(payload) {
+  const top = payload || {};
+  const error = typeof top.error === "object" && top.error ? top.error : {};
+  const details = typeof error.details === "object" && error.details ? error.details : {};
+  const topDetails = typeof top.details === "object" && top.details ? top.details : {};
+  return [
+    error.message,
+    details.reason,
+    top.message,
+    topDetails.reason,
+  ]
+    .filter((value) => typeof value === "string" && value.trim() !== "")
+    .join(" | ")
+    .toLowerCase();
 }
 
 async function postJsonWithDbRetry(url, init, label, maxAttempts = 6) {
@@ -149,6 +167,35 @@ function seedData(dbPath) {
       pinned_flag = 0,
       created_by = 'contributor-frontend-proxy-smoke-user',
       created_at = ${quote(now)};
+
+    INSERT INTO style_influence_types (
+      style_influence_type_id, type_key, label, parameter_prefix, related_parameter_name, description, enabled_flag
+    ) VALUES (
+      'sit_sref_frontend_proxy_smoke',
+      'sref_frontend_proxy_smoke',
+      'Sref Frontend Proxy Smoke',
+      '--sref',
+      '--stylize',
+      'Sref influence type for frontend proxy smoke',
+      1
+    )
+    ON CONFLICT(style_influence_type_id) DO UPDATE SET enabled_flag = 1;
+
+    INSERT INTO style_influences (
+      style_influence_id, style_influence_type_id, influence_code, status, pinned_flag, created_by, created_at
+    ) VALUES (
+      'si_frontend_proxy_sref_smoke',
+      'sit_sref_frontend_proxy_smoke',
+      'sref-front-proxy-smoke',
+      'active',
+      0,
+      'admin-frontend-proxy-smoke-user',
+      ${quote(now)}
+    )
+    ON CONFLICT(style_influence_id) DO UPDATE SET
+      status = 'active',
+      pinned_flag = 0,
+      influence_code = 'sref-front-proxy-smoke';
 
     INSERT INTO analysis_jobs (
       job_id, idempotency_key, run_type, image_id, status, submitted_at, updated_at,
@@ -575,6 +622,280 @@ async function main() {
     }
     assertCondition(Array.isArray(governanceAuditJson.actions), "Expected governance actions array");
 
+    const forbiddenStyleDnaListResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/baseline-sets?limit=5`,
+      {
+        headers: { "x-auth-token": contributorToken },
+      }
+    );
+    assertCondition(forbiddenStyleDnaListResponse.status === 403, "Expected contributor style-dna baseline list to return 403");
+
+    const baselineImageUploadResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/images`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          imageKind: "baseline",
+          fileName: "frontend-proxy-style-dna-baseline.png",
+          mimeType: "image/png",
+          fileBase64: ONE_PIXEL_PNG_BASE64,
+        }),
+      }
+    );
+    const baselineImageUploadJson = await baselineImageUploadResponse.json();
+    if (!baselineImageUploadResponse.ok) {
+      throw new Error(`Frontend proxy style-dna baseline image upload failed (${baselineImageUploadResponse.status}): ${JSON.stringify(baselineImageUploadJson)}`);
+    }
+    const baselineImageId = baselineImageUploadJson?.image?.styleDnaImageId;
+    assertCondition(Boolean(baselineImageId), "Expected style-dna baseline image id");
+
+    const testImageUploadResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/images`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          imageKind: "test",
+          fileName: "frontend-proxy-style-dna-test.png",
+          mimeType: "image/png",
+          fileBase64: ONE_PIXEL_PNG_BASE64,
+        }),
+      }
+    );
+    const testImageUploadJson = await testImageUploadResponse.json();
+    if (!testImageUploadResponse.ok) {
+      throw new Error(`Frontend proxy style-dna test image upload failed (${testImageUploadResponse.status}): ${JSON.stringify(testImageUploadJson)}`);
+    }
+    const testImageId = testImageUploadJson?.image?.styleDnaImageId;
+    assertCondition(Boolean(testImageId), "Expected style-dna test image id");
+
+    const nonControlSetResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/baseline-sets`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          mjModelFamily: "standard",
+          mjModelVersion: "7",
+          suiteId: "suite_style_dna_default_v1",
+          parameterEnvelope: {
+            seed: 42,
+            stylizeTier: 100,
+            quality: 1,
+            aspectRatio: "1:1",
+            styleRaw: true,
+            styleWeight: 100,
+          },
+        }),
+      }
+    );
+    const nonControlSetJson = await nonControlSetResponse.json();
+    if (!nonControlSetResponse.ok) {
+      throw new Error(`Frontend proxy non-control baseline set create failed (${nonControlSetResponse.status}): ${JSON.stringify(nonControlSetJson)}`);
+    }
+    const nonControlBaselineRenderSetId = nonControlSetJson?.baselineRenderSet?.baselineRenderSetId;
+    assertCondition(Boolean(nonControlBaselineRenderSetId), "Expected non-control baseline render set id");
+
+    const nonControlAttachResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/baseline-sets/${encodeURIComponent(nonControlBaselineRenderSetId)}/items`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey: "pk_001",
+          stylizeTier: 100,
+          gridImageId: baselineImageId,
+        }),
+      }
+    );
+    const nonControlAttachJson = await nonControlAttachResponse.json();
+    if (!nonControlAttachResponse.ok) {
+      throw new Error(`Frontend proxy non-control baseline attach failed (${nonControlAttachResponse.status}): ${JSON.stringify(nonControlAttachJson)}`);
+    }
+    assertCondition(nonControlAttachJson?.item?.gridImageId === baselineImageId, "Expected non-control baseline attach to persist image");
+
+    const nonControlRunResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          styleInfluenceId: "si_frontend_proxy_sref_smoke",
+          baselineRenderSetId: nonControlBaselineRenderSetId,
+          styleAdjustmentType: "sref",
+          styleAdjustmentMidjourneyId: "sref-front-proxy-smoke",
+          promptKey: "pk_001",
+          stylizeTier: 100,
+          testGridImageId: testImageId,
+        }),
+      }
+    );
+    const nonControlRunJson = await nonControlRunResponse.json();
+    assertCondition(
+      nonControlRunResponse.status === 409,
+      `Expected non-control sref run submit to return 409, got ${nonControlRunResponse.status}: ${JSON.stringify(nonControlRunJson)}`
+    );
+    assertCondition(
+      extractApiErrorText(nonControlRunJson).includes("matched-control baseline"),
+      "Expected non-control sref run rejection reason to mention matched-control baseline"
+    );
+
+    const controlSetResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/baseline-sets`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          mjModelFamily: "standard",
+          mjModelVersion: "7",
+          suiteId: "suite_style_dna_default_v1",
+          parameterEnvelope: {
+            seed: 42,
+            stylizeTier: 100,
+            quality: 1,
+            aspectRatio: "1:1",
+            styleRaw: true,
+            styleWeight: 0,
+          },
+        }),
+      }
+    );
+    const controlSetJson = await controlSetResponse.json();
+    if (!controlSetResponse.ok) {
+      throw new Error(`Frontend proxy control baseline set create failed (${controlSetResponse.status}): ${JSON.stringify(controlSetJson)}`);
+    }
+    const controlBaselineRenderSetId = controlSetJson?.baselineRenderSet?.baselineRenderSetId;
+    assertCondition(Boolean(controlBaselineRenderSetId), "Expected control baseline render set id");
+
+    const controlAttachResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/baseline-sets/${encodeURIComponent(controlBaselineRenderSetId)}/items`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey: "pk_001",
+          stylizeTier: 100,
+          gridImageId: baselineImageId,
+        }),
+      }
+    );
+    const controlAttachJson = await controlAttachResponse.json();
+    if (!controlAttachResponse.ok) {
+      throw new Error(`Frontend proxy control baseline attach failed (${controlAttachResponse.status}): ${JSON.stringify(controlAttachJson)}`);
+    }
+    assertCondition(controlAttachJson?.item?.gridImageId === baselineImageId, "Expected control baseline attach to persist image");
+
+    const styleDnaPromptJobResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/prompt-jobs`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          styleInfluenceId: "si_frontend_proxy_sref_smoke",
+          baselineRenderSetId: controlBaselineRenderSetId,
+          styleAdjustmentType: "sref",
+          styleAdjustmentMidjourneyId: "sref-front-proxy-smoke",
+          stylizeTiers: [100],
+        }),
+      }
+    );
+    const styleDnaPromptJobJson = await styleDnaPromptJobResponse.json();
+    if (!styleDnaPromptJobResponse.ok) {
+      throw new Error(`Frontend proxy style-dna prompt generation failed (${styleDnaPromptJobResponse.status}): ${JSON.stringify(styleDnaPromptJobJson)}`);
+    }
+    assertCondition(Boolean(styleDnaPromptJobJson?.promptJob?.promptJobId || styleDnaPromptJobJson?.promptJobId), "Expected style-dna prompt job id");
+
+    const stylizeMismatchRunResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          styleInfluenceId: "si_frontend_proxy_sref_smoke",
+          baselineRenderSetId: controlBaselineRenderSetId,
+          styleAdjustmentType: "sref",
+          styleAdjustmentMidjourneyId: "sref-front-proxy-smoke",
+          promptKey: "pk_001",
+          stylizeTier: 0,
+          testGridImageId: testImageId,
+        }),
+      }
+    );
+    const stylizeMismatchRunJson = await stylizeMismatchRunResponse.json();
+    assertCondition(stylizeMismatchRunResponse.status === 409, "Expected stylize mismatch run submit to return 409");
+    assertCondition(
+      extractApiErrorText(stylizeMismatchRunJson).includes("baseline"),
+      "Expected stylize mismatch rejection reason to mention baseline coverage"
+    );
+
+    const controlRunResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          styleInfluenceId: "si_frontend_proxy_sref_smoke",
+          baselineRenderSetId: controlBaselineRenderSetId,
+          styleAdjustmentType: "sref",
+          styleAdjustmentMidjourneyId: "sref-front-proxy-smoke",
+          promptKey: "pk_001",
+          stylizeTier: 100,
+          testGridImageId: testImageId,
+        }),
+      }
+    );
+    const controlRunJson = await controlRunResponse.json();
+    if (controlRunResponse.status !== 202) {
+      throw new Error(`Frontend proxy style-dna run submit failed (${controlRunResponse.status}): ${JSON.stringify(controlRunJson)}`);
+    }
+    const styleDnaRunId = controlRunJson?.run?.styleDnaRunId || controlRunJson?.styleDnaRunId;
+    assertCondition(Boolean(styleDnaRunId), "Expected style-dna run id");
+
+    const styleDnaLookupResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/runs/${encodeURIComponent(styleDnaRunId)}`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const styleDnaLookupJson = await styleDnaLookupResponse.json();
+    if (!styleDnaLookupResponse.ok) {
+      throw new Error(`Frontend proxy style-dna run lookup failed (${styleDnaLookupResponse.status}): ${JSON.stringify(styleDnaLookupJson)}`);
+    }
+    assertCondition(Boolean(styleDnaLookupJson?.run?.status), "Expected style-dna run lookup status");
+
     console.log(
       JSON.stringify(
         {
@@ -600,12 +921,19 @@ async function main() {
             pinned: governanceJson.styleInfluence.pinned,
             auditCount: governanceAuditJson.actions.length,
           },
+          styleDna: {
+            nonControlRunStatus: nonControlRunResponse.status,
+            stylizeMismatchRunStatus: stylizeMismatchRunResponse.status,
+            runStatus: styleDnaLookupJson?.run?.status || "(unknown)",
+            promptJobId: styleDnaPromptJobJson?.promptJob?.promptJobId || styleDnaPromptJobJson?.promptJobId || "",
+          },
           forbiddenChecks: {
             contributorAdminPolicyStatus: forbiddenAdminPolicyResponse.status,
             contributorAdminUsersStatus: forbiddenAdminUsersResponse.status,
             contributorModerationStatus: moderationForbiddenResponse.status,
             contributorPromptCurationStatus: curationForbiddenResponse.status,
             contributorGovernanceStatus: governanceForbiddenResponse.status,
+            contributorStyleDnaStatus: forbiddenStyleDnaListResponse.status,
             consumerContributorCreateStatus: forbiddenConsumerCreateResponse.status,
             foreignOwnerReadStatus: foreignReadResponse.status,
           },

@@ -41,7 +41,7 @@ Completed in implementation:
 - `frontend:critical-flow-smoke`
 - `admin:frontend-proxy-smoke`
 - `feedback:frontend-proxy-smoke`
- - `admin:frontend-proxy-smoke` now verifies admin proxy coverage for approval policy, role management, moderation, prompt curation, and style influence governance (plus contributor proxy ownership/role boundaries)
+ - `admin:frontend-proxy-smoke` now verifies admin proxy coverage for approval policy, role management, moderation, prompt curation, style influence governance, and Style-DNA critical flow/guardrail checks via proxy (plus contributor proxy ownership/role boundaries)
 10. Full launch readiness smoke passes with Next frontend flow active.
 11. Launch readiness smoke now includes Style-DNA smoke gates in full scope:
 - `style-dna:tier-validation-smoke`
