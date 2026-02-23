@@ -31,6 +31,13 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 - prompt curation status updates (`active`, `deprecated`, `experimental`) with audit visibility
 9. `/admin` now also includes style influence governance controls (`disable`, `pin`, `unpin`, `remove`) with required audit reason and audit visibility.
 10. Approval-policy update flow now sends required admin audit `reason` payload.
+11. `admin:frontend-proxy-smoke` coverage is expanded to include admin proxy controls for:
+- approval policy
+- role management
+- analysis moderation
+- prompt curation
+- style influence governance
+- plus contributor ownership/role boundary checks
 
 ## Verification Notes
 
@@ -39,6 +46,7 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 3. `npm run admin:moderation-smoke`
 4. `npm run admin:prompt-curation-smoke`
 5. `npm run admin:governance-smoke`
+6. `npm run admin:frontend-proxy-smoke`
 
 ## Known UI Runtime Risk
 
@@ -56,4 +64,5 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 
 1. UI upgrade documentation is now current with Style-DNA save-as workflow and prompt version-tag behavior.
 2. Admin operations parity advanced with governance, role-management, moderation, and prompt-curation UI controls in Next frontend.
-3. Next runtime chunk stability is currently verified; remaining work is UI polish and final parity/cutover completion.
+3. Proxy smoke coverage now protects these admin controls from regression in launch/readiness paths.
+4. Next runtime chunk stability is currently verified; remaining work is UI polish and final parity/cutover completion.

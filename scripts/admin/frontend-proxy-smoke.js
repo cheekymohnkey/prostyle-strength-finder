@@ -65,8 +65,36 @@ function assertCondition(condition, message) {
   }
 }
 
+function hasDatabaseLockedError(payload) {
+  const detailReason = payload?.details?.reason;
+  const message = payload?.message;
+  const merged = [detailReason, message].filter(Boolean).join(" | ").toLowerCase();
+  return merged.includes("database is locked");
+}
+
+async function postJsonWithDbRetry(url, init, label, maxAttempts = 6) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const response = await fetch(url, init);
+    // eslint-disable-next-line no-await-in-loop
+    const json = await response.json();
+    if (response.ok) {
+      return { response, json };
+    }
+    if (hasDatabaseLockedError(json.error) && attempt < maxAttempts) {
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(120 * attempt);
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+    throw new Error(`${label} (${response.status}): ${JSON.stringify(json)}`);
+  }
+  throw new Error(`${label}: exhausted retries`);
+}
+
 function seedData(dbPath) {
   const now = new Date().toISOString();
+  const older = new Date(Date.now() - 60_000).toISOString();
   runSql(
     dbPath,
     `
@@ -164,6 +192,43 @@ function seedData(dbPath) {
       status = 'failed',
       last_job_id = 'job_frontend_proxy_retry_failed_smoke',
       updated_at = ${quote(now)};
+
+    INSERT INTO analysis_runs (
+      analysis_run_id, job_id, status, attempt_count, started_at, completed_at,
+      last_error_code, last_error_message, model_family, model_version
+    ) VALUES (
+      'run_frontend_proxy_retry_failed_smoke',
+      'job_frontend_proxy_retry_failed_smoke',
+      'failed',
+      1,
+      ${quote(older)},
+      ${quote(now)},
+      'MODEL_TIMEOUT',
+      'timeout for smoke seed',
+      'standard',
+      '6'
+    )
+    ON CONFLICT(analysis_run_id) DO UPDATE SET
+      status = 'failed',
+      completed_at = ${quote(now)},
+      last_error_code = 'MODEL_TIMEOUT',
+      last_error_message = 'timeout for smoke seed';
+
+    INSERT INTO prompts (
+      prompt_id, prompt_text, status, version, curated_flag, created_by, created_at
+    ) VALUES (
+      'prm_frontend_proxy_curation_smoke',
+      'frontend proxy prompt curation smoke text',
+      'deprecated',
+      'v1',
+      0,
+      'admin-frontend-proxy-smoke-user',
+      ${quote(now)}
+    )
+    ON CONFLICT(prompt_id) DO UPDATE SET
+      prompt_text = 'frontend proxy prompt curation smoke text',
+      status = 'deprecated',
+      version = 'v1';
     `
   );
 }
@@ -311,7 +376,7 @@ async function main() {
     );
     assertCondition(foreignReadResponse.status === 403, "Expected foreign-owner submission read to return 403");
 
-    const retryResponse = await fetch(
+    const retryRequest = await postJsonWithDbRetry(
       `http://127.0.0.1:${frontendPort}/api/proxy/contributor/submissions/csub_frontend_proxy_retry_smoke/retry`,
       {
         method: "POST",
@@ -322,13 +387,193 @@ async function main() {
         body: JSON.stringify({
           promptText: "frontend proxy contributor retry --v 6",
         }),
+      },
+      "Frontend proxy contributor retry failed"
+    );
+    const retryJson = retryRequest.json;
+    assertCondition(["queued", "pending_approval"].includes(retryJson.submission.status), "Expected retry queued or pending_approval");
+
+    const adminUsersResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/users?role=consumer&status=active&q=frontend-proxy-smoke&limit=20`,
+      {
+        headers: { "x-auth-token": adminToken },
       }
     );
-    const retryJson = await retryResponse.json();
-    if (!retryResponse.ok) {
-      throw new Error(`Frontend proxy contributor retry failed (${retryResponse.status}): ${JSON.stringify(retryJson)}`);
+    const adminUsersJson = await adminUsersResponse.json();
+    if (!adminUsersResponse.ok) {
+      throw new Error(`Frontend proxy admin users list failed (${adminUsersResponse.status}): ${JSON.stringify(adminUsersJson)}`);
     }
-    assertCondition(["queued", "pending_approval"].includes(retryJson.submission.status), "Expected retry queued or pending_approval");
+    assertCondition(Array.isArray(adminUsersJson.users), "Expected admin users list array");
+    assertCondition(
+      adminUsersJson.users.some((item) => item.userId === "consumer-frontend-proxy-smoke-user"),
+      "Expected admin users list to include seeded consumer user"
+    );
+
+    const forbiddenAdminUsersResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/users?limit=20`,
+      {
+        headers: { "x-auth-token": contributorToken },
+      }
+    );
+    assertCondition(forbiddenAdminUsersResponse.status === 403, "Expected contributor admin users list to return 403");
+
+    const roleUpdateResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/users/consumer-frontend-proxy-smoke-user/role`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          role: "contributor",
+          status: "active",
+          reason: "frontend proxy role smoke update",
+        }),
+      }
+    );
+    const roleUpdateJson = await roleUpdateResponse.json();
+    if (!roleUpdateResponse.ok) {
+      throw new Error(`Frontend proxy role update failed (${roleUpdateResponse.status}): ${JSON.stringify(roleUpdateJson)}`);
+    }
+    assertCondition(roleUpdateJson.user.role === "contributor", "Expected updated user role=contributor");
+    assertCondition(roleUpdateJson.user.status === "active", "Expected updated user status=active");
+
+    const moderationForbiddenResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/analysis-jobs/job_frontend_proxy_retry_failed_smoke/moderation`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": contributorToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "flag",
+          reason: "forbidden moderation check",
+        }),
+      }
+    );
+    assertCondition(moderationForbiddenResponse.status === 403, "Expected contributor moderation update to return 403");
+
+    const moderationResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/analysis-jobs/job_frontend_proxy_retry_failed_smoke/moderation`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "flag",
+          reason: "frontend proxy moderation smoke",
+        }),
+      }
+    );
+    const moderationJson = await moderationResponse.json();
+    if (!moderationResponse.ok) {
+      throw new Error(`Frontend proxy moderation update failed (${moderationResponse.status}): ${JSON.stringify(moderationJson)}`);
+    }
+    assertCondition(moderationJson.job.moderationStatus === "flagged", "Expected moderation status=flagged");
+
+    const moderationViewResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/analysis-jobs/job_frontend_proxy_retry_failed_smoke/moderation`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const moderationViewJson = await moderationViewResponse.json();
+    if (!moderationViewResponse.ok) {
+      throw new Error(`Frontend proxy moderation GET failed (${moderationViewResponse.status}): ${JSON.stringify(moderationViewJson)}`);
+    }
+    assertCondition(Array.isArray(moderationViewJson.actions), "Expected moderation actions array");
+
+    const curationForbiddenResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/prompts/prm_frontend_proxy_curation_smoke/curation`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": contributorToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "experimental",
+          reason: "forbidden curation check",
+        }),
+      }
+    );
+    assertCondition(curationForbiddenResponse.status === 403, "Expected contributor prompt curation update to return 403");
+
+    const curationResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/prompts/prm_frontend_proxy_curation_smoke/curation`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "experimental",
+          reason: "frontend proxy prompt curation smoke",
+        }),
+      }
+    );
+    const curationJson = await curationResponse.json();
+    if (!curationResponse.ok) {
+      throw new Error(`Frontend proxy prompt curation update failed (${curationResponse.status}): ${JSON.stringify(curationJson)}`);
+    }
+    assertCondition(curationJson.prompt.status === "experimental", "Expected prompt status=experimental");
+
+    const governanceForbiddenResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-influences/si_frontend_proxy_retry_smoke/governance`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": contributorToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "pin",
+          reason: "forbidden governance check",
+        }),
+      }
+    );
+    assertCondition(governanceForbiddenResponse.status === 403, "Expected contributor governance update to return 403");
+
+    const governanceResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-influences/si_frontend_proxy_retry_smoke/governance`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "pin",
+          reason: "frontend proxy governance smoke",
+        }),
+      }
+    );
+    const governanceJson = await governanceResponse.json();
+    if (!governanceResponse.ok) {
+      throw new Error(`Frontend proxy governance update failed (${governanceResponse.status}): ${JSON.stringify(governanceJson)}`);
+    }
+    assertCondition(governanceJson.styleInfluence.pinned === true, "Expected governance action to pin style influence");
+
+    const governanceAuditResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-influences/si_frontend_proxy_retry_smoke/audit`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const governanceAuditJson = await governanceAuditResponse.json();
+    if (!governanceAuditResponse.ok) {
+      throw new Error(`Frontend proxy governance audit failed (${governanceAuditResponse.status}): ${JSON.stringify(governanceAuditJson)}`);
+    }
+    assertCondition(Array.isArray(governanceAuditJson.actions), "Expected governance actions array");
 
     console.log(
       JSON.stringify(
@@ -339,8 +584,28 @@ async function main() {
           listedCount: listJson.submissions.length,
           triggerStatus: triggerJson.submission.status,
           retryStatus: retryJson.submission.status,
+          roleManagement: {
+            listCount: adminUsersJson.users.length,
+            updatedRole: roleUpdateJson.user.role,
+            updatedStatus: roleUpdateJson.user.status,
+          },
+          moderation: {
+            status: moderationJson.job.moderationStatus,
+            auditCount: moderationViewJson.actions.length,
+          },
+          promptCuration: {
+            status: curationJson.prompt.status,
+          },
+          governance: {
+            pinned: governanceJson.styleInfluence.pinned,
+            auditCount: governanceAuditJson.actions.length,
+          },
           forbiddenChecks: {
             contributorAdminPolicyStatus: forbiddenAdminPolicyResponse.status,
+            contributorAdminUsersStatus: forbiddenAdminUsersResponse.status,
+            contributorModerationStatus: moderationForbiddenResponse.status,
+            contributorPromptCurationStatus: curationForbiddenResponse.status,
+            contributorGovernanceStatus: governanceForbiddenResponse.status,
             consumerContributorCreateStatus: forbiddenConsumerCreateResponse.status,
             foreignOwnerReadStatus: foreignReadResponse.status,
           },
