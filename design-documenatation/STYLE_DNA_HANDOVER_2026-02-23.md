@@ -59,6 +59,18 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 11. Launch/readiness gate status is now explicitly confirmed in source docs:
 - `launch:readiness-smoke` full scope includes all Style-DNA smoke commands (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`)
 - stale "launch/readiness hook pending" notes were removed from Style-DNA plan/task docs
+12. Style-DNA run-submit guardrails were hardened in `/admin/style-dna`:
+- run submit now surfaces multi-reason blocked state (not single reason)
+- blocks stylize-tier mismatch vs loaded baseline envelope
+- blocks missing baseline prompt+tier coverage before submit
+- enforces explicit sref control-baseline requirement (`styleWeight=0`) in client-side guardrails
+- flags section-1 drift vs loaded baseline envelope before submit
+13. Frontend proxy smoke now includes Style-DNA critical flow and guardrail assertions:
+- baseline/test image upload via `/api/proxy/admin/style-dna/images`
+- baseline set create + baseline item attach via proxy
+- prompt generation via `/api/proxy/admin/style-dna/prompt-jobs`
+- run submit + run lookup via `/api/proxy/admin/style-dna/runs`
+- negative assertions for non-control sref baseline and stylize-tier mismatch (`409 INVALID_STATE`)
 
 ## Key Files Updated This Slice
 
@@ -76,6 +88,9 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 12. `design-documenatation/IMPLEMENTATION_PLAN.md`
 13. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
 14. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+15. `scripts/admin/frontend-proxy-smoke.js`
+16. `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-23.md`
+17. `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`
 
 ## Verification Notes
 
@@ -86,6 +101,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - `npm run style-dna:run-smoke` (includes negative assertion that sref run submission rejects non-control baseline `styleWeight != 0`)
 - `FRONTEND_VARIANT=next ENV_FILE=.env.local scripts/dev-stack.sh restart` + local endpoint verification (`/v1/health`, `/api/auth/session`, `/api/proxy/admin/style-dna/baseline-sets`, `/admin/style-dna`) with successful Next compile/log output and no `layout.js` token error
 - `npm run typecheck --workspace=@prostyle/frontend` after guardrail/status messaging updates
+ - `npm run admin:frontend-proxy-smoke` after Style-DNA proxy critical-flow + guardrail assertions
 2. Local runtime verification of Next chunk behavior may still require manual local restart + hard refresh because this execution environment cannot reliably bind/check local ports.
 
 ## Open Issues / Risks
@@ -121,3 +137,4 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 5. Use `npm run db:reset:safe` when reset is required so a local checkpoint is created first.
 6. `npm run db:reset` now also checkpoints automatically; explicit opt-out is `DB_RESET_SKIP_CHECKPOINT=1`.
 7. Launch/readiness integration for full Style-DNA smoke coverage is complete; remaining work is frontend parity/polish.
+8. Frontend proxy smoke now explicitly protects Style-DNA proxy critical flow + guardrail regressions in addition to admin operations proxy coverage.
