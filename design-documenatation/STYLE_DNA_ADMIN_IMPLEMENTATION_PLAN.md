@@ -64,6 +64,8 @@ Implemented in code:
  - set-producing smokes now self-clean smoke-created baseline/prompt/run/image records on success to avoid local data pollution
  - frontend proxy smoke assertions now explicitly enforce Style-DNA negative-path API error contracts (`FORBIDDEN`, `INVALID_STATE`) and reason-text expectations
  - run smoke now explicitly verifies run-submission idempotency deduplication (`POST /admin/style-dna/runs` returns deduplicated existing run on repeated idempotency key)
+ - run smoke now explicitly verifies admin RBAC for run endpoints (`submit`, `list`, `get`) with contributor-token `403 FORBIDDEN` assertions
+ - run smoke now explicitly verifies lifecycle evidence from pre-worker `queued` status to terminal `succeeded` result
 6. Prompt generation now includes model version argument when available:
 - baseline copy prompts include `--v <mjModelVersion>`
 - generated prompt jobs include `--v <mjModelVersion>`

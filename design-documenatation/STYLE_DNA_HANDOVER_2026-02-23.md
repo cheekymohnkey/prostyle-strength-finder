@@ -81,6 +81,9 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - added workflow-readiness summary panel to `/admin/style-dna` for baseline coverage, prompt generation, and run-submit readiness
 - rendered blocked prerequisite lists in clearer warning panels for save/attach/generate/submit/lookup
 - clarified helper copy for baseline definition and comparison flow sections
+17. Style-DNA run smoke hardening now covers run-endpoint RBAC and lifecycle evidence:
+- contributor token checks now assert `403 FORBIDDEN` on run submit/list/get endpoints
+- run lifecycle assertions now verify pre-worker `queued` state and terminal `succeeded` + result after worker execution
 
 ## Key Files Updated This Slice
 
@@ -114,6 +117,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
  - `npm run admin:frontend-proxy-smoke` after Style-DNA proxy critical-flow + guardrail assertions
  - `npm run admin:frontend-proxy-smoke` after tightening Style-DNA negative-path code/reason assertions (`403 FORBIDDEN`, `409 INVALID_STATE`)
  - `npm run admin:frontend-proxy-smoke` after `/admin/style-dna` readability/polish pass
+ - `npm run style-dna:run-smoke` after adding run RBAC (`403`) and lifecycle progression assertions
 2. Local runtime verification of Next chunk behavior may still require manual local restart + hard refresh because this execution environment cannot reliably bind/check local ports.
 
 ## Open Issues / Risks

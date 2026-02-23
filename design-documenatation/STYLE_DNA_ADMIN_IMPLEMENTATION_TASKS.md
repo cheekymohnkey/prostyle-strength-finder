@@ -70,13 +70,15 @@ Out of scope:
 - `/admin/style-dna` supports baseline setup, image intake, prompt copy/generation, submit, and result lookup.
 - loaded baseline sets can be used as editable drafts and saved as new baseline sets.
 - run-submit guardrails now block and explain: stylize-tier mismatch, missing prompt+tier baseline coverage, sref control baseline requirements (`styleWeight=0`), and section-1 envelope drift vs loaded set.
-- open: additional non-blocking UX status messaging refinement.
+- remaining: minor visual/layout tuning only.
 5. SD5: Mostly implemented.
 - style-dna smoke scripts exist and have passed in prior session verification.
 - prompt generation verification includes model version flag emission (`--v`).
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
 - launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.
 - style-dna run smoke now explicitly verifies idempotent run-submit behavior (same idempotency key returns deduplicated existing run id).
+- style-dna run smoke now explicitly verifies admin RBAC on run submit/list/get (`403 FORBIDDEN` for contributor token).
+- style-dna run smoke now captures lifecycle progression evidence (pre-worker `queued`, terminal `succeeded` with result).
 
 ## SD1. Persistence + Shared Contracts
 

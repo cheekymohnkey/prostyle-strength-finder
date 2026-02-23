@@ -25,6 +25,29 @@ function assertCondition(condition, message) {
   }
 }
 
+function extractApiErrorCode(payload) {
+  const top = payload || {};
+  const error = typeof top.error === "object" && top.error ? top.error : {};
+  const rawCode = error.code || top.code;
+  return typeof rawCode === "string" ? rawCode : "";
+}
+
+function extractApiErrorText(payload) {
+  const top = payload || {};
+  const error = typeof top.error === "object" && top.error ? top.error : {};
+  const details = typeof error.details === "object" && error.details ? error.details : {};
+  const topDetails = typeof top.details === "object" && top.details ? top.details : {};
+  return [
+    error.message,
+    details.reason,
+    top.message,
+    topDetails.reason,
+  ]
+    .filter((value) => typeof value === "string" && value.trim() !== "")
+    .join(" | ")
+    .toLowerCase();
+}
+
 function base64UrlJson(value) {
   return Buffer.from(JSON.stringify(value)).toString("base64url");
 }
@@ -81,6 +104,10 @@ function seedData(dbPath) {
     INSERT INTO users (user_id, role, status, created_at, updated_at)
     VALUES ('admin-style-dna-run-smoke-user', 'admin', 'active', ${quote(now)}, ${quote(now)})
     ON CONFLICT(user_id) DO UPDATE SET role = 'admin', status = 'active', updated_at = ${quote(now)};
+
+    INSERT INTO users (user_id, role, status, created_at, updated_at)
+    VALUES ('contributor-style-dna-run-smoke-user', 'contributor', 'active', ${quote(now)}, ${quote(now)})
+    ON CONFLICT(user_id) DO UPDATE SET role = 'contributor', status = 'active', updated_at = ${quote(now)};
 
     INSERT INTO style_influence_types (
       style_influence_type_id, type_key, label, parameter_prefix, related_parameter_name, description, enabled_flag
@@ -226,6 +253,7 @@ async function main() {
   seedData(dbPath);
 
   const adminToken = buildToken("admin-style-dna-run-smoke-user");
+  const contributorToken = buildToken("contributor-style-dna-run-smoke-user");
   const smokePort = process.env.SMOKE_API_PORT || "3024";
   const baseUrl = `http://127.0.0.1:${smokePort}/v1`;
   const suiteId = `suite_style_dna_run_smoke_${Date.now()}`;
@@ -241,6 +269,22 @@ async function main() {
 
   try {
     await waitForHealth(baseUrl, adminToken);
+
+    const forbiddenRunList = await requestJson(
+      `${baseUrl}/admin/style-dna/runs?limit=5`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${contributorToken}`,
+        },
+      },
+      403
+    );
+    assertCondition(extractApiErrorCode(forbiddenRunList) === "FORBIDDEN", "Expected FORBIDDEN code for contributor run list");
+    assertCondition(
+      extractApiErrorText(forbiddenRunList).includes("admin role is required"),
+      "Expected contributor run list rejection to mention admin role"
+    );
 
     const baselineImageUpload = await requestJson(
       `${baseUrl}/admin/style-dna/images`,
@@ -393,6 +437,33 @@ async function main() {
     assertCondition(typeof testGridImageId === "string" && testGridImageId !== "", "Missing test image id");
     createdImageIds.push(testGridImageId);
 
+    const forbiddenRunSubmit = await requestJson(
+      `${baseUrl}/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${contributorToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: `style-dna-run-smoke:contributor-forbidden:${Date.now()}`,
+          styleInfluenceId: "si_style_dna_smoke",
+          baselineRenderSetId,
+          styleAdjustmentType,
+          styleAdjustmentMidjourneyId,
+          promptKey,
+          stylizeTier,
+          testGridImageId,
+        }),
+      },
+      403
+    );
+    assertCondition(extractApiErrorCode(forbiddenRunSubmit) === "FORBIDDEN", "Expected FORBIDDEN code for contributor run submit");
+    assertCondition(
+      extractApiErrorText(forbiddenRunSubmit).includes("admin role is required"),
+      "Expected contributor run submit rejection to mention admin role"
+    );
+
     const missingControlResponse = await fetch(
       `${baseUrl}/admin/style-dna/runs`,
       {
@@ -455,6 +526,22 @@ async function main() {
     assertCondition(typeof styleDnaRunId === "string" && styleDnaRunId !== "", "Missing style-dna run id");
     assertCondition(runSubmit?.run?.status === "queued", `Expected queued run status, got ${runSubmit?.run?.status}`);
 
+    const forbiddenRunGet = await requestJson(
+      `${baseUrl}/admin/style-dna/runs/${styleDnaRunId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${contributorToken}`,
+        },
+      },
+      403
+    );
+    assertCondition(extractApiErrorCode(forbiddenRunGet) === "FORBIDDEN", "Expected FORBIDDEN code for contributor run get");
+    assertCondition(
+      extractApiErrorText(forbiddenRunGet).includes("admin role is required"),
+      "Expected contributor run get rejection to mention admin role"
+    );
+
     const deduplicatedRunSubmit = await requestJson(
       `${baseUrl}/admin/style-dna/runs`,
       {
@@ -482,6 +569,19 @@ async function main() {
       `Expected deduplicated run id to match original run id, got ${deduplicatedRunSubmit?.run?.styleDnaRunId}`
     );
 
+    const preWorkerRunDetail = await requestJson(
+      `${baseUrl}/admin/style-dna/runs/${styleDnaRunId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      200
+    );
+    assertCondition(preWorkerRunDetail?.run?.status === "queued", `Expected pre-worker queued status, got ${preWorkerRunDetail?.run?.status}`);
+    assertCondition(!preWorkerRunDetail?.result, "Expected no run result before worker execution");
+
     const worker = spawnProcess("node", ["apps/worker/src/index.js"], {
       ...process.env,
       TRAIT_INFERENCE_MODE: "deterministic",
@@ -498,6 +598,7 @@ async function main() {
     }
 
     let runDetail = null;
+    let sawInProgress = false;
     for (let attempt = 0; attempt < 40; attempt += 1) {
       runDetail = await requestJson(
         `${baseUrl}/admin/style-dna/runs/${styleDnaRunId}`,
@@ -509,6 +610,9 @@ async function main() {
         },
         200
       );
+      if (runDetail?.run?.status === "in_progress") {
+        sawInProgress = true;
+      }
       if (runDetail?.run?.status === "succeeded" && runDetail?.result) {
         break;
       }
@@ -516,6 +620,10 @@ async function main() {
     }
 
     assertCondition(runDetail?.run?.status === "succeeded", `Expected succeeded run status, got ${runDetail?.run?.status}`);
+    assertCondition(
+      sawInProgress || preWorkerRunDetail?.run?.status === "queued",
+      "Expected observable lifecycle progression from queued to terminal state"
+    );
     assertCondition(Boolean(runDetail?.run?.analysisRunId), "Expected analysisRunId on succeeded run");
     assertCondition(Boolean(runDetail?.result?.styleDnaRunResultId), "Expected run result row");
     assertCondition(runDetail?.result?.taxonomyVersion === "style_dna_v1", `Unexpected taxonomyVersion: ${runDetail?.result?.taxonomyVersion}`);
