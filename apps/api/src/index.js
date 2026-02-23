@@ -17,6 +17,7 @@ const {
   getLatestAnalysisRunByJobId,
   getImageTraitAnalysisByJobId,
   getStyleInfluenceById,
+  listStyleInfluences,
   getStyleInfluenceTypeByKey,
   getStyleInfluenceTypeById,
   ensureStyleInfluenceTypeByKey,
@@ -778,6 +779,25 @@ function mapStyleDnaRunResultRow(row) {
   };
 }
 
+function mapStyleInfluenceCatalogRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    styleInfluenceId: row.style_influence_id,
+    styleInfluenceTypeId: row.style_influence_type_id,
+    typeKey: row.type_key || null,
+    typeLabel: row.label || null,
+    parameterPrefix: row.parameter_prefix || null,
+    relatedParameterName: row.related_parameter_name || null,
+    influenceCode: row.influence_code,
+    status: row.status,
+    pinned: Boolean(row.pinned_flag),
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
 function encodeUsersListCursor(row) {
   const raw = JSON.stringify({
     updatedAt: row.updated_at,
@@ -992,6 +1012,25 @@ function validateStyleDnaImageUploadPayload(value) {
     fileName: value.fileName.trim(),
     mimeType: value.mimeType.trim(),
     fileBase64: value.fileBase64.trim(),
+  };
+}
+
+function validateAdminStyleInfluenceCreatePayload(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Style influence create payload must be an object");
+  }
+  const influenceType = typeof value.influenceType === "string"
+    ? value.influenceType.trim()
+    : "";
+  if (!["profile", "sref"].includes(influenceType)) {
+    throw new Error("influenceType must be one of: profile, sref");
+  }
+  if (typeof value.influenceCode !== "string" || value.influenceCode.trim() === "") {
+    throw new Error("influenceCode is required");
+  }
+  return {
+    influenceType,
+    influenceCode: value.influenceCode.trim(),
   };
 }
 
@@ -3123,6 +3162,111 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       ctx
     );
     return;
+  }
+
+  if (method === "GET" && path === "/v1/admin/style-influences") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 200;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid style influences list limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..500",
+      });
+      return;
+    }
+
+    const rows = listStyleInfluences(dbPath, {
+      status: url.searchParams.get("status") || undefined,
+      typeKey: url.searchParams.get("typeKey") || undefined,
+      limit,
+    });
+    sendJson(
+      res,
+      200,
+      {
+        styleInfluences: rows.map(mapStyleInfluenceCatalogRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-influences") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateAdminStyleInfluenceCreatePayload(body);
+      const styleInfluenceType = ensureDefaultContributorStyleInfluenceType(dbPath, payload.influenceType);
+      if (!styleInfluenceType || Number(styleInfluenceType.enabled_flag || 0) !== 1) {
+        sendError(res, 409, "INVALID_STATE", "Style influence type is not enabled", ctx, {
+          influenceType: payload.influenceType,
+        });
+        return;
+      }
+
+      const styleInfluenceId = `si_${crypto.randomUUID()}`;
+      insertStyleInfluence(dbPath, {
+        styleInfluenceId,
+        styleInfluenceTypeId: styleInfluenceType.style_influence_type_id,
+        influenceCode: payload.influenceCode,
+        status: "active",
+        pinnedFlag: false,
+        createdBy: authenticatedUserId,
+      });
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_influence.create",
+        targetType: "style_influence",
+        targetId: styleInfluenceId,
+        reason: payload.influenceType,
+      });
+      const created = getStyleInfluenceById(dbPath, styleInfluenceId);
+      const createdType = created
+        ? getStyleInfluenceTypeById(dbPath, created.style_influence_type_id)
+        : null;
+      sendJson(
+        res,
+        201,
+        {
+          styleInfluence: mapStyleInfluenceCatalogRow({
+            ...created,
+            type_key: createdType?.type_key || null,
+            label: createdType?.label || null,
+            parameter_prefix: createdType?.parameter_prefix || null,
+            related_parameter_name: createdType?.related_parameter_name || null,
+          }),
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      const duplicateInfluenceCode = String(error.message || "").includes("UNIQUE constraint failed: style_influences.influence_code");
+      sendError(
+        res,
+        duplicateInfluenceCode ? 409 : 400,
+        duplicateInfluenceCode ? "DUPLICATE_INFLUENCE_CODE" : "INVALID_REQUEST",
+        duplicateInfluenceCode
+          ? "Style influence code already exists"
+          : "Style influence create failed validation",
+        ctx,
+        {
+          reason: error.message,
+        }
+      );
+      return;
+    }
   }
 
   if (method === "POST"

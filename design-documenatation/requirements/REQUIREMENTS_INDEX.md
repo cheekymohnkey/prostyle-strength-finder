@@ -16,6 +16,7 @@ Define a stable requirements hierarchy and separate it from implementation plann
 - `design-documenatation/requirements/functional/FR-RECOMMENDATION_AND_FEEDBACK.md`
 - `design-documenatation/requirements/functional/FR-ADMIN_AND_CONTRIBUTOR_OPERATIONS.md`
 - `design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md`
+- `design-documenatation/requirements/functional/FR-STYLE_DNA_SECTION3_COMPARISON_FIX.md`
 
 3. Detailed non-functional requirements:
 - `design-documenatation/requirements/non-functional/NFR-SECURITY_AND_ACCESS.md`

@@ -357,6 +357,29 @@ function getStyleInfluenceById(dbPath, styleInfluenceId) {
   return rows[0] || null;
 }
 
+function listStyleInfluences(dbPath, input = {}) {
+  const where = [];
+  if (input.status) {
+    where.push(`si.status = ${quote(input.status)}`);
+  }
+  if (input.typeKey) {
+    where.push(`sit.type_key = ${quote(input.typeKey)}`);
+  }
+  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+  return queryJson(
+    dbPath,
+    `SELECT si.style_influence_id, si.style_influence_type_id, si.influence_code, si.status,
+            si.pinned_flag, si.created_by, si.created_at,
+            sit.type_key, sit.label, sit.parameter_prefix, sit.related_parameter_name
+     FROM style_influences si
+     JOIN style_influence_types sit
+       ON sit.style_influence_type_id = si.style_influence_type_id
+     ${whereClause}
+     ORDER BY si.created_at DESC
+     LIMIT ${Number(input.limit || 200)};`
+  );
+}
+
 function getStyleInfluenceTypeByKey(dbPath, typeKey) {
   const rows = queryJson(
     dbPath,
@@ -1475,6 +1498,7 @@ module.exports = {
   insertImageTraitAnalysis,
   getImageTraitAnalysisByJobId,
   getStyleInfluenceById,
+  listStyleInfluences,
   getStyleInfluenceTypeByKey,
   getStyleInfluenceTypeById,
   insertStyleInfluenceType,

@@ -24,6 +24,17 @@ Compared current requirements/planning docs against implemented code paths in AP
 - Current implementation: run submit checks `styleWeight=0` for `sref` and baseline prompt+tier coverage, but does not compare a submitted test envelope object because it is not part of run payload (`apps/api/src/index.js`).
 - Impact: server cannot independently prove full envelope parity at submit-time; this remains process/UI-driven.
 
+4. `DISC-004` Section 3 matrix includes `--sw` variants in generated prompts, but backend run contract does not model per-run `styleWeight`.
+- Requirement source: Section 3 matrix requirements include explicit `sref` cells with differing `--sw` values.
+- Current implementation: UI generates matrix prompt text including `--sw`; run submit payload has no `styleWeight` field and server does not validate test-side `--sw` as submitted metadata (`apps/api/src/index.js`, `apps/frontend/app/admin/style-dna/page.tsx`).
+- Impact: matrix-cell provenance for `--sw` depends on operator discipline and UI state rather than server-enforced run parameters.
+
+## Recently Resolved
+
+1. `DISC-005` Section 3 direct admin create-new Style Influence flow from Midjourney ID input.
+- Resolution: Admin list/create style influence API endpoints were added and wired into Section 3 with `Create New` + auto-select behavior.
+- Files: `apps/api/src/index.js`, `scripts/db/repository.js`, `apps/frontend/app/admin/style-dna/page.tsx`.
+
 ## Documentation Drift Fixed in This Change
 
 1. Old root-level implementation-plan/task document paths were moved to `design-documenatation/implementation/` and references updated.

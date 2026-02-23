@@ -18,18 +18,15 @@ type SessionStateResponse =
       };
     };
 
-type ContributorSubmission = {
-  submissionId: string;
-  styleInfluence?: {
-    styleInfluenceId: string;
-    influenceType: "profile" | "sref" | null;
-    influenceCode: string;
-    status: string;
-  };
+type StyleInfluenceCatalogItem = {
+  styleInfluenceId?: string;
+  typeKey?: "profile" | "sref" | string | null;
+  influenceCode?: string;
+  status?: string;
 };
 
-type ContributorListResponse = {
-  submissions: ContributorSubmission[];
+type StyleInfluenceListResponse = {
+  styleInfluences?: StyleInfluenceCatalogItem[];
 };
 
 type EndpointProbe = {
@@ -43,6 +40,7 @@ type PromptJobResponse = {
   };
   promptJobId?: string;
   prompts?: Array<{
+    cellId?: string;
     promptKey?: string;
     stylizeTier?: number;
     promptTextGenerated?: string;
@@ -73,6 +71,24 @@ type StyleDnaRunLookupResponse = {
       };
     };
   };
+};
+
+type Section3PromptProgress = {
+  copied?: boolean;
+  generatedPromptText?: string;
+  testGridImageId?: string;
+  runId?: string;
+  runStatus?: string;
+  result?: StyleDnaRunLookupResponse["result"];
+};
+
+type Section3TestFamily = "profile_triplet" | "sref_matrix";
+
+type Section3TestCell = {
+  cellId: string;
+  label: string;
+  stylizeTier: number;
+  styleWeight?: number;
 };
 
 type StyleDnaImageUploadResponse = {
@@ -223,12 +239,12 @@ async function fetchSessionState(): Promise<SessionStateResponse> {
   return parseApiResponse<SessionStateResponse>(response);
 }
 
-async function fetchContributorSubmissions(): Promise<ContributorListResponse> {
-  const response = await fetch("/api/proxy/contributor/submissions", {
+async function fetchStyleInfluences(): Promise<StyleInfluenceListResponse> {
+  const response = await fetch("/api/proxy/admin/style-influences?status=active&limit=500", {
     method: "GET",
     cache: "no-store",
   });
-  return parseApiResponse<ContributorListResponse>(response);
+  return parseApiResponse<StyleInfluenceListResponse>(response);
 }
 
 async function probeStyleDnaApi(): Promise<EndpointProbe> {
@@ -313,6 +329,10 @@ function styleDnaImageContentPath(styleDnaImageId: string): string {
   return `/api/proxy/admin/style-dna/images/${encodeURIComponent(styleDnaImageId)}/content`;
 }
 
+function section3ProgressKey(promptKey: string, cellId: string): string {
+  return `${promptKey}::${cellId}`;
+}
+
 export default function StyleDnaAdminPage() {
   const [mjModelFamily, setMjModelFamily] = useState("standard");
   const [mjModelVersion, setMjModelVersion] = useState("7");
@@ -328,6 +348,8 @@ export default function StyleDnaAdminPage() {
 
   const [styleAdjustmentType, setStyleAdjustmentType] = useState<"sref" | "profile">("sref");
   const [styleAdjustmentMidjourneyId, setStyleAdjustmentMidjourneyId] = useState("");
+  const [section3TestFamily, setSection3TestFamily] = useState<Section3TestFamily>("sref_matrix");
+  const [selectedSection3CellId, setSelectedSection3CellId] = useState("sref_s0_sw0");
 
   const [baselineGridImageId, setBaselineGridImageId] = useState("");
   const [testGridImageId, setTestGridImageId] = useState("");
@@ -346,6 +368,7 @@ export default function StyleDnaAdminPage() {
   const [uploadedTestPreviewUrl, setUploadedTestPreviewUrl] = useState("");
   const [baselineFilePreviewUrl, setBaselineFilePreviewUrl] = useState("");
   const [testFilePreviewUrl, setTestFilePreviewUrl] = useState("");
+  const [section3PromptProgress, setSection3PromptProgress] = useState<Record<string, Section3PromptProgress>>({});
   const queryClient = useQueryClient();
 
   const sessionStateQuery = useQuery({
@@ -354,9 +377,9 @@ export default function StyleDnaAdminPage() {
     refetchInterval: 30_000,
   });
 
-  const contributorListQuery = useQuery({
-    queryKey: ["contributor", "submissions"],
-    queryFn: fetchContributorSubmissions,
+  const styleInfluenceListQuery = useQuery({
+    queryKey: ["admin", "style-influences"],
+    queryFn: fetchStyleInfluences,
   });
 
   const styleDnaProbeQuery = useQuery({
@@ -454,6 +477,54 @@ export default function StyleDnaAdminPage() {
     return linesByKey;
   }, [baselinePromptLines, missingPromptRows]);
 
+  const section3TestCells = useMemo<Section3TestCell[]>(() => {
+    if (section3TestFamily === "profile_triplet") {
+      return [
+        { cellId: "profile_s0", label: "--s 0", stylizeTier: 0 },
+        { cellId: "profile_s100", label: "--s 100", stylizeTier: 100 },
+        { cellId: "profile_s1000", label: "--s 1000", stylizeTier: 1000 },
+      ];
+    }
+    return [
+      { cellId: "sref_s0_sw0", label: "--s 0 --sw 0", stylizeTier: 0, styleWeight: 0 },
+      { cellId: "sref_s0_sw1000", label: "--s 0 --sw 1000", stylizeTier: 0, styleWeight: 1000 },
+      { cellId: "sref_s1000_sw1000", label: "--s 1000 --sw 1000", stylizeTier: 1000, styleWeight: 1000 },
+      { cellId: "sref_s100_sw250", label: "--s 100 --sw 250", stylizeTier: 100, styleWeight: 250 },
+    ];
+  }, [section3TestFamily]);
+
+  function buildSection3PromptLine(input: { promptText: string; stylize: number; styleWeight?: number }): string {
+    const parts: string[] = [input.promptText];
+    const ratio = String(baselineEnvelope?.aspectRatio || "").trim();
+    const seedValue = String(baselineEnvelope?.seed || "").trim();
+    const qualityValue = String(baselineEnvelope?.quality || "").trim();
+    if (ratio !== "") {
+      parts.push(`--ar ${ratio}`);
+    }
+    if (seedValue !== "") {
+      parts.push(`--seed ${seedValue}`);
+    }
+    if (baselineEnvelope?.styleRaw !== false) {
+      parts.push("--raw");
+    }
+    if (styleAdjustmentType === "profile") {
+      parts.push(`--profile ${styleAdjustmentMidjourneyId.trim()}`);
+    } else {
+      parts.push(`--sref ${styleAdjustmentMidjourneyId.trim()}`);
+      if (Number.isFinite(Number(input.styleWeight))) {
+        parts.push(`--sw ${Number(input.styleWeight)}`);
+      }
+    }
+    parts.push(`--stylize ${Number(input.stylize)}`);
+    if (baselineModelVersion !== "") {
+      parts.push(`--v ${baselineModelVersion}`);
+    }
+    if (qualityValue !== "") {
+      parts.push(`--q ${qualityValue}`);
+    }
+    return parts.join(" ");
+  }
+
   useEffect(() => {
     const loaded = baselineSetDetailQuery.data?.baselineRenderSet;
     if (!loaded) {
@@ -515,6 +586,41 @@ export default function StyleDnaAdminPage() {
   }, [missingPromptKeySignature, missingPromptRows]);
 
   useEffect(() => {
+    setSection3PromptProgress((previous) => {
+      const keys = new Set(
+        baselinePromptDefinitions.flatMap((row) => (
+          section3TestCells.map((cell) => section3ProgressKey(row.promptKey, cell.cellId))
+        ))
+      );
+      const next: Record<string, Section3PromptProgress> = {};
+      for (const [key, value] of Object.entries(previous)) {
+        if (keys.has(key)) {
+          next[key] = value;
+        }
+      }
+      const previousKeys = Object.keys(previous);
+      const nextKeys = Object.keys(next);
+      if (
+        previousKeys.length === nextKeys.length
+        && previousKeys.every((key) => next[key] === previous[key])
+      ) {
+        return previous;
+      }
+      return next;
+    });
+  }, [baselinePromptDefinitions, section3TestCells]);
+
+  useEffect(() => {
+    if (section3TestCells.length === 0) {
+      return;
+    }
+    const exists = section3TestCells.some((cell) => cell.cellId === selectedSection3CellId);
+    if (!exists) {
+      setSelectedSection3CellId(section3TestCells[0].cellId);
+    }
+  }, [section3TestCells, selectedSection3CellId]);
+
+  useEffect(() => {
     if (!baselineFile) {
       setBaselineFilePreviewUrl("");
       return;
@@ -564,6 +670,24 @@ export default function StyleDnaAdminPage() {
       [promptKeyToCopy]: true,
     }));
     setCopyStatus(`Copied prompt ${promptKeyToCopy}.`);
+  }
+
+  async function copySection3Prompt(promptKeyToCopy: string, cellIdToCopy: string) {
+    const key = section3ProgressKey(promptKeyToCopy, cellIdToCopy);
+    const generatedPromptText = section3PromptProgress[key]?.generatedPromptText || "";
+    if (!generatedPromptText.trim()) {
+      setCopyStatus("Generate prompts first for this style adjustment.");
+      return;
+    }
+    await navigator.clipboard.writeText(generatedPromptText);
+    setSection3PromptProgress((previous) => ({
+      ...previous,
+      [key]: {
+        ...(previous[key] || {}),
+        copied: true,
+      },
+    }));
+    setCopyStatus(`Copied Section 3 prompt ${promptKeyToCopy} (${cellIdToCopy}).`);
   }
 
   async function pasteBaselineImageFromClipboard() {
@@ -751,9 +875,12 @@ export default function StyleDnaAdminPage() {
   });
 
   const uploadTestImageMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (input: { promptKey: string; cellId: string }) => {
       if (!testFile) {
         throw new Error("Choose a test grid file first");
+      }
+      if (!input.promptKey.trim()) {
+        throw new Error("Prompt key is required for test upload");
       }
       const response = await fetch("/api/proxy/admin/style-dna/images", {
         method: "POST",
@@ -767,13 +894,26 @@ export default function StyleDnaAdminPage() {
           fileBase64: await readFileAsBase64(testFile),
         }),
       });
-      return parseApiResponse<StyleDnaImageUploadResponse>(response);
+      const data = await parseApiResponse<StyleDnaImageUploadResponse>(response);
+      return {
+        promptKey: input.promptKey,
+        cellId: input.cellId,
+        data,
+      };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ promptKey: uploadedPromptKey, cellId: uploadedCellId, data }) => {
       const id = data.image?.styleDnaImageId || "";
       if (id) {
         setTestGridImageId(id);
         setUploadedTestPreviewUrl(styleDnaImageContentPath(id));
+        const key = section3ProgressKey(uploadedPromptKey, uploadedCellId);
+        setSection3PromptProgress((previous) => ({
+          ...previous,
+          [key]: {
+            ...(previous[key] || {}),
+            testGridImageId: id,
+          },
+        }));
       }
       setTestClipboardStatus(id ? `Upload succeeded: ${id}` : "Upload succeeded");
     },
@@ -781,20 +921,40 @@ export default function StyleDnaAdminPage() {
 
   const promptJobMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/proxy/admin/style-dna/prompt-jobs", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      if (!styleAdjustmentMidjourneyId.trim()) {
+        throw new Error("Style adjustment Midjourney id is required");
+      }
+      if (baselinePromptDefinitions.length === 0) {
+        throw new Error("Load a baseline set with prompt definitions first");
+      }
+      if (section3TestFamily === "profile_triplet" && styleAdjustmentType !== "profile") {
+        throw new Error("Profile triplet family requires style adjustment type = profile");
+      }
+      if (section3TestFamily === "sref_matrix" && styleAdjustmentType !== "sref") {
+        throw new Error("Sref matrix family requires style adjustment type = sref");
+      }
+
+      const prompts = baselinePromptDefinitions.flatMap((definition) => (
+        section3TestCells.map((cell) => ({
+          cellId: cell.cellId,
+          promptKey: definition.promptKey,
+          stylizeTier: cell.stylizeTier,
+          promptTextGenerated: buildSection3PromptLine({
+            promptText: definition.promptText,
+            stylize: cell.stylizeTier,
+            styleWeight: cell.styleWeight,
+          }),
+        }))
+      ));
+      const localPromptJobId = `local_${Date.now()}`;
+
+      return {
+        promptJob: {
+          promptJobId: localPromptJobId,
         },
-        body: JSON.stringify({
-          styleInfluenceId: styleInfluenceId.trim(),
-          baselineRenderSetId: baselineRenderSetId.trim(),
-          styleAdjustmentType,
-          styleAdjustmentMidjourneyId: styleAdjustmentMidjourneyId.trim(),
-          stylizeTiers: [Number(stylizeTier)],
-        }),
-      });
-      return parseApiResponse<PromptJobResponse>(response);
+        promptJobId: localPromptJobId,
+        prompts,
+      } satisfies PromptJobResponse;
     },
     onSuccess: (data) => {
       const id = data.promptJob?.promptJobId || data.promptJobId || "";
@@ -802,6 +962,68 @@ export default function StyleDnaAdminPage() {
       const firstPromptKey = data.prompts?.[0]?.promptKey;
       if (firstPromptKey) {
         setPromptKey(firstPromptKey);
+      }
+      const selectedTier = Number(stylizeTier);
+      setSection3PromptProgress((previous) => {
+        const next = { ...previous };
+        for (const promptRow of data.prompts || []) {
+          const promptKeyValue = String(promptRow.promptKey || "").trim();
+          if (!promptKeyValue) {
+            continue;
+          }
+          const promptTier = Number(promptRow.stylizeTier || 0);
+          const explicitCellId = (promptRow as { cellId?: string }).cellId;
+          const resolvedCell = explicitCellId
+            ? section3TestCells.find((cell) => cell.cellId === explicitCellId)
+            : section3TestCells.find((cell) => (
+                cell.stylizeTier === promptTier
+                && (
+                  cell.styleWeight === undefined
+                  || String(promptRow.promptTextGenerated || "").includes(`--sw ${cell.styleWeight}`)
+                )
+              ));
+          if (!resolvedCell) {
+            continue;
+          }
+          if (Number.isFinite(selectedTier) && promptTier !== selectedTier) {
+            continue;
+          }
+          const key = section3ProgressKey(promptKeyValue, resolvedCell.cellId);
+          next[key] = {
+            ...(next[key] || {}),
+            generatedPromptText: String(promptRow.promptTextGenerated || ""),
+          };
+        }
+        return next;
+      });
+    },
+  });
+
+  const createStyleInfluenceMutation = useMutation({
+    mutationFn: async () => {
+      const influenceCode = styleAdjustmentMidjourneyId.trim();
+      if (!influenceCode) {
+        throw new Error("Enter a Style Adjustment Midjourney Id first");
+      }
+      const response = await fetch("/api/proxy/admin/style-influences", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          influenceType: styleAdjustmentType,
+          influenceCode,
+        }),
+      });
+      return parseApiResponse<{ styleInfluence?: { styleInfluenceId?: string } }>(response);
+    },
+    onSuccess: async (data) => {
+      const createdId = String(data.styleInfluence?.styleInfluenceId || "").trim();
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-influences"],
+      });
+      if (createdId) {
+        setStyleInfluenceId(createdId);
       }
     },
   });
@@ -819,8 +1041,8 @@ export default function StyleDnaAdminPage() {
           styleAdjustmentType,
           styleAdjustmentMidjourneyId: styleAdjustmentMidjourneyId.trim(),
           promptKey: promptKey.trim(),
-          stylizeTier: Number(stylizeTier),
-          testGridImageId: testGridImageId.trim(),
+          stylizeTier: Number(selectedSection3Cell?.stylizeTier || stylizeTier),
+          testGridImageId: selectedSection3PromptTestImageId.trim(),
         }),
       });
       return parseApiResponse<StyleDnaRunSubmitResponse>(response);
@@ -828,37 +1050,68 @@ export default function StyleDnaAdminPage() {
     onSuccess: (data) => {
       const runId = data.run?.styleDnaRunId || data.styleDnaRunId || "";
       setLastStyleDnaRunId(runId);
+      if (promptKey.trim() && selectedSection3Cell) {
+        const key = section3ProgressKey(promptKey.trim(), selectedSection3Cell.cellId);
+        setSection3PromptProgress((previous) => ({
+          ...previous,
+          [key]: {
+            ...(previous[key] || {}),
+            runId,
+            runStatus: "queued",
+          },
+        }));
+      }
     },
   });
 
   const lookupRunMutation = useMutation({
     mutationFn: async () => {
-      if (!lastStyleDnaRunId.trim()) {
+      const runId = selectedPromptRunId || lastStyleDnaRunId.trim();
+      if (!runId) {
         throw new Error("Enter or create a style-dna run id first");
       }
-      const response = await fetch(`/api/proxy/admin/style-dna/runs/${encodeURIComponent(lastStyleDnaRunId.trim())}`, {
+      const response = await fetch(`/api/proxy/admin/style-dna/runs/${encodeURIComponent(runId)}`, {
         method: "GET",
         cache: "no-store",
       });
       return parseApiResponse<StyleDnaRunLookupResponse>(response);
     },
+    onSuccess: (data) => {
+      const run = data.run;
+      const resolvedPromptKey = String(run?.promptKey || "").trim() || promptKey.trim();
+      const resolvedRunId = String(run?.styleDnaRunId || "").trim();
+      if (!resolvedPromptKey || !selectedSection3Cell) {
+        return;
+      }
+      const key = section3ProgressKey(resolvedPromptKey, selectedSection3Cell.cellId);
+      setSection3PromptProgress((previous) => ({
+        ...previous,
+        [key]: {
+          ...(previous[key] || {}),
+          runId: resolvedRunId || previous[key]?.runId,
+          runStatus: String(run?.status || previous[key]?.runStatus || ""),
+          result: data.result || previous[key]?.result,
+        },
+      }));
+    },
   });
 
   const availableInfluences = useMemo(() => {
     const map = new Map<string, { id: string; label: string }>();
-    for (const submission of contributorListQuery.data?.submissions || []) {
-      const influence = submission.styleInfluence;
-      if (!influence || !influence.styleInfluenceId || map.has(influence.styleInfluenceId)) {
+    for (const influence of styleInfluenceListQuery.data?.styleInfluences || []) {
+      const styleInfluenceId = String(influence.styleInfluenceId || "").trim();
+      if (!styleInfluenceId || map.has(styleInfluenceId)) {
         continue;
       }
-      const typeLabel = influence.influenceType || "unknown";
-      map.set(influence.styleInfluenceId, {
-        id: influence.styleInfluenceId,
-        label: `${influence.styleInfluenceId} (${typeLabel}: ${influence.influenceCode})`,
+      const typeLabel = String(influence.typeKey || "unknown");
+      const influenceCode = String(influence.influenceCode || "");
+      map.set(styleInfluenceId, {
+        id: styleInfluenceId,
+        label: `${styleInfluenceId} (${typeLabel}: ${influenceCode})`,
       });
     }
     return Array.from(map.values());
-  }, [contributorListQuery.data]);
+  }, [styleInfluenceListQuery.data]);
 
   const authStateLabel = useMemo(() => {
     if (sessionStateQuery.isLoading) {
@@ -877,6 +1130,45 @@ export default function StyleDnaAdminPage() {
     : Number.NaN;
   const loadedBaselineSet = baselineSetDetailQuery.data?.baselineRenderSet;
   const loadedEnvelope = loadedBaselineSet?.parameterEnvelope;
+  const selectedSection3Cell = section3TestCells.find((cell) => cell.cellId === selectedSection3CellId) || null;
+  const section3Rows = useMemo(() => baselinePromptDefinitions.flatMap((definition) => (
+    section3TestCells.map((cell) => {
+      const baselineItem = baselineItems.find((item) => (
+        item.promptKey === definition.promptKey
+        && Number(item.stylizeTier || 0) === Number(cell.stylizeTier)
+      ));
+      const progressKey = section3ProgressKey(definition.promptKey, cell.cellId);
+      const progress = section3PromptProgress[progressKey] || {};
+      const copied = Boolean(progress.copied);
+      const uploaded = Boolean(progress.testGridImageId);
+      return {
+        definition,
+        cell,
+        copied,
+        uploaded,
+        complete: copied && uploaded,
+        generatedPromptText: progress.generatedPromptText || "",
+        testGridImageId: progress.testGridImageId || "",
+        runId: progress.runId || "",
+        runStatus: progress.runStatus || "",
+        result: progress.result,
+        baselineGridImageId: baselineItem?.gridImageId || "",
+      };
+    })
+  )), [baselineItems, baselinePromptDefinitions, section3PromptProgress, section3TestCells]);
+  const selectedSection3Row = section3Rows.find((row) => (
+    row.definition.promptKey === promptKey && row.cell.cellId === selectedSection3CellId
+  )) || null;
+  const selectedSection3PromptTestImageId = selectedSection3Row?.testGridImageId || testGridImageId.trim();
+  const selectedPromptRunId = String(selectedSection3Row?.runId || "").trim();
+  const section3PendingRows = section3Rows.filter((row) => !row.complete);
+  const section3CompleteRows = section3Rows.filter((row) => row.complete);
+  const section3BaselinePreviewUrl = selectedSection3Row?.baselineGridImageId
+    ? styleDnaImageContentPath(selectedSection3Row.baselineGridImageId)
+    : "";
+  const section3TestPreviewUrl = testPreviewUrl || (
+    selectedSection3Row?.testGridImageId ? styleDnaImageContentPath(selectedSection3Row.testGridImageId) : ""
+  );
 
   const createBaselineBlockingReasons = useMemo(() => {
     const reasons: string[] = [];
@@ -955,7 +1247,7 @@ export default function StyleDnaAdminPage() {
 
   const submitRunBlockingReasons = useMemo(() => {
     const reasons: string[] = [];
-    const runStylizeTier = Number(stylizeTier);
+    const runStylizeTier = Number(selectedSection3Cell?.stylizeTier ?? stylizeTier);
     const loadedStylizeTier = loadedEnvelope?.stylizeTier !== undefined
       ? Number(loadedEnvelope.stylizeTier)
       : Number.NaN;
@@ -976,6 +1268,9 @@ export default function StyleDnaAdminPage() {
     if (!promptKey.trim()) {
       reasons.push("Prompt key is required.");
     }
+    if (!selectedSection3Cell) {
+      reasons.push("Select a test cell before submitting.");
+    }
     if (!promptDefinitionExists) {
       reasons.push("Selected prompt key is not part of the loaded baseline prompt suite.");
     }
@@ -991,8 +1286,8 @@ export default function StyleDnaAdminPage() {
     if (!styleAdjustmentMidjourneyId.trim()) {
       reasons.push("Style adjustment Midjourney id is required.");
     }
-    if (!testGridImageId.trim()) {
-      reasons.push("Upload a test grid image first.");
+    if (!selectedSection3PromptTestImageId.trim()) {
+      reasons.push("Upload a test grid image for the selected prompt first.");
     }
     if (styleAdjustmentType === "sref" && !Number.isFinite(baselineStyleWeight)) {
       reasons.push("sref runs require a baseline set with explicit styleWeight=0 control envelope.");
@@ -1037,21 +1332,23 @@ export default function StyleDnaAdminPage() {
     styleAdjustmentType,
     styleInfluenceId,
     stylizeTier,
+    selectedSection3Cell,
     suiteId,
     testGridImageId,
+    selectedSection3PromptTestImageId,
   ]);
   const submitRunBlocker = submitRunBlockingReasons[0] || "";
 
   const lookupRunBlockingReasons = useMemo(() => {
     const reasons: string[] = [];
-    if (!lastStyleDnaRunId.trim()) {
+    if (!selectedPromptRunId && !lastStyleDnaRunId.trim()) {
       reasons.push("Enter a Style-DNA run id first.");
     }
     if (styleDnaProbeQuery.data?.ready === false) {
       reasons.push("Style-DNA admin endpoints are not available.");
     }
     return reasons;
-  }, [lastStyleDnaRunId, styleDnaProbeQuery.data?.ready]);
+  }, [lastStyleDnaRunId, selectedPromptRunId, styleDnaProbeQuery.data?.ready]);
   const lookupRunBlocker = lookupRunBlockingReasons[0] || "";
   const workflowReadiness = useMemo(() => ([
     {
@@ -1085,6 +1382,20 @@ export default function StyleDnaAdminPage() {
     submitRunBlockingReasons.length,
     uploadedPromptRows.length,
   ]);
+
+  const section3MatrixPreviewRows = useMemo(() => baselinePromptDefinitions.map((definition) => ({
+    promptKey: definition.promptKey,
+    promptText: definition.promptText,
+    cells: section3TestCells.map((cell) => ({
+      cellId: cell.cellId,
+      label: cell.label,
+      prompt: buildSection3PromptLine({
+        promptText: definition.promptText,
+        stylize: cell.stylizeTier,
+        styleWeight: cell.styleWeight,
+      }),
+    })),
+  })), [baselinePromptDefinitions, section3TestCells, baselineEnvelope?.aspectRatio, baselineEnvelope?.quality, baselineEnvelope?.seed, baselineEnvelope?.styleRaw, baselineModelVersion, styleAdjustmentMidjourneyId, styleAdjustmentType]);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
@@ -1523,14 +1834,62 @@ export default function StyleDnaAdminPage() {
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Style Adjustment Type</span>
-            <select value={styleAdjustmentType} onChange={(event) => setStyleAdjustmentType(event.target.value as "sref" | "profile")} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm">
+            <select
+              value={styleAdjustmentType}
+              onChange={(event) => {
+                const nextType = event.target.value as "sref" | "profile";
+                setStyleAdjustmentType(nextType);
+                const nextFamily = nextType === "profile" ? "profile_triplet" : "sref_matrix";
+                setSection3TestFamily(nextFamily);
+                setSelectedSection3CellId(nextFamily === "profile_triplet" ? "profile_s0" : "sref_s0_sw0");
+              }}
+              className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm"
+            >
               <option value="sref">sref</option>
               <option value="profile">profile</option>
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Test Family</span>
+            <select
+              value={section3TestFamily}
+              onChange={(event) => {
+                const nextFamily = event.target.value as Section3TestFamily;
+                setSection3TestFamily(nextFamily);
+                setSelectedSection3CellId(nextFamily === "profile_triplet" ? "profile_s0" : "sref_s0_sw0");
+              }}
+              className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm"
+            >
+              <option value="profile_triplet">Profile Triplet (`--s 0,100,1000`)</option>
+              <option value="sref_matrix">Sref Matrix (`--s/--sw combinations`)</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--muted)]">Test Cell</span>
+            <select
+              value={selectedSection3CellId}
+              onChange={(event) => setSelectedSection3CellId(event.target.value)}
+              className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm"
+            >
+              {section3TestCells.map((cell) => (
+                <option key={cell.cellId} value={cell.cellId}>
+                  {cell.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Style Adjustment Midjourney Id</span>
             <input value={styleAdjustmentMidjourneyId} onChange={(event) => setStyleAdjustmentMidjourneyId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+            <button
+              type="button"
+              onClick={() => createStyleInfluenceMutation.mutate()}
+              disabled={createStyleInfluenceMutation.isPending || !styleAdjustmentMidjourneyId.trim()}
+              title={styleAdjustmentMidjourneyId.trim() ? undefined : "Enter a Midjourney id first."}
+              className="mt-2 w-fit rounded-lg border border-[var(--line)] px-3 py-1 text-xs disabled:opacity-60"
+            >
+              {createStyleInfluenceMutation.isPending ? "Creating..." : "Create New"}
+            </button>
           </label>
           <label className="flex flex-col gap-1 text-sm md:col-span-2">
             <span className="text-[var(--muted)]">Style Influence Id</span>
@@ -1540,10 +1899,19 @@ export default function StyleDnaAdminPage() {
                 <option key={influence.id} value={influence.id}>{influence.label}</option>
               ))}
             </select>
+            {styleInfluenceListQuery.isLoading ? (
+              <p className="text-xs text-[var(--muted)]">Loading style influences...</p>
+            ) : null}
+            {styleInfluenceListQuery.isError ? (
+              <p className="text-xs text-red-600">Could not load style influences.</p>
+            ) : null}
+            {!styleInfluenceListQuery.isLoading && !styleInfluenceListQuery.isError && availableInfluences.length === 0 ? (
+              <p className="text-xs text-[var(--muted)]">No style influences yet. Enter a Midjourney id and click Create New.</p>
+            ) : null}
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Test Grid Image Id</span>
-            <input value={testGridImageId} onChange={(event) => setTestGridImageId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
+            <input value={selectedSection3PromptTestImageId} onChange={(event) => setTestGridImageId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Style-DNA Run Id</span>
@@ -1580,11 +1948,22 @@ export default function StyleDnaAdminPage() {
           {testFile ? <p className="text-[var(--muted)]">Selected: {testFile.name}</p> : null}
           {testClipboardStatus ? <p className="text-[var(--muted)]">{testClipboardStatus}</p> : null}
         </div>
-        {(testPreviewUrl || testGridImageId) ? (
+        {(section3BaselinePreviewUrl || section3TestPreviewUrl || selectedSection3PromptTestImageId) ? (
           <div className="mt-3 flex flex-wrap items-start gap-4 rounded-lg border border-[var(--line)] p-3">
-            {testPreviewUrl ? (
+            {section3BaselinePreviewUrl ? (
               <img
-                src={testPreviewUrl}
+                src={section3BaselinePreviewUrl}
+                alt="Baseline comparison preview"
+                className="h-24 w-24 rounded border border-[var(--line)] object-cover"
+              />
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded border border-[var(--line)] text-xs text-[var(--muted)]">
+                no baseline
+              </div>
+            )}
+            {section3TestPreviewUrl ? (
+              <img
+                src={section3TestPreviewUrl}
                 alt="Test grid preview"
                 className="h-24 w-24 rounded border border-[var(--line)] object-cover"
               />
@@ -1594,7 +1973,10 @@ export default function StyleDnaAdminPage() {
               </div>
             )}
             <div className="text-sm">
-              <p><span className="font-medium">Test Image Id:</span> {testGridImageId || "(not uploaded yet)"}</p>
+              <p><span className="font-medium">Prompt:</span> {promptKey || "(none)"}</p>
+              <p><span className="font-medium">Cell:</span> {selectedSection3Row?.cell.label || selectedSection3Cell?.label || "(none)"}</p>
+              <p><span className="font-medium">Baseline Image Id:</span> {selectedSection3Row?.baselineGridImageId || "(missing baseline coverage)"}</p>
+              <p><span className="font-medium">Test Image Id:</span> {selectedSection3PromptTestImageId || "(not uploaded yet)"}</p>
               <p className="text-[var(--muted)]">Use this to confirm the intended grid is selected/uploaded.</p>
             </div>
           </div>
@@ -1611,9 +1993,9 @@ export default function StyleDnaAdminPage() {
           </button>
           <button
             type="button"
-            onClick={() => uploadTestImageMutation.mutate()}
-            disabled={uploadTestImageMutation.isPending || !testFile}
-            title={testFile ? undefined : "Choose or paste a test grid file first."}
+            onClick={() => uploadTestImageMutation.mutate({ promptKey: promptKey.trim(), cellId: selectedSection3CellId })}
+            disabled={uploadTestImageMutation.isPending || !testFile || !promptKey.trim() || !selectedSection3CellId}
+            title={testFile ? (!promptKey.trim() ? "Select a prompt first." : undefined) : "Choose or paste a test grid file first."}
             className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-60"
           >
             {uploadTestImageMutation.isPending ? "Uploading..." : "Upload Test Grid"}
@@ -1625,7 +2007,7 @@ export default function StyleDnaAdminPage() {
             title={submitRunBlocker || undefined}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
-            {submitRunMutation.isPending ? "Submitting..." : "Submit Comparison Run"}
+            {submitRunMutation.isPending ? "Submitting..." : "Analyse DNA"}
           </button>
           <button
             type="button"
@@ -1675,6 +2057,33 @@ export default function StyleDnaAdminPage() {
         {promptJobMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Prompt generation failed: {mutationErrorMessage(promptJobMutation.error)}</p>
         ) : null}
+        {createStyleInfluenceMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Create style influence failed: {mutationErrorMessage(createStyleInfluenceMutation.error)}</p>
+        ) : null}
+        {section3MatrixPreviewRows.length > 0 ? (
+          <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
+            <p className="font-medium">Generated Matrix Prompt Set</p>
+            <p className="mt-1 text-[var(--muted)]">
+              Family: {section3TestFamily === "profile_triplet" ? "profile triplet" : "sref matrix"}.
+            </p>
+            <div className="mt-3 space-y-3">
+              {section3MatrixPreviewRows.map((row) => (
+                <div key={`matrix-${row.promptKey}`} className="rounded border border-[var(--line)] p-2">
+                  <p className="font-mono text-xs text-[var(--muted)]">{row.promptKey}</p>
+                  <p>{row.promptText}</p>
+                  <div className="mt-2 space-y-2">
+                    {row.cells.map((cell) => (
+                      <div key={`${row.promptKey}-${cell.cellId}`} className="rounded border border-[var(--line)] bg-[var(--surface-alt)] p-2">
+                        <p className="text-xs font-medium text-[var(--muted)]">{cell.label}</p>
+                        <pre className="mt-1 overflow-x-auto whitespace-pre-wrap text-xs">{cell.prompt}</pre>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {uploadTestImageMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Test upload failed: {mutationErrorMessage(uploadTestImageMutation.error)}</p>
         ) : null}
@@ -1684,6 +2093,75 @@ export default function StyleDnaAdminPage() {
         {lookupRunMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Run lookup failed: {mutationErrorMessage(lookupRunMutation.error)}</p>
         ) : null}
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border border-[var(--line)] p-3 text-sm">
+            <p className="font-medium">Prompts Pending</p>
+            {section3PendingRows.length === 0 ? (
+              <p className="mt-2 text-[var(--muted)]">No pending prompts.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {section3PendingRows.map((row) => (
+                  <li key={`pending-${row.definition.promptKey}-${row.cell.cellId}`} className="rounded border border-[var(--line)] p-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-xs text-[var(--muted)]">{row.definition.promptKey}</p>
+                        <p>{row.definition.promptText}</p>
+                        <p className="text-xs text-[var(--muted)]">{row.cell.label}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copySection3Prompt(row.definition.promptKey, row.cell.cellId)}
+                        disabled={!row.generatedPromptText}
+                        className={`rounded px-2 py-1 text-xs ${row.copied ? "border border-green-600 text-green-700" : "border border-[var(--line)] text-[var(--ink)]"}`}
+                      >
+                        {row.copied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Upload: {row.uploaded ? "completed" : "pending"} | Baseline: {row.baselineGridImageId ? "ready" : "missing"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="rounded-lg border border-[var(--line)] p-3 text-sm">
+            <p className="font-medium">Prompts Completed</p>
+            {section3CompleteRows.length === 0 ? (
+              <p className="mt-2 text-[var(--muted)]">No completed prompts yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {section3CompleteRows.map((row) => (
+                  <li key={`complete-${row.definition.promptKey}-${row.cell.cellId}`} className="rounded border border-green-200 bg-green-50 p-2">
+                    <p className="font-mono text-xs text-green-700">{row.definition.promptKey}</p>
+                    <p className="text-green-800">{row.definition.promptText}</p>
+                    <p className="text-xs text-green-700">{row.cell.label}</p>
+                    <p className="mt-1 text-xs text-green-700">Test image: {row.testGridImageId}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        {selectedSection3Row?.generatedPromptText ? (
+          <div className="mt-3 rounded-lg border border-[var(--line)] p-3 text-sm">
+            <p className="font-medium">Selected Prompt Copy Block</p>
+            <p className="mt-1 font-mono text-xs text-[var(--muted)]">{selectedSection3Row.definition.promptKey}</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">{selectedSection3Row.cell.label}</p>
+            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded border border-[var(--line)] bg-[var(--surface-alt)] p-2 text-xs">
+              {selectedSection3Row.generatedPromptText}
+            </pre>
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => copySection3Prompt(selectedSection3Row.definition.promptKey, selectedSection3Row.cell.cellId)}
+                className={`rounded-lg px-3 py-1 text-xs ${selectedSection3Row.copied ? "border border-green-600 text-green-700" : "border border-[var(--line)]"}`}
+              >
+                {selectedSection3Row.copied ? "Copied" : "Copy to Clipboard"}
+              </button>
+            </div>
+          </div>
+        ) : null}
         {lookupRunMutation.data?.run ? (
           <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
             <p><span className="font-medium">Run:</span> {lookupRunMutation.data.run.styleDnaRunId || "(unknown)"}</p>
@@ -1692,6 +2170,14 @@ export default function StyleDnaAdminPage() {
             {lookupRunMutation.data.result?.canonicalTraits?.deltaStrength ? (
               <p><span className="font-medium">Delta:</span> {lookupRunMutation.data.result.canonicalTraits.deltaStrength.score_1_to_10}</p>
             ) : null}
+          </div>
+        ) : null}
+        {selectedSection3Row?.result?.canonicalTraits ? (
+          <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
+            <p><span className="font-medium">Stored Traits ({selectedSection3Row.definition.promptKey}, {selectedSection3Row.cell.label}):</span></p>
+            <p className="mt-1"><span className="font-medium">Vibe Shift:</span> {selectedSection3Row.result.canonicalTraits?.vibeShift || "(none)"}</p>
+            <p><span className="font-medium">DNA Tags:</span> {(selectedSection3Row.result.canonicalTraits?.dominantDnaTags || []).join(", ") || "(none)"}</p>
+            <p><span className="font-medium">Delta:</span> {selectedSection3Row.result.canonicalTraits?.deltaStrength?.score_1_to_10 ?? "-"}</p>
           </div>
         ) : null}
       </section>

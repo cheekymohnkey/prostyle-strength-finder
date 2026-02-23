@@ -7,6 +7,11 @@ Date: 2026-02-23
 
 Covers admin-only baseline creation/reuse, prompt generation, run submission, worker processing, and result retrieval.
 
+Section-specific extension:
+1. Section 3 comparison UX parity requirements are specified in:
+- `design-documenatation/requirements/functional/FR-STYLE_DNA_SECTION3_COMPARISON_FIX.md`
+2. Section 3 matrix families and cell-level progress tracking are part of the active requirements baseline.
+
 ## Requirements
 
 1. `FR-SD-001` Style-DNA endpoints and UI shall be admin-only.
@@ -20,6 +25,7 @@ Covers admin-only baseline creation/reuse, prompt generation, run submission, wo
 9. `FR-SD-009` Worker processing shall persist raw LLM output and structured result artifacts.
 10. `FR-SD-010` Style-DNA run lifecycle shall expose `queued`, `in_progress`, terminal (`succeeded|failed|dead_letter`).
 11. `FR-SD-011` Frontend shall gate invalid actions with explicit prerequisite reasons.
+12. `FR-SD-012` Admin workflow shall include an in-UI path to create new Style Influence records (for new Midjourney IDs) without requiring contributor submission flow or direct database edits.
 
 ## User Acceptance Criteria
 
