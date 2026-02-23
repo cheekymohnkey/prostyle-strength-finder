@@ -73,6 +73,7 @@ Out of scope:
 5. SD5: Mostly implemented.
 - style-dna smoke scripts exist and have passed in prior session verification.
 - prompt generation verification includes model version flag emission (`--v`).
+- set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
 - open: launch/readiness gate integration for full style-dna smoke set.
 
 ## SD1. Persistence + Shared Contracts
@@ -219,6 +220,7 @@ Acceptance criteria:
 2. Failure-path smoke proves strict-schema invalid responses are handled safely.
 3. Existing critical smokes remain green (no regressions).
 4. Prompt-generation smoke verifies deterministic prompt blocks for selected `sw`/`s` matrix tiers.
+5. Set-producing smoke scripts do not leave residual baseline test data after successful execution.
 
 ## Suggested Ticket Breakdown
 

@@ -49,6 +49,13 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - restored local DB from pre-reset checkpoint `data/checkpoints/prostyle.local.pre-reset.20260223-050935Z.db`
 - recovered baseline/image linkage (`baseline_render_set_items` and `style_dna_images`) without re-upload
 - removed duplicate seeded baseline sets that had `0` attached items after restore
+9. Style-DNA admin guardrail/status pass shipped in UI:
+- disabled-state gating now blocks invalid actions before request dispatch (save/upload/attach/prompt/run/lookup)
+- inline reason text explains exactly which prerequisite is missing
+- mutation error states are now rendered inline for baseline/test/prompt/run actions
+10. Style-DNA set-producing smoke scripts now self-clean after successful verification:
+- cleanup applies to smoke-created suites, baseline sets/items, prompt jobs/items, runs/results, and uploaded smoke images
+- prevents local baseline set accumulation/noise from repeated smoke execution
 
 ## Key Files Updated This Slice
 
@@ -57,12 +64,15 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 3. `apps/frontend/next.config.js`
 4. `scripts/launch/readiness-smoke.js`
 5. `scripts/style-dna/prompt-generation-smoke.js`
-6. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
-7. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-22.md`
-8. `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-22.md`
-9. `design-documenatation/IMPLEMENTATION_PLAN.md`
-10. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-11. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+6. `scripts/style-dna/baseline-smoke.js`
+7. `scripts/style-dna/run-smoke.js`
+8. `scripts/style-dna/schema-failure-smoke.js`
+9. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
+10. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-22.md`
+11. `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-22.md`
+12. `design-documenatation/IMPLEMENTATION_PLAN.md`
+13. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+14. `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
 ## Verification Notes
 
@@ -72,6 +82,7 @@ Capture the latest Style-DNA and local-dev stability state so the next chat can 
 - `npm run style-dna:prompt-generation-smoke`
 - `npm run style-dna:run-smoke` (includes negative assertion that sref run submission rejects non-control baseline `styleWeight != 0`)
 - `FRONTEND_VARIANT=next ENV_FILE=.env.local scripts/dev-stack.sh restart` + local endpoint verification (`/v1/health`, `/api/auth/session`, `/api/proxy/admin/style-dna/baseline-sets`, `/admin/style-dna`) with successful Next compile/log output and no `layout.js` token error
+- `npm run typecheck --workspace=@prostyle/frontend` after guardrail/status messaging updates
 2. Local runtime verification of Next chunk behavior may still require manual local restart + hard refresh because this execution environment cannot reliably bind/check local ports.
 
 ## Open Issues / Risks

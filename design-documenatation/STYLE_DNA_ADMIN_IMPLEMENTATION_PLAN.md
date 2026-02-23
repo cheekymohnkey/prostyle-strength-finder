@@ -49,6 +49,7 @@ Implemented in code:
 - `style-dna:prompt-generation-smoke`
 - `style-dna:run-smoke`
 - `style-dna:schema-failure-smoke`
+ - set-producing smokes now self-clean smoke-created baseline/prompt/run/image records on success to avoid local data pollution
 6. Prompt generation now includes model version argument when available:
 - baseline copy prompts include `--v <mjModelVersion>`
 - generated prompt jobs include `--v <mjModelVersion>`

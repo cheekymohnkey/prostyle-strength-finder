@@ -103,6 +103,7 @@ type BaselineSetDetailResponse = {
       quality?: number | string;
       aspectRatio?: string;
       styleRaw?: boolean;
+      styleWeight?: number | string;
     };
   };
   baselinePromptSuite?: {
@@ -153,6 +154,16 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
     throw new Error(`${message}${reason}`);
   }
   return json as T;
+}
+
+function mutationErrorMessage(error: unknown): string | null {
+  if (!error) {
+    return null;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Request failed";
 }
 
 async function readFileAsBase64(file: File): Promise<string> {
@@ -273,8 +284,8 @@ function styleDnaImageContentPath(styleDnaImageId: string): string {
 
 export default function StyleDnaAdminPage() {
   const [mjModelFamily, setMjModelFamily] = useState("standard");
-  const [mjModelVersion, setMjModelVersion] = useState("6.1");
-  const [suiteId, setSuiteId] = useState("suite_style_dna_sref_control_v1");
+  const [mjModelVersion, setMjModelVersion] = useState("7");
+  const [suiteId, setSuiteId] = useState("suite_style_dna_default_v1");
   const [seed, setSeed] = useState("42");
   const [quality, setQuality] = useState("1");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -830,6 +841,91 @@ export default function StyleDnaAdminPage() {
 
   const baselinePreviewUrl = baselineFilePreviewUrl || uploadedBaselinePreviewUrl;
   const testPreviewUrl = testFilePreviewUrl || uploadedTestPreviewUrl;
+  const baselineStyleWeight = baselineEnvelope?.styleWeight !== undefined
+    ? Number(baselineEnvelope.styleWeight)
+    : Number.NaN;
+
+  const createBaselineBlocker = useMemo(() => {
+    if (!mjModelFamily.trim()) {
+      return "Model family is required.";
+    }
+    if (!mjModelVersion.trim()) {
+      return "Model version is required.";
+    }
+    if (!suiteId.trim()) {
+      return "Baseline prompt suite id is required.";
+    }
+    if (!aspectRatio.trim()) {
+      return "Aspect ratio is required.";
+    }
+    if (!stylizeTier.trim()) {
+      return "Stylize tier is required.";
+    }
+    return "";
+  }, [aspectRatio, mjModelFamily, mjModelVersion, stylizeTier, suiteId]);
+
+  const attachBaselineBlocker = useMemo(() => {
+    if (!baselineRenderSetId.trim()) {
+      return "Baseline render set id is required.";
+    }
+    if (!promptKey.trim()) {
+      return "Prompt key is required.";
+    }
+    if (!baselineGridImageId.trim()) {
+      return "Upload a baseline grid image first.";
+    }
+    return "";
+  }, [baselineGridImageId, baselineRenderSetId, promptKey]);
+
+  const generatePromptBlocker = useMemo(() => {
+    if (!styleInfluenceId.trim()) {
+      return "Style influence id is required.";
+    }
+    if (!baselineRenderSetId.trim()) {
+      return "Baseline render set id is required.";
+    }
+    if (!styleAdjustmentMidjourneyId.trim()) {
+      return "Style adjustment Midjourney id is required.";
+    }
+    return "";
+  }, [baselineRenderSetId, styleAdjustmentMidjourneyId, styleInfluenceId]);
+
+  const submitRunBlocker = useMemo(() => {
+    if (!styleInfluenceId.trim()) {
+      return "Style influence id is required.";
+    }
+    if (!baselineRenderSetId.trim()) {
+      return "Baseline render set id is required.";
+    }
+    if (!promptKey.trim()) {
+      return "Prompt key is required.";
+    }
+    if (!styleAdjustmentMidjourneyId.trim()) {
+      return "Style adjustment Midjourney id is required.";
+    }
+    if (!testGridImageId.trim()) {
+      return "Upload a test grid image first.";
+    }
+    if (styleAdjustmentType === "sref" && Number.isFinite(baselineStyleWeight) && baselineStyleWeight !== 0) {
+      return "sref runs require a control baseline with styleWeight=0.";
+    }
+    return "";
+  }, [
+    baselineRenderSetId,
+    baselineStyleWeight,
+    promptKey,
+    styleAdjustmentMidjourneyId,
+    styleAdjustmentType,
+    styleInfluenceId,
+    testGridImageId,
+  ]);
+
+  const lookupRunBlocker = useMemo(() => {
+    if (!lastStyleDnaRunId.trim()) {
+      return "Enter a Style-DNA run id first.";
+    }
+    return "";
+  }, [lastStyleDnaRunId]);
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
@@ -896,7 +992,8 @@ export default function StyleDnaAdminPage() {
           <button
             type="button"
             onClick={() => createBaselineMutation.mutate()}
-            disabled={createBaselineMutation.isPending}
+            disabled={createBaselineMutation.isPending || createBaselineBlocker !== ""}
+            title={createBaselineBlocker || undefined}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
           >
             {createBaselineMutation.isPending ? "Saving..." : "Save As New Baseline Set"}
@@ -940,6 +1037,12 @@ export default function StyleDnaAdminPage() {
           <p className="mt-2 text-sm text-[var(--muted)]">
             No baseline render sets found. Create one in section 1 first.
           </p>
+        ) : null}
+        {createBaselineBlocker ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Save is disabled: {createBaselineBlocker}</p>
+        ) : null}
+        {createBaselineMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Save failed: {mutationErrorMessage(createBaselineMutation.error)}</p>
         ) : null}
         {baselineRenderSetId.trim() ? (
           <p className="mt-2 text-sm text-[var(--muted)]">
@@ -1080,13 +1183,40 @@ export default function StyleDnaAdminPage() {
           </div>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
-          <button type="button" onClick={() => uploadBaselineImageMutation.mutate()} disabled={uploadBaselineImageMutation.isPending} className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm">
+          <button
+            type="button"
+            onClick={() => uploadBaselineImageMutation.mutate()}
+            disabled={uploadBaselineImageMutation.isPending || !baselineFile}
+            title={baselineFile ? undefined : "Choose or paste a baseline grid file first."}
+            className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-60"
+          >
             {uploadBaselineImageMutation.isPending ? "Uploading..." : "Upload Baseline Grid"}
           </button>
-          <button type="button" onClick={() => attachBaselineItemMutation.mutate()} disabled={attachBaselineItemMutation.isPending} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+          <button
+            type="button"
+            onClick={() => attachBaselineItemMutation.mutate()}
+            disabled={attachBaselineItemMutation.isPending || attachBaselineBlocker !== ""}
+            title={attachBaselineBlocker || undefined}
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
             {attachBaselineItemMutation.isPending ? "Saving..." : "Attach Baseline Grid to Set"}
           </button>
         </div>
+        {!baselineFile ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Upload requires a selected baseline file.</p>
+        ) : null}
+        {attachBaselineBlocker ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Attach is disabled: {attachBaselineBlocker}</p>
+        ) : null}
+        {uploadBaselineImageMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Baseline upload failed: {mutationErrorMessage(uploadBaselineImageMutation.error)}</p>
+        ) : null}
+        {attachBaselineItemMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Baseline attach failed: {mutationErrorMessage(attachBaselineItemMutation.error)}</p>
+        ) : null}
+        {deleteBaselineItemMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Baseline delete failed: {mutationErrorMessage(deleteBaselineItemMutation.error)}</p>
+        ) : null}
         <div className="mt-4 rounded-lg border border-[var(--line)] p-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-medium text-[var(--ink)]">
@@ -1271,19 +1401,67 @@ export default function StyleDnaAdminPage() {
           </div>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-3">
-          <button type="button" onClick={() => promptJobMutation.mutate()} disabled={promptJobMutation.isPending} className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm">
+          <button
+            type="button"
+            onClick={() => promptJobMutation.mutate()}
+            disabled={promptJobMutation.isPending || generatePromptBlocker !== ""}
+            title={generatePromptBlocker || undefined}
+            className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-60"
+          >
             {promptJobMutation.isPending ? "Generating..." : "Generate Prompt"}
           </button>
-          <button type="button" onClick={() => uploadTestImageMutation.mutate()} disabled={uploadTestImageMutation.isPending} className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm">
+          <button
+            type="button"
+            onClick={() => uploadTestImageMutation.mutate()}
+            disabled={uploadTestImageMutation.isPending || !testFile}
+            title={testFile ? undefined : "Choose or paste a test grid file first."}
+            className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-60"
+          >
             {uploadTestImageMutation.isPending ? "Uploading..." : "Upload Test Grid"}
           </button>
-          <button type="button" onClick={() => submitRunMutation.mutate()} disabled={submitRunMutation.isPending} className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
+          <button
+            type="button"
+            onClick={() => submitRunMutation.mutate()}
+            disabled={submitRunMutation.isPending || submitRunBlocker !== ""}
+            title={submitRunBlocker || undefined}
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+          >
             {submitRunMutation.isPending ? "Submitting..." : "Submit Comparison Run"}
           </button>
-          <button type="button" onClick={() => lookupRunMutation.mutate()} disabled={lookupRunMutation.isPending} className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm">
+          <button
+            type="button"
+            onClick={() => lookupRunMutation.mutate()}
+            disabled={lookupRunMutation.isPending || lookupRunBlocker !== ""}
+            title={lookupRunBlocker || undefined}
+            className="rounded-lg border border-[var(--line)] px-4 py-2 text-sm disabled:opacity-60"
+          >
             {lookupRunMutation.isPending ? "Loading..." : "Get Run Status"}
           </button>
         </div>
+        {generatePromptBlocker ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Prompt generation is disabled: {generatePromptBlocker}</p>
+        ) : null}
+        {!testFile ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Test upload requires a selected test grid file.</p>
+        ) : null}
+        {submitRunBlocker ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Run submit is disabled: {submitRunBlocker}</p>
+        ) : null}
+        {lookupRunBlocker ? (
+          <p className="mt-2 text-sm text-[var(--muted)]">Run lookup is disabled: {lookupRunBlocker}</p>
+        ) : null}
+        {promptJobMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Prompt generation failed: {mutationErrorMessage(promptJobMutation.error)}</p>
+        ) : null}
+        {uploadTestImageMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Test upload failed: {mutationErrorMessage(uploadTestImageMutation.error)}</p>
+        ) : null}
+        {submitRunMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Run submit failed: {mutationErrorMessage(submitRunMutation.error)}</p>
+        ) : null}
+        {lookupRunMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Run lookup failed: {mutationErrorMessage(lookupRunMutation.error)}</p>
+        ) : null}
         {lookupRunMutation.data?.run ? (
           <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
             <p><span className="font-medium">Run:</span> {lookupRunMutation.data.run.styleDnaRunId || "(unknown)"}</p>

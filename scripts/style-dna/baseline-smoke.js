@@ -85,6 +85,80 @@ function seedAdmin(dbPath) {
   );
 }
 
+function cleanupSmokeData(dbPath, input) {
+  const suiteId = input.suiteId ? String(input.suiteId).trim() : "";
+  if (!suiteId) {
+    return;
+  }
+  const imageIds = Array.from(new Set((input.imageIds || []).filter(Boolean)));
+  runSql(
+    dbPath,
+    `
+    DELETE FROM style_dna_run_results
+    WHERE style_dna_run_id IN (
+      SELECT style_dna_run_id
+      FROM style_dna_runs
+      WHERE baseline_render_set_id IN (
+        SELECT baseline_render_set_id
+        FROM baseline_render_sets
+        WHERE suite_id = ${quote(suiteId)}
+      )
+    );
+
+    DELETE FROM style_dna_runs
+    WHERE baseline_render_set_id IN (
+      SELECT baseline_render_set_id
+      FROM baseline_render_sets
+      WHERE suite_id = ${quote(suiteId)}
+    );
+
+    DELETE FROM style_dna_prompt_job_items
+    WHERE prompt_job_id IN (
+      SELECT prompt_job_id
+      FROM style_dna_prompt_jobs
+      WHERE baseline_render_set_id IN (
+        SELECT baseline_render_set_id
+        FROM baseline_render_sets
+        WHERE suite_id = ${quote(suiteId)}
+      )
+    );
+
+    DELETE FROM style_dna_prompt_jobs
+    WHERE baseline_render_set_id IN (
+      SELECT baseline_render_set_id
+      FROM baseline_render_sets
+      WHERE suite_id = ${quote(suiteId)}
+    );
+
+    DELETE FROM baseline_render_set_items
+    WHERE baseline_render_set_id IN (
+      SELECT baseline_render_set_id
+      FROM baseline_render_sets
+      WHERE suite_id = ${quote(suiteId)}
+    );
+
+    DELETE FROM baseline_render_sets
+    WHERE suite_id = ${quote(suiteId)};
+
+    DELETE FROM baseline_prompt_suite_item_metadata
+    WHERE suite_id = ${quote(suiteId)};
+
+    DELETE FROM baseline_prompt_suite_items
+    WHERE suite_id = ${quote(suiteId)};
+
+    DELETE FROM baseline_prompt_suites
+    WHERE suite_id = ${quote(suiteId)};
+    `
+  );
+  if (imageIds.length > 0) {
+    runSql(
+      dbPath,
+      `DELETE FROM style_dna_images
+       WHERE style_dna_image_id IN (${imageIds.map((id) => quote(id)).join(", ")});`
+    );
+  }
+}
+
 async function main() {
   const databaseUrl = requireEnv("DATABASE_URL");
   requireEnv("COGNITO_ISSUER");
@@ -112,6 +186,9 @@ async function main() {
   apiProc.stderr.on("data", (chunk) => {
     apiStderr += chunk.toString("utf8");
   });
+  let suiteId = "";
+  const createdImageIds = [];
+  let cleanupVerified = false;
 
   try {
     await waitForHealth(baseUrl, adminToken);
@@ -154,8 +231,9 @@ async function main() {
     const testImageId = testImage?.image?.styleDnaImageId;
     assertCondition(Boolean(baselineImageId), "Missing baseline image id");
     assertCondition(Boolean(testImageId), "Missing test image id");
+    createdImageIds.push(baselineImageId, testImageId);
 
-    const suiteId = `suite_style_dna_baseline_smoke_${Date.now()}`;
+    suiteId = `suite_style_dna_baseline_smoke_${Date.now()}`;
     const createS0 = await requestJson(
       `${baseUrl}/admin/style-dna/baseline-sets`,
       {
@@ -290,6 +368,7 @@ async function main() {
     const ids = new Set((list.baselineSets || []).map((item) => item.baselineRenderSetId));
     assertCondition(ids.has(baselineRenderSetIdS0), "Expected list to include s=0 baseline set");
     assertCondition(ids.has(baselineRenderSetIdS100), "Expected list to include s=100 baseline set");
+    cleanupVerified = true;
 
     console.log(
       JSON.stringify(
@@ -307,6 +386,12 @@ async function main() {
       )
     );
   } finally {
+    if (cleanupVerified) {
+      cleanupSmokeData(dbPath, {
+        suiteId,
+        imageIds: createdImageIds,
+      });
+    }
     apiProc.kill("SIGTERM");
     await sleep(200);
     if (!apiProc.killed) {

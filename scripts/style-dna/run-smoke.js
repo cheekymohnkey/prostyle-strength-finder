@@ -111,6 +111,80 @@ function seedData(dbPath) {
   );
 }
 
+function cleanupSmokeData(dbPath, input) {
+  const suiteId = input.suiteId ? String(input.suiteId).trim() : "";
+  if (!suiteId) {
+    return;
+  }
+  const imageIds = Array.from(new Set((input.imageIds || []).filter(Boolean)));
+  runSql(
+    dbPath,
+    `
+    DELETE FROM style_dna_run_results
+    WHERE style_dna_run_id IN (
+      SELECT style_dna_run_id
+      FROM style_dna_runs
+      WHERE baseline_render_set_id IN (
+        SELECT baseline_render_set_id
+        FROM baseline_render_sets
+        WHERE suite_id = ${quote(suiteId)}
+      )
+    );
+
+    DELETE FROM style_dna_runs
+    WHERE baseline_render_set_id IN (
+      SELECT baseline_render_set_id
+      FROM baseline_render_sets
+      WHERE suite_id = ${quote(suiteId)}
+    );
+
+    DELETE FROM style_dna_prompt_job_items
+    WHERE prompt_job_id IN (
+      SELECT prompt_job_id
+      FROM style_dna_prompt_jobs
+      WHERE baseline_render_set_id IN (
+        SELECT baseline_render_set_id
+        FROM baseline_render_sets
+        WHERE suite_id = ${quote(suiteId)}
+      )
+    );
+
+    DELETE FROM style_dna_prompt_jobs
+    WHERE baseline_render_set_id IN (
+      SELECT baseline_render_set_id
+      FROM baseline_render_sets
+      WHERE suite_id = ${quote(suiteId)}
+    );
+
+    DELETE FROM baseline_render_set_items
+    WHERE baseline_render_set_id IN (
+      SELECT baseline_render_set_id
+      FROM baseline_render_sets
+      WHERE suite_id = ${quote(suiteId)}
+    );
+
+    DELETE FROM baseline_render_sets
+    WHERE suite_id = ${quote(suiteId)};
+
+    DELETE FROM baseline_prompt_suite_item_metadata
+    WHERE suite_id = ${quote(suiteId)};
+
+    DELETE FROM baseline_prompt_suite_items
+    WHERE suite_id = ${quote(suiteId)};
+
+    DELETE FROM baseline_prompt_suites
+    WHERE suite_id = ${quote(suiteId)};
+    `
+  );
+  if (imageIds.length > 0) {
+    runSql(
+      dbPath,
+      `DELETE FROM style_dna_images
+       WHERE style_dna_image_id IN (${imageIds.map((id) => quote(id)).join(", ")});`
+    );
+  }
+}
+
 function spawnProcess(command, args, env) {
   const proc = spawn(command, args, {
     env,
@@ -155,6 +229,8 @@ async function main() {
   const smokePort = process.env.SMOKE_API_PORT || "3024";
   const baseUrl = `http://127.0.0.1:${smokePort}/v1`;
   const suiteId = `suite_style_dna_run_smoke_${Date.now()}`;
+  const createdImageIds = [];
+  let cleanupVerified = false;
 
   const api = spawnProcess("node", ["apps/api/src/index.js"], {
     ...process.env,
@@ -185,6 +261,7 @@ async function main() {
     );
     const baselineImageId = baselineImageUpload?.image?.styleDnaImageId;
     assertCondition(typeof baselineImageId === "string" && baselineImageId !== "", "Missing baseline image id");
+    createdImageIds.push(baselineImageId);
 
     const baselineSet = await requestJson(
       `${baseUrl}/admin/style-dna/baseline-sets`,
@@ -314,6 +391,7 @@ async function main() {
     );
     const testGridImageId = testImageUpload?.image?.styleDnaImageId;
     assertCondition(typeof testGridImageId === "string" && testGridImageId !== "", "Missing test image id");
+    createdImageIds.push(testGridImageId);
 
     const missingControlResponse = await fetch(
       `${baseUrl}/admin/style-dna/runs`,
@@ -417,6 +495,7 @@ async function main() {
       Number(runDetail?.result?.canonicalTraits?.deltaStrength?.score_1_to_10 || 0) >= 1,
       `Invalid canonical deltaStrength score: ${JSON.stringify(runDetail?.result?.canonicalTraits?.deltaStrength)}`
     );
+    cleanupVerified = true;
 
     console.log(
       JSON.stringify(
@@ -434,6 +513,12 @@ async function main() {
       )
     );
   } finally {
+    if (cleanupVerified) {
+      cleanupSmokeData(dbPath, {
+        suiteId,
+        imageIds: createdImageIds,
+      });
+    }
     api.proc.kill("SIGTERM");
     await sleep(200);
     if (!api.proc.killed) {
