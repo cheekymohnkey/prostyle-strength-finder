@@ -25,6 +25,18 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 5. Baseline attach flow now auto-advances prompt selection to the next prompt key, reducing repetitive clicks during batch baseline capture.
 6. Launch readiness smoke full scope now includes Style-DNA smoke gates (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`).
 7. Contributor proxy regression was fixed for local admin-bypass sessions by ensuring contributor checks apply local admin promotion guard before role evaluation.
+8. `/admin` operations console now covers additional U5 controls:
+- user role management list/filter/update with required audit reason
+- analysis moderation (`flag`, `remove`, `re-run`) with audit visibility
+- prompt curation status updates (`active`, `deprecated`, `experimental`) with audit visibility
+9. Approval-policy update flow now sends required admin audit `reason` payload.
+
+## Verification Notes
+
+1. `npm run typecheck --workspace=@prostyle/frontend`
+2. `npm run admin:role-management-smoke`
+3. `npm run admin:moderation-smoke`
+4. `npm run admin:prompt-curation-smoke`
 
 ## Known UI Runtime Risk
 
@@ -41,4 +53,5 @@ Record the latest UI upgrade state after Style-DNA console enhancements and loca
 ## Handoff Summary
 
 1. UI upgrade documentation is now current with Style-DNA save-as workflow and prompt version-tag behavior.
-2. Next runtime chunk stability is currently verified; remaining work is UI polish and parity completion.
+2. Admin operations parity advanced with role-management, moderation, and prompt-curation UI controls in Next frontend.
+3. Next runtime chunk stability is currently verified; remaining work is UI polish and final parity completion.

@@ -15,7 +15,7 @@ Upgrade the frontend implementation to the documented stack and interaction mode
 3. TanStack Query for async server state.
 4. Cognito Hosted UI + Google IdP sign-in flow (PKCE), replacing manual token entry for normal user flows.
 
-## Current Execution Snapshot (2026-02-22)
+## Current Execution Snapshot (2026-02-23)
 
 Completed in implementation:
 1. Next.js App Router + TypeScript foundation is active in `apps/frontend`.
@@ -28,8 +28,11 @@ Completed in implementation:
 - `/api/auth/logout`
 5. Next proxy route (`/api/proxy/*`) is wired and used by migrated flows.
 6. U3 recommendation + feedback migrated page exists (`apps/frontend/app/page.tsx`).
-7. Initial U5 operations slice exists (`apps/frontend/app/admin/page.tsx`) for:
+7. Expanded U5 operations console exists (`apps/frontend/app/admin/page.tsx`) for:
 - approval policy get/update
+- admin user role management list/filter/update + audit visibility
+- admin analysis moderation actions (`flag|remove|re-run`) + audit visibility
+- admin prompt curation status updates + audit visibility
 - contributor submission create/list
 - trigger/retry actions
 8. Style-DNA admin workflow route exists at `apps/frontend/app/admin/style-dna/page.tsx` with baseline/image/prompt/run flow.
@@ -46,7 +49,7 @@ Completed in implementation:
 - `style-dna:schema-failure-smoke`
 
 Remaining:
-1. Complete U4/U5 parity coverage beyond current initial slices.
+1. Complete remaining U5 parity coverage (notably style influence governance controls).
 2. Improve Style-DNA admin UX guardrails/polish and tighten state/error messaging.
 3. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
 
