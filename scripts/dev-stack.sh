@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 ENV_FILE="${ENV_FILE:-.env.local}"
 NODE_PATH_PREFIX="${NODE_PATH_PREFIX:-/opt/homebrew/opt/node@20/bin}"
-FRONTEND_VARIANT="${FRONTEND_VARIANT:-legacy}"
+FRONTEND_VARIANT="${FRONTEND_VARIANT:-next}"
 
 API_PID_FILE="/tmp/prostyle_api.pid"
 WORKER_PID_FILE="/tmp/prostyle_worker.pid"
@@ -18,14 +18,11 @@ FRONTEND_LOG="/tmp/prostyle_frontend.log"
 
 resolve_frontend_cmd() {
   case "${FRONTEND_VARIANT}" in
-    legacy)
-      echo "npm run frontend"
-      ;;
     next)
       echo "PORT=3000 npm run frontend:next"
       ;;
     *)
-      echo "Invalid FRONTEND_VARIANT='$FRONTEND_VARIANT' (expected: legacy|next)" >&2
+      echo "Invalid FRONTEND_VARIANT='$FRONTEND_VARIANT' (expected: next)" >&2
       exit 1
       ;;
   esac
@@ -195,7 +192,7 @@ case "${1:-}" in
     ;;
   *)
     echo "usage: scripts/dev-stack.sh {start|stop|restart|status}"
-    echo "optional: ENV_FILE=.env.local NODE_PATH_PREFIX=/opt/homebrew/opt/node@20/bin FRONTEND_VARIANT=legacy|next"
+    echo "optional: ENV_FILE=.env.local NODE_PATH_PREFIX=/opt/homebrew/opt/node@20/bin FRONTEND_VARIANT=next"
     exit 1
     ;;
 esac

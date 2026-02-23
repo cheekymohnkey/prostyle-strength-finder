@@ -20,7 +20,9 @@ Upgrade the frontend implementation to the documented stack and interaction mode
 Completed in implementation:
 1. Next.js App Router + TypeScript foundation is active in `apps/frontend`.
 2. Next.js is now default frontend dev entrypoint (`apps/frontend/package.json` `dev` script).
-3. Legacy frontend remains available as fallback (`dev:legacy`) for controlled rollback window.
+3. Legacy frontend fallback has been retired from active dev entrypoints:
+- `apps/frontend` no longer exposes `dev:legacy`
+- `scripts/dev-stack.sh` now supports `FRONTEND_VARIANT=next` only
 4. Hosted UI + PKCE auth route handlers exist in Next app:
 - `/api/auth/login`
 - `/api/auth/callback`
@@ -60,11 +62,13 @@ Completed in implementation:
 
 Remaining:
 1. Remaining Style-DNA work is limited to minor visual/layout tuning; guardrail/status UX and proxy smoke coverage are complete for current scope.
-2. Finalize legacy frontend deprecation/removal once parity and rollout confidence are complete.
+2. Execute release rollback readiness using prior known-good Next build artifacts (not legacy frontend path).
 
 ## Legacy Frontend Removal Gate
 
-Before removing `dev:legacy` fallback, require all of:
+Gate status: complete.
+
+Removal criteria used:
 1. Full `launch:readiness-smoke` scope passes on current `master`.
 2. Full Style-DNA smoke set passes (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`).
 3. `admin:frontend-proxy-smoke` and `frontend:critical-flow-smoke` pass in the same verification window.
@@ -224,7 +228,7 @@ Tasks:
 2. Update smoke scripts to target new UI routes/selectors.
 3. Run launch readiness smoke + operational checks.
 4. Switch `npm run frontend` to new app entrypoint.
-5. Keep rollback switch to legacy frontend path for one release window.
+5. Keep rollback procedure to prior known-good Next release for one release window.
 
 Done when:
 1. Launch checklist passes with new frontend.
@@ -248,7 +252,7 @@ Mitigation: update smoke scripts in parallel with each phase, not at the end.
 Mitigation: reuse existing backend smoke fixtures and add negative-path UI checks.
 
 4. Risk: Cutover causes launch instability.
-Mitigation: one-release rollback path to legacy frontend with explicit switch procedure.
+Mitigation: one-release rollback path to prior known-good Next release with explicit switch procedure.
 
 ## Acceptance Criteria
 
@@ -266,7 +270,7 @@ Rollout:
 3. Enable new frontend as default entry.
 
 Rollback:
-1. Repoint frontend service/entry command to legacy implementation.
+1. Repoint frontend deployment/service to prior known-good Next release artifact (or previous git tag/commit).
 2. Re-run critical smoke checks.
 3. Keep API/worker unchanged during rollback to reduce blast radius.
 
