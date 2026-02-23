@@ -1,6 +1,7 @@
 # Prostyle Strength Finder - UI Upgrade Handover (2026-02-22)
 
 Superseded: This handover is superseded by `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-23.md`.
+Historical Note: Current frontend runtime is Next-only (`apps/frontend/app/*`); legacy dev fallback references in this file are historical context.
 
 Status: In Progress  
 Handover Date: 2026-02-22  
@@ -49,6 +50,7 @@ Capture current UI upgrade implementation state after Style-DNA admin workflow i
 1. UI migration has moved beyond bootstrap: core recommendation/admin flows run through Next app + proxy.
 2. Style-DNA UI is no longer a placeholder; the operator flow is functional end-to-end with API-backed controls.
 3. Legacy frontend remains as fallback path and has not been retired yet.
+   - Update: legacy fallback has since been retired.
 
 ## Known Gaps / Remaining Work
 
@@ -61,6 +63,7 @@ Capture current UI upgrade implementation state after Style-DNA admin workflow i
 1. Add focused UI assertions for Style-DNA prerequisite gating and state transitions.
 2. Add launch-readiness inclusion for Style-DNA smoke commands.
 3. Decide and document legacy frontend retirement criteria/date.
+   - Status update: completed in `design-documenatation/UI_UPGRADE_IMPLEMENTATION_PLAN.md`.
 
 ## Suggested First Commands Next Session
 

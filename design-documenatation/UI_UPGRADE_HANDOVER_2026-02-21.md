@@ -1,5 +1,7 @@
 # Prostyle Strength Finder - UI Upgrade Handover (2026-02-21)
 
+Historical Note: This handover captures 2026-02-21 state. Current frontend runtime is Next-only (`apps/frontend/app/*`); `dev:legacy` is retired.
+
 Status: In Progress  
 Handover Date: 2026-02-21  
 Owner: Codex Session Handover
@@ -22,7 +24,7 @@ Capture current UI upgrade implementation state for immediate continuation in th
 1. Next.js is now the default frontend dev entrypoint.
 - `apps/frontend/package.json`
 - `dev` -> `next dev`
-- legacy retained as fallback via `dev:legacy`.
+- legacy was retained as fallback via `dev:legacy` at this snapshot time (now retired).
 
 2. Frontend migration docs updated for current default behavior.
 - `apps/frontend/README.md`
@@ -68,6 +70,7 @@ All executed with local env loading from `.env.local.example`.
 2. Existing smoke/runbook gates pass against Next.js.
 3. U5 essentials have an initial page-level implementation.
 4. Legacy frontend still exists as fallback and historical compatibility path.
+   - Update: legacy fallback has since been removed; this line is historical.
 
 ## Known Gaps / Remaining Work
 
@@ -81,7 +84,7 @@ All executed with local env loading from `.env.local.example`.
   - `design-documenatation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
 3. Legacy frontend retirement decision still pending.
-- `apps/frontend/src/index.js` remains available via `dev:legacy`.
+- Historical (as-of this handover): `apps/frontend/src/index.js` remained available via `dev:legacy`.
 
 4. Historical docs still reference legacy UI files as implementation evidence.
 - Not blocking execution, but needs cleanup pass for clarity.

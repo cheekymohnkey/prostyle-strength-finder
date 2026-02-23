@@ -95,7 +95,7 @@ Translate Epic C (MVP-2 Feedback Loop) into executable engineering tasks with cl
   - `GET /v1/post-result-feedback/:feedbackId`
   - `GET /v1/recommendation-sessions/:sessionId/post-result-feedback`
 - Ownership enforcement is validated for feedback retrieval routes.
-- C7 frontend feedback panel is implemented in `apps/frontend/src/index.js`:
+- C7 frontend feedback panel is implemented in `apps/frontend/src/index.js` (historical pre-Next migration):
   - recommendation selector
   - optional generated-image upload
   - emoji/useful/comments inputs
@@ -124,7 +124,8 @@ Translate Epic C (MVP-2 Feedback Loop) into executable engineering tasks with cl
 | C4 alignment scaffold | `pass` | deterministic evaluator in `apps/api/src/index.js`; `npm run feedback:service-smoke` output includes alignment payloads | Model-quality tuning deferred |
 | C5 emoji weighting policy | `pass` | `apps/api/src/index.js` weighting logic; smoke output confirms normal (`0.12`) vs minor (`-0.03`) bounded deltas | Continue monitoring weighting calibration |
 | C6 API linkage + auth | `pass` | `apps/api/src/index.js` retrieval endpoints + ownership checks; service smoke verifies `forbiddenStatus: 403` | No blocking gap |
-| C7 frontend feedback panel | `pass` | `apps/frontend/src/index.js`; `npm run feedback:frontend-proxy-smoke` passes through `/api/*` feedback routes | Visual polish optional |
+| C7 frontend feedback panel | `pass` | `apps/frontend/src/index.js` (historical pre-Next migration); `npm run feedback:frontend-proxy-smoke` passes through `/api/*` feedback routes | Visual polish optional |
+| C7 frontend feedback panel (current runtime note) | `pass` | Current UI runtime is Next App Router in `apps/frontend/app/*`; historical `apps/frontend/src/index.js` references are retained as evidence context only. | Visual polish optional |
 | C8 verification/handoff | `pass` | Smoke commands documented and passing in `README.md`; Epic C matrix + snapshot updated | Prepare Epic D kickoff handoff |
 
 3. Outstanding risks/issues:

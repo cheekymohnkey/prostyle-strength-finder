@@ -30,6 +30,9 @@ Always anchor tasks to:
 
 ## Implementation Plan Links
 
+Current frontend runtime contract:
+1. UI is Next.js App Router in `apps/frontend/app/*` (legacy frontend fallback has been retired).
+
 1. Master implementation plan:
 - `design-documenatation/IMPLEMENTATION_PLAN.md`
 2. UI upgrade implementation plan:
