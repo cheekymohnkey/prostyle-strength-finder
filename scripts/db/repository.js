@@ -1610,6 +1610,28 @@ function listActiveStyleDnaTraitAliases(dbPath, input = {}) {
   );
 }
 
+function listStyleDnaTraitAliases(dbPath, input = {}) {
+  const where = [
+    `taxonomy_version = ${quote(input.taxonomyVersion || "style_dna_v1")}`,
+  ];
+  if (input.axis) {
+    where.push(`axis = ${quote(input.axis)}`);
+  }
+  if (input.status) {
+    where.push(`status = ${quote(input.status)}`);
+  }
+  return queryJson(
+    dbPath,
+    `SELECT alias_id, taxonomy_version, axis, alias_text, normalized_alias, canonical_trait_id,
+            source, merge_method, lexical_similarity, semantic_similarity, status,
+            created_at, updated_at, created_by, review_note
+     FROM style_dna_trait_aliases
+     WHERE ${where.join(" AND ")}
+     ORDER BY axis ASC, alias_text ASC
+     LIMIT ${Number(input.limit || 500)};`
+  );
+}
+
 function getActiveStyleDnaTraitAliasByNormalized(dbPath, input) {
   const rows = queryJson(
     dbPath,
@@ -1621,6 +1643,19 @@ function getActiveStyleDnaTraitAliasByNormalized(dbPath, input) {
        AND taxonomy_version = ${quote(input.taxonomyVersion || "style_dna_v1")}
        AND axis = ${quote(input.axis)}
        AND normalized_alias = ${quote(input.normalizedAlias)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getStyleDnaTraitAliasById(dbPath, aliasId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT alias_id, taxonomy_version, axis, alias_text, normalized_alias, canonical_trait_id,
+            source, merge_method, lexical_similarity, semantic_similarity, status,
+            created_at, updated_at, created_by, review_note
+     FROM style_dna_trait_aliases
+     WHERE alias_id = ${quote(aliasId)}
      LIMIT 1;`
   );
   return rows[0] || null;
@@ -1651,6 +1686,20 @@ function insertStyleDnaTraitAlias(dbPath, input) {
        ${quote(input.createdBy || "system")},
        ${quote(input.reviewNote || null)}
      );`
+  );
+}
+
+function updateStyleDnaTraitAliasStatus(dbPath, aliasId, input) {
+  exec(
+    dbPath,
+    `UPDATE style_dna_trait_aliases
+     SET status = ${quote(input.status)},
+         updated_at = ${quote(input.updatedAt || nowIso())},
+         review_note = CASE
+           WHEN ${quote(input.reviewNote)} IS NULL THEN review_note
+           ELSE ${quote(input.reviewNote)}
+         END
+     WHERE alias_id = ${quote(aliasId)};`
   );
 }
 
@@ -1862,8 +1911,11 @@ module.exports = {
   listStyleDnaCanonicalTraits,
   getStyleDnaCanonicalTraitById,
   listActiveStyleDnaTraitAliases,
+  listStyleDnaTraitAliases,
   getActiveStyleDnaTraitAliasByNormalized,
+  getStyleDnaTraitAliasById,
   insertStyleDnaTraitAlias,
+  updateStyleDnaTraitAliasStatus,
   getPendingStyleDnaTraitDiscoveryByNormalized,
   insertStyleDnaTraitDiscovery,
   updateStyleDnaTraitDiscoveryObservation,

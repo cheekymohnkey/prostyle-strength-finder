@@ -1025,7 +1025,8 @@ async function main() {
     if (aliasCreateResponse.status !== 201) {
       throw new Error(`Frontend proxy trait alias create failed (${aliasCreateResponse.status}): ${JSON.stringify(aliasCreateJson)}`);
     }
-    assertCondition(Boolean(aliasCreateJson?.traitAlias?.aliasId), "Expected trait alias id from create response");
+    const aliasId = String(aliasCreateJson?.traitAlias?.aliasId || "").trim();
+    assertCondition(Boolean(aliasId), "Expected trait alias id from create response");
 
     const aliasListResponse = await fetch(
       `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/trait-aliases?axis=lighting_and_contrast`,
@@ -1043,6 +1044,47 @@ async function main() {
       Array.isArray(aliasListJson?.traitAliases)
       && aliasListJson.traitAliases.some((row) => String(row?.canonicalTraitId || "") === canonicalTraitId),
       `Expected alias list to include canonicalTraitId ${canonicalTraitId}`
+    );
+
+    const aliasDeprecateResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/trait-aliases/${encodeURIComponent(aliasId)}/status`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "deprecated",
+          note: "frontend proxy alias deprecate smoke",
+        }),
+      }
+    );
+    const aliasDeprecateJson = await aliasDeprecateResponse.json();
+    if (!aliasDeprecateResponse.ok) {
+      throw new Error(`Frontend proxy alias status update failed (${aliasDeprecateResponse.status}): ${JSON.stringify(aliasDeprecateJson)}`);
+    }
+    assertCondition(
+      String(aliasDeprecateJson?.traitAlias?.status || "") === "deprecated",
+      "Expected alias status update to set deprecated"
+    );
+
+    const aliasDeprecatedListResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/trait-aliases?axis=lighting_and_contrast&status=deprecated&limit=50`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const aliasDeprecatedListJson = await aliasDeprecatedListResponse.json();
+    if (!aliasDeprecatedListResponse.ok) {
+      throw new Error(`Frontend proxy alias deprecated list failed (${aliasDeprecatedListResponse.status}): ${JSON.stringify(aliasDeprecatedListJson)}`);
+    }
+    assertCondition(
+      Array.isArray(aliasDeprecatedListJson?.traitAliases)
+      && aliasDeprecatedListJson.traitAliases.some((row) => String(row?.aliasId || "") === aliasId),
+      `Expected deprecated alias list to include alias ${aliasId}`
     );
 
     const canonicalDeprecateResponse = await fetch(
@@ -1119,10 +1161,12 @@ async function main() {
           },
           canonicalGovernance: {
             canonicalTraitId,
+            aliasId,
             canonicalCreateStatus: canonicalCreateResponse.status,
             canonicalDedupeStatus: canonicalDedupeResponse.status,
             canonicalDeprecatedStatus: canonicalDeprecateJson?.canonicalTrait?.status || "(unknown)",
             aliasCreateStatus: aliasCreateResponse.status,
+            aliasDeprecatedStatus: aliasDeprecateJson?.traitAlias?.status || "(unknown)",
             aliasListCount: Array.isArray(aliasListJson?.traitAliases) ? aliasListJson.traitAliases.length : 0,
           },
           forbiddenChecks: {

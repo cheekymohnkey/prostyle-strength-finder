@@ -68,12 +68,16 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `GET/POST /v1/admin/style-dna/canonical-traits`
 - `POST /v1/admin/style-dna/canonical-traits/:canonicalTraitId/status`
 - `GET/POST /v1/admin/style-dna/trait-aliases`
+- `POST /v1/admin/style-dna/trait-aliases/:aliasId/status`
 - `npm run style-dna:canonical-governance-smoke`
 13. Extended frontend proxy smoke coverage:
 - `npm run admin:frontend-proxy-smoke` now validates canonical governance proxy flow (create/dedupe/status + alias create/list + contributor-forbidden check).
 14. Added discovery review replay smoke:
 - `npm run style-dna:discovery-review-replay-smoke`
 - validates discovery review status transitions (`approved_alias`, `approved_new_canonical`, duplicate review `INVALID_STATE`) and replay alias-resolution behavior in canonicalization.
+15. Section 3 canonical library alias controls now support status lifecycle:
+- alias list supports `status` filter (`active`, `deprecated`, `all`)
+- alias rows now support deprecate/reactivate actions from UI
 
 ## Resolved Discrepancies
 
@@ -117,10 +121,12 @@ Capture the current Style-DNA implementation state and active risks so the next 
 
 ## Recent Commits
 
-1. `a9d58b7` Move Style-DNA admin payload validators into shared contracts (`DISC-001`)
-2. `b932897` Add OpenAI debug panel/logging and harden local dev path handling
-3. `8ce0840` Pin local storage root across dev stack and document `STORAGE_LOCAL_DIR`
-4. `e798b50` Add style influence removal in Section 3 and update requirements
+1. `f0518c2` Add discovery review replay smoke for style-dna
+2. `668ff01` Extend frontend proxy smoke for canonical governance
+3. `5b46d25` Add Section 3 canonical trait library UI controls
+4. `2f40804` Add Style-DNA canonical trait governance API and smoke
+5. `65b5103` Add Style-DNA semantic canonicalization regression smoke
+6. `392c1f2` Wire Style-DNA canonicalization to embedding similarity
 
 ## Runtime Notes
 
@@ -141,12 +147,16 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `npm run contracts`
 - `npm run typecheck --workspace=@prostyle/frontend`
 - `npm run style-dna:canonicalization-smoke`
+ - `npm run style-dna:canonicalization-semantic-smoke`
+ - `npm run style-dna:canonical-governance-smoke`
+ - `npm run style-dna:discovery-review-replay-smoke`
+ - `npm run admin:frontend-proxy-smoke`
 4. If env is configured, run DISC-003 regression checks:
 - `npm run style-dna:run-smoke`
 - `npm run style-dna:schema-failure-smoke`
 5. Continue `DISC-002` completion slice:
 - add taxonomy seed/admin flows for canonical trait curation at scale
-- add API/worker tests around review actions and alias resolution replay behavior
+- add API/worker tests around taxonomy-seed idempotency and deprecation/reactivation effects on replay behavior
 
 ## Suggested First Commands Next Session
 
@@ -155,7 +165,11 @@ Capture the current Style-DNA implementation state and active risks so the next 
 3. `npm run contracts`
 4. `npm run typecheck --workspace=@prostyle/frontend`
 5. `npm run style-dna:canonicalization-smoke`
-6. `npm run style-dna:run-smoke`
+6. `npm run style-dna:canonicalization-semantic-smoke`
+7. `npm run style-dna:canonical-governance-smoke`
+8. `npm run style-dna:discovery-review-replay-smoke`
+9. `npm run admin:frontend-proxy-smoke`
+10. `npm run style-dna:run-smoke`
 
 ## Handoff Summary
 

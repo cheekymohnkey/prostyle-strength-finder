@@ -437,11 +437,17 @@ async function fetchCanonicalTraits(input: {
 
 async function fetchTraitAliases(input: {
   axis?: string;
+  status?: "active" | "deprecated" | "";
+  limit?: number;
 } = {}): Promise<TraitAliasListResponse> {
   const params = new URLSearchParams();
   if (input.axis && input.axis.trim() !== "") {
     params.set("axis", input.axis.trim());
   }
+  if (input.status && input.status.trim() !== "") {
+    params.set("status", input.status.trim());
+  }
+  params.set("limit", String(input.limit || 500));
   const query = params.toString();
   const response = await fetch(`/api/proxy/admin/style-dna/trait-aliases${query ? `?${query}` : ""}`, {
     method: "GET",
@@ -562,6 +568,7 @@ export default function StyleDnaAdminPage() {
   const [canonicalCreateLabel, setCanonicalCreateLabel] = useState("");
   const [canonicalCreateNote, setCanonicalCreateNote] = useState("");
   const [selectedCanonicalTraitId, setSelectedCanonicalTraitId] = useState("");
+  const [aliasStatusFilter, setAliasStatusFilter] = useState<"active" | "deprecated" | "">("");
   const [aliasCreateText, setAliasCreateText] = useState("");
   const [aliasCreateNote, setAliasCreateNote] = useState("");
   const queryClient = useQueryClient();
@@ -622,9 +629,11 @@ export default function StyleDnaAdminPage() {
     enabled: styleDnaProbeQuery.data?.ready === true,
   });
   const traitAliasesQuery = useQuery({
-    queryKey: ["admin", "style-dna", "trait-aliases", canonicalAxisFilter],
+    queryKey: ["admin", "style-dna", "trait-aliases", canonicalAxisFilter, aliasStatusFilter],
     queryFn: () => fetchTraitAliases({
       axis: canonicalAxisFilter,
+      status: aliasStatusFilter,
+      limit: 500,
     }),
     enabled: styleDnaProbeQuery.data?.ready === true,
   });
@@ -1417,6 +1426,26 @@ export default function StyleDnaAdminPage() {
     onSuccess: async () => {
       setAliasCreateText("");
       setAliasCreateNote("");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "trait-aliases"],
+      });
+    },
+  });
+  const updateTraitAliasStatusMutation = useMutation({
+    mutationFn: async (input: { aliasId: string; status: "active" | "deprecated"; note?: string }) => {
+      const response = await fetch(`/api/proxy/admin/style-dna/trait-aliases/${encodeURIComponent(input.aliasId)}/status`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          status: input.status,
+          note: input.note,
+        }),
+      });
+      return parseApiResponse<{ traitAlias?: TraitAlias; changed?: boolean }>(response);
+    },
+    onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["admin", "style-dna", "trait-aliases"],
       });
@@ -3117,7 +3146,18 @@ export default function StyleDnaAdminPage() {
               ) : null}
             </div>
             <div className="rounded border border-[var(--line)] p-2">
-              <p className="font-medium">Aliases For Selected Canonical Trait</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium">Aliases For Selected Canonical Trait</p>
+                <select
+                  value={aliasStatusFilter}
+                  onChange={(event) => setAliasStatusFilter(event.currentTarget.value as "active" | "deprecated" | "")}
+                  className="rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+                >
+                  <option value="">all statuses</option>
+                  <option value="active">active</option>
+                  <option value="deprecated">deprecated</option>
+                </select>
+              </div>
               {traitAliasesQuery.isLoading ? (
                 <p className="mt-2 text-[var(--muted)]">Loading aliases...</p>
               ) : null}
@@ -3134,8 +3174,30 @@ export default function StyleDnaAdminPage() {
                 <ul className="mt-2 space-y-1">
                   {selectedCanonicalTraitAliases.slice(0, 40).map((alias) => (
                     <li key={String(alias.aliasId || "")} className="rounded border border-[var(--line)] p-2">
-                      <p className="font-medium">{alias.aliasText}</p>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium">{alias.aliasText}</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const aliasId = String(alias.aliasId || "").trim();
+                            if (!aliasId) {
+                              return;
+                            }
+                            const nextStatus = alias.status === "deprecated" ? "active" : "deprecated";
+                            updateTraitAliasStatusMutation.mutate({
+                              aliasId,
+                              status: nextStatus,
+                              note: `Status updated from canonical trait library (${nextStatus}).`,
+                            });
+                          }}
+                          disabled={!alias.aliasId || updateTraitAliasStatusMutation.isPending}
+                          className="rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-50"
+                        >
+                          Mark {alias.status === "deprecated" ? "active" : "deprecated"}
+                        </button>
+                      </div>
                       <p className="text-xs text-[var(--muted)]">
+                        {alias.status} |{" "}
                         {alias.source} | {alias.mergeMethod}
                         {alias.semanticSimilarity !== null && alias.semanticSimilarity !== undefined ? ` | sem=${alias.semanticSimilarity}` : ""}
                         {alias.lexicalSimilarity !== null && alias.lexicalSimilarity !== undefined ? ` | lex=${alias.lexicalSimilarity}` : ""}
@@ -3143,6 +3205,9 @@ export default function StyleDnaAdminPage() {
                     </li>
                   ))}
                 </ul>
+              ) : null}
+              {updateTraitAliasStatusMutation.isError ? (
+                <p className="mt-2 text-red-600">Alias status update failed: {mutationErrorMessage(updateTraitAliasStatusMutation.error)}</p>
               ) : null}
             </div>
           </div>

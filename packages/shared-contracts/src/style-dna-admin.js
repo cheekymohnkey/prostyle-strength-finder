@@ -281,6 +281,23 @@ function validateStyleDnaTraitAliasCreatePayload(value) {
   };
 }
 
+function validateStyleDnaTraitAliasStatusPayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Style-DNA trait alias status payload must be an object");
+  }
+  const status = assertRequiredString(value.status, "status");
+  if (!STYLE_DNA_CANONICAL_STATUSES.includes(status)) {
+    throw new Error("status must be one of: active, deprecated");
+  }
+  const note = typeof value.note === "string" && value.note.trim() !== ""
+    ? value.note.trim()
+    : null;
+  return {
+    status,
+    note,
+  };
+}
+
 module.exports = {
   STYLE_DNA_STYLIZE_TIERS,
   STYLE_DNA_ADJUSTMENT_TYPES,
@@ -296,4 +313,5 @@ module.exports = {
   validateStyleDnaCanonicalTraitCreatePayload,
   validateStyleDnaCanonicalTraitStatusPayload,
   validateStyleDnaTraitAliasCreatePayload,
+  validateStyleDnaTraitAliasStatusPayload,
 };

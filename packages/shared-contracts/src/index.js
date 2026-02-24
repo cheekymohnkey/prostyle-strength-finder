@@ -65,6 +65,7 @@ const {
   validateStyleDnaCanonicalTraitCreatePayload,
   validateStyleDnaCanonicalTraitStatusPayload,
   validateStyleDnaTraitAliasCreatePayload,
+  validateStyleDnaTraitAliasStatusPayload,
 } = require("./style-dna-admin");
 const { createApiErrorResponse } = require("./api-error");
 
@@ -124,5 +125,6 @@ module.exports = {
   validateStyleDnaCanonicalTraitCreatePayload,
   validateStyleDnaCanonicalTraitStatusPayload,
   validateStyleDnaTraitAliasCreatePayload,
+  validateStyleDnaTraitAliasStatusPayload,
   createApiErrorResponse,
 };

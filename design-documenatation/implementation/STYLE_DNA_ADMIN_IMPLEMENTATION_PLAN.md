@@ -84,10 +84,12 @@ Implemented in code:
 - `POST /v1/admin/style-dna/canonical-traits/:canonicalTraitId/status`
 - `GET /v1/admin/style-dna/trait-aliases`
 - `POST /v1/admin/style-dna/trait-aliases`
+ - `POST /v1/admin/style-dna/trait-aliases/:aliasId/status`
 8. Canonical governance smoke is now available:
 - `style-dna:canonical-governance-smoke`
 9. Frontend proxy smoke now includes canonical governance coverage:
 - `admin:frontend-proxy-smoke` validates canonical create/dedupe/status and alias create/list via `/api/proxy/admin/style-dna/*` routes.
+ - includes alias status update (`active`/`deprecated`) assertions via proxy.
 10. Discovery review replay smoke is now available:
 - `style-dna:discovery-review-replay-smoke` validates trait-discovery review transitions (`approved_alias`, `create_canonical`, duplicate-review `409`) and alias replay canonicalization behavior.
 

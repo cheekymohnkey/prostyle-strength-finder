@@ -64,7 +64,7 @@ Out of scope:
 - idempotency behavior is implemented for run submission.
 - server-side matched-control (`--sw 0`) gating for sref policy is now enforced at run submission (`styleWeight=0` control baseline requirement).
 - run submission contract now includes `submittedTestEnvelope` and server-side locked-envelope parity checks.
-- canonical trait governance endpoints are now implemented (`canonical-traits` list/create/status + `trait-aliases` list/create).
+- canonical trait governance endpoints are now implemented (`canonical-traits` list/create/status + `trait-aliases` list/create/status).
 3. SD3: Implemented (DISC-002 foundation now in place).
 - worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
 - canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
@@ -75,6 +75,7 @@ Out of scope:
 - loaded baseline sets can be used as editable drafts and saved as new baseline sets.
 - run-submit guardrails now block and explain: stylize-tier mismatch, missing prompt+tier baseline coverage, sref control baseline requirements (`styleWeight=0`), and section-1 envelope drift vs loaded set.
 - trait-discovery review queue and status-filtered review history are now available in Section 3.
+- canonical trait library UI now supports alias status filtering and alias deprecate/reactivate actions.
 - remaining: minor visual/layout tuning only.
 5. SD5: Mostly implemented.
 - style-dna smoke scripts exist and have passed in prior session verification.

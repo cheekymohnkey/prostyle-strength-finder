@@ -89,10 +89,12 @@ const {
   insertStyleDnaTraitAlias,
   getActiveStyleDnaTraitAliasByNormalized,
   listActiveStyleDnaCanonicalTraits,
-  listActiveStyleDnaTraitAliases,
+  listStyleDnaTraitAliases,
   getStyleDnaImageById,
   insertStyleDnaImage,
   updateRecommendationSessionStatus,
+  getStyleDnaTraitAliasById,
+  updateStyleDnaTraitAliasStatus,
 } = require("../../../scripts/db/repository");
 const { createQueueAdapter } = require("../../../scripts/queue/adapter");
 const { createStorageAdapter } = require("../../../packages/storage-adapter/src");
@@ -131,6 +133,7 @@ const {
   validateStyleDnaCanonicalTraitCreatePayload,
   validateStyleDnaCanonicalTraitStatusPayload,
   validateStyleDnaTraitAliasCreatePayload,
+  validateStyleDnaTraitAliasStatusPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -3544,9 +3547,30 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
     }
     const taxonomyVersion = String(url.searchParams.get("taxonomyVersion") || "style_dna_v1").trim();
     const axis = String(url.searchParams.get("axis") || "").trim();
-    const aliases = listActiveStyleDnaTraitAliases(dbPath, {
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 500;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid trait-aliases list limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..1000",
+      });
+      return;
+    }
+    const status = String(url.searchParams.get("status") || "").trim();
+    const allowedStatuses = new Set(["active", "deprecated", ""]);
+    if (!allowedStatuses.has(status)) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid trait alias status filter", ctx, {
+        status,
+      });
+      return;
+    }
+    const aliases = listStyleDnaTraitAliases(dbPath, {
       taxonomyVersion,
       axis: axis || undefined,
+      status: status || undefined,
+      limit,
     });
     sendJson(
       res,
@@ -3639,6 +3663,72 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       return;
     } catch (error) {
       sendError(res, 400, "INVALID_REQUEST", "Trait alias create failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/style-dna/trait-aliases/")
+    && path.endsWith("/status")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const aliasId = path.slice("/v1/admin/style-dna/trait-aliases/".length, -"/status".length).trim();
+    if (aliasId === "") {
+      sendError(res, 400, "INVALID_REQUEST", "Trait alias id is required", ctx);
+      return;
+    }
+    const alias = getStyleDnaTraitAliasById(dbPath, aliasId);
+    if (!alias) {
+      sendError(res, 404, "NOT_FOUND", "Trait alias not found", ctx, {
+        aliasId,
+      });
+      return;
+    }
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaTraitAliasStatusPayload(body);
+      if (payload.status === alias.status) {
+        sendJson(
+          res,
+          200,
+          {
+            traitAlias: mapStyleDnaTraitAliasRow(alias),
+            changed: false,
+          },
+          ctx
+        );
+        return;
+      }
+      updateStyleDnaTraitAliasStatus(dbPath, aliasId, {
+        status: payload.status,
+        reviewNote: payload.note,
+        updatedAt: new Date().toISOString(),
+      });
+      const updated = getStyleDnaTraitAliasById(dbPath, aliasId);
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.trait_alias.status_update",
+        targetType: "style_dna_trait_alias",
+        targetId: aliasId,
+        reason: payload.note || payload.status,
+      });
+      sendJson(
+        res,
+        200,
+        {
+          traitAlias: mapStyleDnaTraitAliasRow(updated),
+          changed: true,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Trait alias status update failed validation", ctx, {
         reason: error.message,
       });
       return;

@@ -173,6 +173,8 @@ async function main() {
     const aliasCreateJson = await aliasCreate.json();
     assertCondition(aliasCreate.status === 201, `Expected alias create 201, got ${aliasCreate.status}: ${JSON.stringify(aliasCreateJson)}`);
     assertCondition(Boolean(aliasCreateJson?.traitAlias?.aliasId), "Missing aliasId in alias create response");
+    const aliasId = String(aliasCreateJson?.traitAlias?.aliasId || "").trim();
+    assertCondition(Boolean(aliasId), "Expected non-empty alias id");
 
     const aliasList = await fetch(`${baseUrl}/admin/style-dna/trait-aliases?axis=lighting_and_contrast`, {
       headers: {
@@ -185,6 +187,34 @@ async function main() {
       Array.isArray(aliasListJson?.traitAliases)
       && aliasListJson.traitAliases.some((row) => row.canonicalTraitId === canonicalTraitId),
       `Expected alias list to include canonical trait ${canonicalTraitId}`
+    );
+
+    const aliasStatusUpdate = await fetch(`${baseUrl}/admin/style-dna/trait-aliases/${encodeURIComponent(aliasId)}/status`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        status: "deprecated",
+        note: "Alias governance smoke deprecation.",
+      }),
+    });
+    const aliasStatusUpdateJson = await aliasStatusUpdate.json();
+    assertCondition(aliasStatusUpdate.status === 200, `Expected alias status update 200, got ${aliasStatusUpdate.status}`);
+    assertCondition(aliasStatusUpdateJson?.traitAlias?.status === "deprecated", "Expected alias status to be deprecated");
+
+    const aliasDeprecatedList = await fetch(`${baseUrl}/admin/style-dna/trait-aliases?axis=lighting_and_contrast&status=deprecated`, {
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+      },
+    });
+    const aliasDeprecatedListJson = await aliasDeprecatedList.json();
+    assertCondition(aliasDeprecatedList.status === 200, `Expected alias deprecated list 200, got ${aliasDeprecatedList.status}`);
+    assertCondition(
+      Array.isArray(aliasDeprecatedListJson?.traitAliases)
+      && aliasDeprecatedListJson.traitAliases.some((row) => row.aliasId === aliasId),
+      `Expected deprecated alias list to include alias ${aliasId}`
     );
 
     const statusUpdate = await fetch(`${baseUrl}/admin/style-dna/canonical-traits/${encodeURIComponent(canonicalTraitId)}/status`, {
@@ -220,9 +250,10 @@ async function main() {
         {
           ok: true,
           canonicalTraitId,
-          aliasId: aliasCreateJson.traitAlias.aliasId,
+          aliasId,
           forbiddenCreateStatus: forbiddenCreate.status,
           deprecatedStatus: statusUpdateJson.canonicalTrait.status,
+          aliasDeprecatedStatus: aliasStatusUpdateJson.traitAlias.status,
           smokePort,
         },
         null,
