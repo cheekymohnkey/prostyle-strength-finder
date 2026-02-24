@@ -9,22 +9,17 @@ Compared current requirements/planning docs against implemented code paths in AP
 
 ## Confirmed Discrepancies
 
-1. `DISC-001` Style-DNA payload contracts are not in `packages/shared-contracts`.
-- Requirement source: Style-DNA task doc says shared validators should be added in `packages/shared-contracts`.
-- Current implementation: validators are implemented in API service only (`apps/api/src/index.js`) and are not exported by shared contracts (`packages/shared-contracts/src/index.js`).
-- Impact: frontend/worker cannot consume a shared typed contract for Style-DNA payloads, increasing drift risk.
-
-2. `DISC-002` Canonical trait mapping policy is only minimally implemented.
+1. `DISC-002` Canonical trait mapping policy is only minimally implemented.
 - Requirement source: Style-DNA plan defines alias normalization/squashing and taxonomy mapping workflow.
 - Current implementation: worker stores atomic traits and a small canonical snapshot (`dominantDnaTags`, `vibeShift`, `deltaStrength`) without alias registry/synonym merge flow (`apps/worker/src/index.js`).
 - Impact: taxonomy-governance requirements are only partially met; synonym fragmentation risk remains.
 
-3. `DISC-003` Run submission does not fully validate the locked parameter envelope beyond control-policy and prompt-tier coverage.
+2. `DISC-003` Run submission does not fully validate the locked parameter envelope beyond control-policy and prompt-tier coverage.
 - Requirement source: plan states baseline reuse/comparisons are tied to locked envelope matching.
 - Current implementation: run submit checks `styleWeight=0` for `sref` and baseline prompt+tier coverage, but does not compare a submitted test envelope object because it is not part of run payload (`apps/api/src/index.js`).
 - Impact: server cannot independently prove full envelope parity at submit-time; this remains process/UI-driven.
 
-4. `DISC-004` Section 3 matrix includes `--sw` variants in generated prompts, but backend run contract does not model per-run `styleWeight`.
+3. `DISC-004` Section 3 matrix includes `--sw` variants in generated prompts, but backend run contract does not model per-run `styleWeight`.
 - Requirement source: Section 3 matrix requirements include explicit `sref` cells with differing `--sw` values.
 - Current implementation: UI generates matrix prompt text including `--sw`; run submit payload has no `styleWeight` field and server does not validate test-side `--sw` as submitted metadata (`apps/api/src/index.js`, `apps/frontend/app/admin/style-dna/page.tsx`).
 - Impact: matrix-cell provenance for `--sw` depends on operator discipline and UI state rather than server-enforced run parameters.
@@ -34,6 +29,9 @@ Compared current requirements/planning docs against implemented code paths in AP
 1. `DISC-005` Section 3 direct admin create-new Style Influence flow from Midjourney ID input.
 - Resolution: Admin list/create style influence API endpoints were added and wired into Section 3 with `Create New` + auto-select behavior.
 - Files: `apps/api/src/index.js`, `scripts/db/repository.js`, `apps/frontend/app/admin/style-dna/page.tsx`.
+2. `DISC-001` Style-DNA payload contracts shared in `packages/shared-contracts`.
+- Resolution: Style-DNA admin payload validators are now defined/exported in shared contracts and consumed by API instead of API-local duplicates.
+- Files: `packages/shared-contracts/src/style-dna-admin.js`, `packages/shared-contracts/src/index.js`, `apps/api/src/index.js`.
 
 ## Documentation Drift Fixed in This Change
 

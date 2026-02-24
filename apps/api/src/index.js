@@ -110,6 +110,11 @@ const {
   validateUserRoleManagementPayload,
   validateContributorSubmissionCreatePayload,
   validateContributorSubmissionTriggerPayload,
+  validateStyleDnaBaselineSetPayload,
+  validateStyleDnaBaselineSetItemPayload,
+  validateStyleDnaPromptJobPayload,
+  validateStyleDnaRunPayload,
+  validateStyleDnaImageUploadPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -952,175 +957,6 @@ function stableStringify(value) {
 
 function hashParameterEnvelope(value) {
   return crypto.createHash("sha256").update(stableStringify(value || {})).digest("hex");
-}
-
-function parseIntegerField(value, fieldName) {
-  const parsed = Number.parseInt(String(value), 10);
-  if (!Number.isInteger(parsed)) {
-    throw new Error(`${fieldName} must be an integer`);
-  }
-  return parsed;
-}
-
-const ALLOWED_STYLE_DNA_STYLIZE_TIERS = new Set([0, 100, 1000]);
-
-function ensureAllowedStyleDnaStylizeTier(value, fieldName) {
-  if (!ALLOWED_STYLE_DNA_STYLIZE_TIERS.has(value)) {
-    throw new Error(`${fieldName} must be one of: 0, 100, 1000`);
-  }
-  return value;
-}
-
-function validateStyleDnaBaselineSetPayload(value) {
-  if (!value || typeof value !== "object") {
-    throw new Error("Style-DNA baseline payload must be an object");
-  }
-  if (typeof value.mjModelFamily !== "string" || value.mjModelFamily.trim() === "") {
-    throw new Error("mjModelFamily is required");
-  }
-  if (typeof value.mjModelVersion !== "string" || value.mjModelVersion.trim() === "") {
-    throw new Error("mjModelVersion is required");
-  }
-  if (typeof value.suiteId !== "string" || value.suiteId.trim() === "") {
-    throw new Error("suiteId is required");
-  }
-  if (!value.parameterEnvelope || typeof value.parameterEnvelope !== "object" || Array.isArray(value.parameterEnvelope)) {
-    throw new Error("parameterEnvelope must be an object");
-  }
-  if (value.parameterEnvelope.stylizeTier !== undefined) {
-    ensureAllowedStyleDnaStylizeTier(
-      parseIntegerField(value.parameterEnvelope.stylizeTier, "parameterEnvelope.stylizeTier"),
-      "parameterEnvelope.stylizeTier"
-    );
-  }
-
-  return {
-    mjModelFamily: value.mjModelFamily.trim(),
-    mjModelVersion: value.mjModelVersion.trim(),
-    suiteId: value.suiteId.trim(),
-    parameterEnvelope: value.parameterEnvelope,
-  };
-}
-
-function validateStyleDnaBaselineSetItemPayload(value) {
-  if (!value || typeof value !== "object") {
-    throw new Error("Style-DNA baseline item payload must be an object");
-  }
-  if (typeof value.promptKey !== "string" || value.promptKey.trim() === "") {
-    throw new Error("promptKey is required");
-  }
-  if (typeof value.gridImageId !== "string" || value.gridImageId.trim() === "") {
-    throw new Error("gridImageId is required");
-  }
-  return {
-    promptKey: value.promptKey.trim(),
-    gridImageId: value.gridImageId.trim(),
-    stylizeTier: ensureAllowedStyleDnaStylizeTier(
-      value.stylizeTier === undefined ? 100 : parseIntegerField(value.stylizeTier, "stylizeTier"),
-      "stylizeTier"
-    ),
-  };
-}
-
-function validateStyleDnaPromptJobPayload(value) {
-  if (!value || typeof value !== "object") {
-    throw new Error("Style-DNA prompt job payload must be an object");
-  }
-  if (typeof value.styleInfluenceId !== "string" || value.styleInfluenceId.trim() === "") {
-    throw new Error("styleInfluenceId is required");
-  }
-  if (typeof value.baselineRenderSetId !== "string" || value.baselineRenderSetId.trim() === "") {
-    throw new Error("baselineRenderSetId is required");
-  }
-  if (!Array.isArray(value.stylizeTiers) || value.stylizeTiers.length === 0) {
-    throw new Error("stylizeTiers must be a non-empty array");
-  }
-  const styleAdjustmentType = typeof value.styleAdjustmentType === "string"
-    ? value.styleAdjustmentType.trim()
-    : "";
-  if (!["sref", "profile"].includes(styleAdjustmentType)) {
-    throw new Error("styleAdjustmentType must be one of: sref, profile");
-  }
-  if (typeof value.styleAdjustmentMidjourneyId !== "string" || value.styleAdjustmentMidjourneyId.trim() === "") {
-    throw new Error("styleAdjustmentMidjourneyId is required");
-  }
-  const stylizeTiers = value.stylizeTiers.map((tier) => ensureAllowedStyleDnaStylizeTier(
-    parseIntegerField(tier, "stylizeTier"),
-    "stylizeTier"
-  ));
-  return {
-    styleInfluenceId: value.styleInfluenceId.trim(),
-    baselineRenderSetId: value.baselineRenderSetId.trim(),
-    styleAdjustmentType,
-    styleAdjustmentMidjourneyId: value.styleAdjustmentMidjourneyId.trim(),
-    stylizeTiers,
-  };
-}
-
-function validateStyleDnaRunPayload(value) {
-  if (!value || typeof value !== "object") {
-    throw new Error("Style-DNA run payload must be an object");
-  }
-  if (typeof value.styleInfluenceId !== "string" || value.styleInfluenceId.trim() === "") {
-    throw new Error("styleInfluenceId is required");
-  }
-  if (typeof value.baselineRenderSetId !== "string" || value.baselineRenderSetId.trim() === "") {
-    throw new Error("baselineRenderSetId is required");
-  }
-  if (typeof value.promptKey !== "string" || value.promptKey.trim() === "") {
-    throw new Error("promptKey is required");
-  }
-  if (typeof value.testGridImageId !== "string" || value.testGridImageId.trim() === "") {
-    throw new Error("testGridImageId is required");
-  }
-  const styleAdjustmentType = typeof value.styleAdjustmentType === "string"
-    ? value.styleAdjustmentType.trim()
-    : "";
-  if (!["sref", "profile"].includes(styleAdjustmentType)) {
-    throw new Error("styleAdjustmentType must be one of: sref, profile");
-  }
-  if (typeof value.styleAdjustmentMidjourneyId !== "string" || value.styleAdjustmentMidjourneyId.trim() === "") {
-    throw new Error("styleAdjustmentMidjourneyId is required");
-  }
-  return {
-    idempotencyKey: typeof value.idempotencyKey === "string" && value.idempotencyKey.trim() !== ""
-      ? value.idempotencyKey.trim()
-      : null,
-    styleInfluenceId: value.styleInfluenceId.trim(),
-    baselineRenderSetId: value.baselineRenderSetId.trim(),
-    styleAdjustmentType,
-    styleAdjustmentMidjourneyId: value.styleAdjustmentMidjourneyId.trim(),
-    promptKey: value.promptKey.trim(),
-    stylizeTier: ensureAllowedStyleDnaStylizeTier(
-      parseIntegerField(value.stylizeTier, "stylizeTier"),
-      "stylizeTier"
-    ),
-    testGridImageId: value.testGridImageId.trim(),
-  };
-}
-
-function validateStyleDnaImageUploadPayload(value) {
-  if (!value || typeof value !== "object") {
-    throw new Error("Style-DNA image upload payload must be an object");
-  }
-  if (!["baseline", "test"].includes(String(value.imageKind || "").trim())) {
-    throw new Error("imageKind must be baseline or test");
-  }
-  if (typeof value.fileName !== "string" || value.fileName.trim() === "") {
-    throw new Error("fileName is required");
-  }
-  if (!["image/png", "image/jpeg", "image/webp"].includes(String(value.mimeType || "").trim())) {
-    throw new Error("mimeType must be image/png, image/jpeg, or image/webp");
-  }
-  if (typeof value.fileBase64 !== "string" || value.fileBase64.trim() === "") {
-    throw new Error("fileBase64 is required");
-  }
-  return {
-    imageKind: value.imageKind.trim(),
-    fileName: value.fileName.trim(),
-    mimeType: value.mimeType.trim(),
-    fileBase64: value.fileBase64.trim(),
-  };
 }
 
 function validateAdminStyleInfluenceCreatePayload(value) {

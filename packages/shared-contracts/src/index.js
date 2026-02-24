@@ -50,6 +50,17 @@ const {
   validateContributorSubmissionCreatePayload,
   validateContributorSubmissionTriggerPayload,
 } = require("./contributor-essentials");
+const {
+  STYLE_DNA_STYLIZE_TIERS,
+  STYLE_DNA_ADJUSTMENT_TYPES,
+  STYLE_DNA_IMAGE_KINDS,
+  STYLE_DNA_IMAGE_MIME_TYPES,
+  validateStyleDnaBaselineSetPayload,
+  validateStyleDnaBaselineSetItemPayload,
+  validateStyleDnaPromptJobPayload,
+  validateStyleDnaRunPayload,
+  validateStyleDnaImageUploadPayload,
+} = require("./style-dna-admin");
 const { createApiErrorResponse } = require("./api-error");
 
 module.exports = {
@@ -94,5 +105,14 @@ module.exports = {
   CONTRIBUTOR_SUBMISSION_INFLUENCE_TYPES,
   validateContributorSubmissionCreatePayload,
   validateContributorSubmissionTriggerPayload,
+  STYLE_DNA_STYLIZE_TIERS,
+  STYLE_DNA_ADJUSTMENT_TYPES,
+  STYLE_DNA_IMAGE_KINDS,
+  STYLE_DNA_IMAGE_MIME_TYPES,
+  validateStyleDnaBaselineSetPayload,
+  validateStyleDnaBaselineSetItemPayload,
+  validateStyleDnaPromptJobPayload,
+  validateStyleDnaRunPayload,
+  validateStyleDnaImageUploadPayload,
   createApiErrorResponse,
 };
