@@ -950,6 +950,142 @@ async function main() {
     }
     assertCondition(Boolean(styleDnaLookupJson?.run?.status), "Expected style-dna run lookup status");
 
+    const canonicalForbiddenResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/canonical-traits?axis=lighting_and_contrast&status=active&limit=5`,
+      {
+        headers: { "x-auth-token": contributorToken },
+      }
+    );
+    const canonicalForbiddenJson = await canonicalForbiddenResponse.json().catch(() => ({}));
+    assertCondition(canonicalForbiddenResponse.status === 403, "Expected contributor canonical trait list to return 403");
+    assertCondition(
+      extractApiErrorCode(canonicalForbiddenJson) === "FORBIDDEN",
+      `Expected contributor canonical trait list to return FORBIDDEN, got ${JSON.stringify(canonicalForbiddenJson)}`
+    );
+
+    const canonicalDisplayLabel = `frontend proxy canonical ${Date.now()}`;
+    const canonicalCreateResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/canonical-traits`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          axis: "lighting_and_contrast",
+          displayLabel: canonicalDisplayLabel,
+          notes: "frontend proxy canonical governance smoke",
+        }),
+      }
+    );
+    const canonicalCreateJson = await canonicalCreateResponse.json();
+    if (canonicalCreateResponse.status !== 201) {
+      throw new Error(`Frontend proxy canonical trait create failed (${canonicalCreateResponse.status}): ${JSON.stringify(canonicalCreateJson)}`);
+    }
+    const canonicalTraitId = String(canonicalCreateJson?.canonicalTrait?.canonicalTraitId || "").trim();
+    assertCondition(Boolean(canonicalTraitId), "Expected canonical trait id from create response");
+
+    const canonicalDedupeResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/canonical-traits`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          axis: "lighting_and_contrast",
+          displayLabel: canonicalDisplayLabel,
+        }),
+      }
+    );
+    const canonicalDedupeJson = await canonicalDedupeResponse.json();
+    assertCondition(canonicalDedupeResponse.status === 200, "Expected canonical trait dedupe create to return 200");
+    assertCondition(Boolean(canonicalDedupeJson?.deduplicated), "Expected canonical dedupe=true");
+
+    const aliasText = `frontend proxy alias ${Date.now()}`;
+    const aliasCreateResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/trait-aliases`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          axis: "lighting_and_contrast",
+          canonicalTraitId,
+          aliasText,
+          note: "frontend proxy alias governance smoke",
+        }),
+      }
+    );
+    const aliasCreateJson = await aliasCreateResponse.json();
+    if (aliasCreateResponse.status !== 201) {
+      throw new Error(`Frontend proxy trait alias create failed (${aliasCreateResponse.status}): ${JSON.stringify(aliasCreateJson)}`);
+    }
+    assertCondition(Boolean(aliasCreateJson?.traitAlias?.aliasId), "Expected trait alias id from create response");
+
+    const aliasListResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/trait-aliases?axis=lighting_and_contrast`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const aliasListJson = await aliasListResponse.json();
+    if (!aliasListResponse.ok) {
+      throw new Error(`Frontend proxy trait alias list failed (${aliasListResponse.status}): ${JSON.stringify(aliasListJson)}`);
+    }
+    assertCondition(
+      Array.isArray(aliasListJson?.traitAliases)
+      && aliasListJson.traitAliases.some((row) => String(row?.canonicalTraitId || "") === canonicalTraitId),
+      `Expected alias list to include canonicalTraitId ${canonicalTraitId}`
+    );
+
+    const canonicalDeprecateResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/canonical-traits/${encodeURIComponent(canonicalTraitId)}/status`,
+      {
+        method: "POST",
+        headers: {
+          "x-auth-token": adminToken,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          status: "deprecated",
+          note: "frontend proxy canonical deprecate smoke",
+        }),
+      }
+    );
+    const canonicalDeprecateJson = await canonicalDeprecateResponse.json();
+    if (!canonicalDeprecateResponse.ok) {
+      throw new Error(`Frontend proxy canonical status update failed (${canonicalDeprecateResponse.status}): ${JSON.stringify(canonicalDeprecateJson)}`);
+    }
+    assertCondition(
+      String(canonicalDeprecateJson?.canonicalTrait?.status || "") === "deprecated",
+      "Expected canonical status update to set deprecated"
+    );
+
+    const canonicalDeprecatedListResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/canonical-traits?axis=lighting_and_contrast&status=deprecated&limit=50`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const canonicalDeprecatedListJson = await canonicalDeprecatedListResponse.json();
+    if (!canonicalDeprecatedListResponse.ok) {
+      throw new Error(`Frontend proxy canonical deprecated list failed (${canonicalDeprecatedListResponse.status}): ${JSON.stringify(canonicalDeprecatedListJson)}`);
+    }
+    assertCondition(
+      Array.isArray(canonicalDeprecatedListJson?.canonicalTraits)
+      && canonicalDeprecatedListJson.canonicalTraits.some((row) => String(row?.canonicalTraitId || "") === canonicalTraitId),
+      `Expected deprecated list to include canonicalTraitId ${canonicalTraitId}`
+    );
+
     console.log(
       JSON.stringify(
         {
@@ -981,6 +1117,14 @@ async function main() {
             runStatus: styleDnaLookupJson?.run?.status || "(unknown)",
             promptJobId: styleDnaPromptJobJson?.promptJob?.promptJobId || styleDnaPromptJobJson?.promptJobId || "",
           },
+          canonicalGovernance: {
+            canonicalTraitId,
+            canonicalCreateStatus: canonicalCreateResponse.status,
+            canonicalDedupeStatus: canonicalDedupeResponse.status,
+            canonicalDeprecatedStatus: canonicalDeprecateJson?.canonicalTrait?.status || "(unknown)",
+            aliasCreateStatus: aliasCreateResponse.status,
+            aliasListCount: Array.isArray(aliasListJson?.traitAliases) ? aliasListJson.traitAliases.length : 0,
+          },
           forbiddenChecks: {
             contributorAdminPolicyStatus: forbiddenAdminPolicyResponse.status,
             contributorAdminUsersStatus: forbiddenAdminUsersResponse.status,
@@ -988,6 +1132,7 @@ async function main() {
             contributorPromptCurationStatus: curationForbiddenResponse.status,
             contributorGovernanceStatus: governanceForbiddenResponse.status,
             contributorStyleDnaStatus: forbiddenStyleDnaListResponse.status,
+            contributorCanonicalTraitStatus: canonicalForbiddenResponse.status,
             consumerContributorCreateStatus: forbiddenConsumerCreateResponse.status,
             foreignOwnerReadStatus: foreignReadResponse.status,
           },

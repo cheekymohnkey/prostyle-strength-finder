@@ -86,6 +86,8 @@ Implemented in code:
 - `POST /v1/admin/style-dna/trait-aliases`
 8. Canonical governance smoke is now available:
 - `style-dna:canonical-governance-smoke`
+9. Frontend proxy smoke now includes canonical governance coverage:
+- `admin:frontend-proxy-smoke` validates canonical create/dedupe/status and alias create/list via `/api/proxy/admin/style-dna/*` routes.
 
 Open gaps:
 1. `DISC-002` remains partially open: embedding-model similarity path is now wired in canonicalization, but broader taxonomy seeding and governance tooling still needs completion.

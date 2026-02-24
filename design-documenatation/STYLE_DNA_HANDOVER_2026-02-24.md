@@ -69,6 +69,8 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `POST /v1/admin/style-dna/canonical-traits/:canonicalTraitId/status`
 - `GET/POST /v1/admin/style-dna/trait-aliases`
 - `npm run style-dna:canonical-governance-smoke`
+13. Extended frontend proxy smoke coverage:
+- `npm run admin:frontend-proxy-smoke` now validates canonical governance proxy flow (create/dedupe/status + alias create/list + contributor-forbidden check).
 
 ## Resolved Discrepancies
 
