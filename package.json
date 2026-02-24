@@ -47,6 +47,7 @@
     "style-dna:prompt-generation-smoke": "node scripts/style-dna/prompt-generation-smoke.js",
     "style-dna:run-smoke": "node scripts/style-dna/run-smoke.js",
     "style-dna:canonicalization-smoke": "node scripts/style-dna/canonicalization-smoke.js",
+    "style-dna:canonicalization-semantic-smoke": "node scripts/style-dna/canonicalization-semantic-smoke.js",
     "style-dna:schema-failure-smoke": "node scripts/style-dna/schema-failure-smoke.js",
     "style-dna:smokes:with-restore": "scripts/db/run-with-db-restore.sh /bin/zsh -lc \"npm run style-dna:tier-validation-smoke && npm run style-dna:baseline-smoke && npm run style-dna:prompt-generation-smoke && npm run style-dna:canonicalization-smoke && npm run style-dna:run-smoke && npm run style-dna:schema-failure-smoke\""
   }

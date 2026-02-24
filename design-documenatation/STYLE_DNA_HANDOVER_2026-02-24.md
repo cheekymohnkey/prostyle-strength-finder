@@ -61,6 +61,9 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - canonicalizer now supports OpenAI embeddings (`/embeddings`) for semantic similarity scoring
 - worker now passes canonicalization semantic mode/config (`auto|embedding|proxy`)
 - canonicalization falls back safely to proxy similarity when embeddings are unavailable
+11. Added canonicalization semantic-mode regression smoke:
+- `npm run style-dna:canonicalization-semantic-smoke`
+- covers proxy behavior, embedding behavior, and auto-mode embedding-failure fallback behavior
 
 ## Resolved Discrepancies
 

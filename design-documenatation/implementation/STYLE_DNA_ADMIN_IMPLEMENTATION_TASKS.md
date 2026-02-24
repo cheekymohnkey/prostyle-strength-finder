@@ -78,6 +78,7 @@ Out of scope:
 5. SD5: Mostly implemented.
 - style-dna smoke scripts exist and have passed in prior session verification.
 - `style-dna:canonicalization-smoke` is implemented and passing.
+- `style-dna:canonicalization-semantic-smoke` is implemented and passing (`proxy` vs `embedding` vs `auto` fallback coverage).
 - prompt generation verification includes model version flag emission (`--v`).
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
 - launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.

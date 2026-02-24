@@ -63,6 +63,7 @@ Implemented in code:
 - `style-dna:prompt-generation-smoke`
 - `style-dna:run-smoke`
 - `style-dna:canonicalization-smoke`
+- `style-dna:canonicalization-semantic-smoke`
 - `style-dna:schema-failure-smoke`
  - set-producing smokes now self-clean smoke-created baseline/prompt/run/image records on success to avoid local data pollution
  - frontend proxy smoke assertions now explicitly enforce Style-DNA negative-path API error contracts (`FORBIDDEN`, `INVALID_STATE`) and reason-text expectations
