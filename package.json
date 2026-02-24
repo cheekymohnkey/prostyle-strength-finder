@@ -69,6 +69,7 @@
     "style-dna:taxonomy-seed-rollout-artifacts-export-smoke": "node scripts/style-dna/taxonomy-seed-rollout-artifacts-export-smoke.js",
     "style-dna:taxonomy-seed-rollout-artifacts-upload-smoke": "node scripts/style-dna/taxonomy-seed-rollout-artifacts-upload-smoke.js",
     "style-dna:taxonomy-seed-rollout-artifacts-upload-ci": "node scripts/style-dna/taxonomy-seed-rollout-artifacts-upload-ci.js",
+    "style-dna:taxonomy-seed-evidence-governance-check": "node scripts/style-dna/taxonomy-seed-evidence-governance-check.js",
     "style-dna:discovery-review-replay-smoke": "node scripts/style-dna/discovery-review-replay-smoke.js",
     "style-dna:schema-failure-smoke": "node scripts/style-dna/schema-failure-smoke.js",
     "style-dna:smokes:with-restore": "scripts/db/run-with-db-restore.sh /bin/zsh -lc \"npm run style-dna:tier-validation-smoke && npm run style-dna:baseline-smoke && npm run style-dna:prompt-generation-smoke && npm run style-dna:canonicalization-smoke && npm run style-dna:run-smoke && npm run style-dna:schema-failure-smoke\""

@@ -141,9 +141,32 @@ Implemented in code:
 - command: `npm run style-dna:taxonomy-seed-rollout-artifacts-upload-ci`
 - supports `isolated` (default) and `shared` storage-policy modes
 - shared mode enforces env contract (`APP_ENV`, `S3_BUCKET`, `AWS_REGION`) before smoke execution
+24. Deterministic shared-mode evidence retention/export workflow is now documented:
+- runbook includes deterministic retention pathing under `tmp/style-dna-evidence/shared-ci/<app_env>/<timestamp>`
+- shared-mode guidance now separates ephemeral CI wrapper validation from persistent evidence package generation/export/upload
+- handover-required evidence fields now include `receiptPath` plus retention directory references
+25. Recurring shared-mode evidence governance is now documented:
+- runbook now defines execution cadence (release-candidate minimum + weekly recommendation)
+- ownership model is explicit across release owner, infra owner, and on-call maintainer
+- handover freshness contract now includes required `freshnessStatus` and `freshnessCheckedAtUtc` fields
+26. Evidence governance validator command is now available:
+- command: `npm run style-dna:taxonomy-seed-evidence-governance-check`
+- emits deterministic `fresh|stale` JSON governance status summary
+- supports CI hard-gate via `--fail-on-stale` and artifact output via `--output`
+27. Shared CI/release adoption guidance is now documented:
+- runbook includes default hard-gate policy for shared CI/release workflows
+- one canonical warning-only vs hard-gate pipeline snippet is now provided
+- governance status artifact (`latest_governance_status.json`) persistence is now explicitly required
+28. Repo CI workflow wiring is now implemented:
+- GitHub Actions workflow: `.github/workflows/style-dna-evidence-governance.yml`
+- concrete governance job: `style_dna_evidence_governance`
+- workflow uploads governance status artifact even on hard-gate failure (`if: always()`)
+29. SDNA-34 rollout verification runbook is now documented:
+- includes copy/paste `gh` commands for warning-only and hard-gate dispatch runs
+- includes artifact download commands and handover evidence block template
 
 Open gaps:
-1. `DISC-002` remains partially open: v2 bundle, rollout workflow, consolidated artifacts, index/prune, export, upload/publish tooling, storage-adapter destination policy integration, CI execution wrapper, shared-mode runbook guidance, and provider-backed shared-mode execution evidence are implemented; remaining work is evidence retention/export standardization.
+1. `DISC-002` remains partially open: SDNA-34 execution runbook is ready; remaining work is capturing real CI run evidence (warning-only + hard-gate + schedule ownership verification).
 2. DISC-003 residual limitation: submitted test-envelope evidence is validated server-side, but rendered-image authenticity remains operator/process-dependent.
 3. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
 

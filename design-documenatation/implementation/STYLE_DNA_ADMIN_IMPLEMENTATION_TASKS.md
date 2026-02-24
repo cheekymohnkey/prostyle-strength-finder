@@ -293,15 +293,15 @@ Acceptance criteria:
 21. `SDNA-21` artifact export + manifest tooling.
 22. `SDNA-22` artifact upload/publish receipt workflow.
 
-## Next Task (SDNA-29 / DISC-002 Evidence Retention Standardization)
+## Next Task (SDNA-34 / DISC-002 Environment Rollout Verification)
 
 Objective:
-1. Standardize evidence retention/export flow for shared-mode CI wrapper outputs.
+1. Verify governance workflow rollout in target CI environments and confirm scheduled cadence operates with retained evidence.
 
 Scope:
-1. Define deterministic destination path/pattern for shared-mode execution evidence artifacts.
-2. Add runbook guidance for storing and linking shared-mode evidence outputs.
-3. Update handover with retention standard and example evidence references.
+1. Trigger `.github/workflows/style-dna-evidence-governance.yml` in `hard-gate` and `warning-only` modes and capture run evidence.
+2. Confirm artifact upload (`style-dna-governance-status-<app_env>`) appears in run outputs for both pass/fail outcomes.
+3. Validate weekly schedule behavior and ownership notification path for stale failures.
 
 Out of scope:
 1. Broad UI redesign of Section 3.
@@ -309,10 +309,11 @@ Out of scope:
 3. Unrelated style-dna run contract changes.
 
 Definition of done:
-1. Evidence retention pattern is documented and reusable across environments.
-2. Handover records command, env assumptions, and retained evidence locations.
-3. Regression checks remain green.
-4. Task handoff documents files changed, decisions made, risks, and recommended next slice.
+1. CI run evidence is captured for both enforcement modes.
+2. Artifact persistence is confirmed in real CI runs.
+3. Schedule + ownership response path is documented with concrete run references.
+4. Regression checks remain green.
+5. Task handoff documents files changed, decisions made, risks, and recommended next slice.
 
 Verification commands:
 1. `npm run contracts`

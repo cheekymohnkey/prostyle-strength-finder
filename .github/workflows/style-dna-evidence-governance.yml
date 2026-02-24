@@ -1,0 +1,65 @@
+name: Style DNA Evidence Governance
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_env:
+        description: "Environment key under tmp/style-dna-evidence/shared-ci/"
+        required: false
+        default: "prod"
+      max_age_days:
+        description: "Maximum evidence age in days before stale"
+        required: false
+        default: "7"
+      enforcement_mode:
+        description: "hard-gate fails on stale evidence; warning-only records status only"
+        required: false
+        default: "hard-gate"
+  schedule:
+    - cron: "0 9 * * 1"
+
+jobs:
+  style_dna_evidence_governance:
+    name: Style DNA Evidence Governance
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: ${{ github.event.inputs.app_env || 'prod' }}
+      MAX_AGE_DAYS: ${{ github.event.inputs.max_age_days || '7' }}
+      ENFORCEMENT_MODE: ${{ github.event.inputs.enforcement_mode || 'hard-gate' }}
+      GOVERNANCE_STATUS_PATH: tmp/style-dna-evidence/shared-ci/${{ github.event.inputs.app_env || 'prod' }}/latest_governance_status.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Ensure governance artifact directory exists
+        run: mkdir -p "$(dirname "$GOVERNANCE_STATUS_PATH")"
+
+      - name: Governance Check (warning-only)
+        if: ${{ env.ENFORCEMENT_MODE == 'warning-only' }}
+        run: |
+          npm run style-dna:taxonomy-seed-evidence-governance-check -- \
+            --app-env "$APP_ENV" \
+            --max-age-days "$MAX_AGE_DAYS" \
+            --output "$GOVERNANCE_STATUS_PATH"
+
+      - name: Governance Check (hard-gate)
+        if: ${{ env.ENFORCEMENT_MODE != 'warning-only' }}
+        run: |
+          npm run style-dna:taxonomy-seed-evidence-governance-check -- \
+            --app-env "$APP_ENV" \
+            --max-age-days "$MAX_AGE_DAYS" \
+            --fail-on-stale \
+            --output "$GOVERNANCE_STATUS_PATH"
+
+      - name: Upload governance status artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: style-dna-governance-status-${{ env.APP_ENV }}
+          path: ${{ env.GOVERNANCE_STATUS_PATH }}
+          if-no-files-found: error

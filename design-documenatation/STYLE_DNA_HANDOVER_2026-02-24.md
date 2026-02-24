@@ -430,6 +430,163 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `receiptId`: `2d301636f361a29f075e8186de2e6419bfb2f01006e55709e67a799dcbff645a`
 - `storagePrefix`: `uploads/style-dna/taxonomy-rollouts-shared-smoke/1771938189171-41a98f2d-2e8d-41f5-9c89-e7a37bb066a7`
 
+## This Session Addendum (SDNA-29)
+
+1. What was completed:
+- Added deterministic shared-mode evidence retention/export workflow guidance to taxonomy seed versioning runbook.
+- Clarified CI wrapper output behavior as ephemeral and documented persistent evidence generation via rollout/export/upload commands.
+- Added required handover evidence fields including `receiptPath` and deterministic retention directory conventions.
+- Synced plan/tasks docs to mark retention/export standardization complete and move next slice to recurring evidence governance.
+
+2. Files changed:
+- `design-documenatation/implementation/STYLE_DNA_TAXONOMY_SEED_VERSIONING.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+
+3. Decisions made:
+- Shared-mode CI wrapper is treated as a gate check, not the retained evidence source.
+- Retained evidence packages must be generated/exported/uploaded in deterministic paths after wrapper success.
+- Handover evidence contract now explicitly requires both `manifestPath` and `receiptPath`.
+
+4. Outstanding risks/issues:
+- Recurring execution ownership/cadence is still process-defined and not yet enforced by automation.
+- Provider/IAM contract remains environment-specific and can still fail despite deterministic retention guidance.
+
+5. Recommended next task:
+- Define recurring shared-mode evidence governance (cadence owner, freshness checks, and retention-monitoring responsibilities).
+
+## This Session Addendum (SDNA-30)
+
+1. What was completed:
+- Added recurring shared-mode evidence governance guidance to the taxonomy seed versioning runbook.
+- Defined execution cadence, role-based ownership model, freshness policy thresholds, and retention monitoring checklist.
+- Extended handover evidence template with explicit freshness fields (`freshnessStatus`, `freshnessCheckedAtUtc`).
+- Synced plan/tasks docs to mark governance documentation complete and move next slice to enforcement automation.
+
+2. Files changed:
+- `design-documenatation/implementation/STYLE_DNA_TAXONOMY_SEED_VERSIONING.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+
+3. Decisions made:
+- Shared-mode evidence freshness uses a 7-day threshold (`fresh` <= 7 days, otherwise `stale`).
+- Release readiness requires fresh shared-mode evidence unless an explicit handover risk waiver is documented.
+- Ownership responsibilities are split across release owner, infra owner, and on-call maintainer roles.
+
+4. Outstanding risks/issues:
+- Governance checks are still process-driven and not yet machine-enforced in CI/reporting.
+- Provider/IAM environment drift can still cause shared-mode evidence gaps despite governance guidance.
+
+5. Recommended next task:
+- Implement evidence governance enforcement automation (freshness validator output + CI/reporting stale-signal integration).
+
+## This Session Addendum (SDNA-31)
+
+1. What was completed:
+- Implemented shared-mode evidence governance validator command with deterministic JSON output.
+- Added optional CI hard-gate mode (`--fail-on-stale`) and artifact output mode (`--output`).
+- Documented validator output contract and warning/hard-gate CI usage examples in taxonomy seed runbook.
+- Synced plan/tasks docs to mark enforcement automation completed and move next slice to CI adoption integration.
+
+2. Files changed:
+- `scripts/style-dna/taxonomy-seed-evidence-governance-check.js`
+- `package.json`
+- `design-documenatation/implementation/STYLE_DNA_TAXONOMY_SEED_VERSIONING.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+
+3. Decisions made:
+- Governance freshness evaluation is based on retention timestamp directory (`YYYYMMDDTHHMMSSZ`) plus required artifact presence (`manifest` + `receipt`).
+- `--fail-on-stale` is the canonical CI enforcement switch; without it, command remains reporting-friendly.
+- Governance status artifact naming/reference is standardized via `latest_governance_status.json`.
+
+4. Outstanding risks/issues:
+- Default shared CI/release pipelines do not yet universally invoke the governance check.
+- Historical retention directories using non-standard names are ignored by validator timestamp parsing.
+
+5. Recommended next task:
+- Integrate governance check into default shared CI/release pipeline guidance and artifact publishing flow.
+
+## This Session Addendum (SDNA-32)
+
+1. What was completed:
+- Added shared CI/release adoption guidance for evidence governance enforcement in the taxonomy seed runbook.
+- Added one canonical snippet showing warning-only mode vs hard-gate mode (`--fail-on-stale`).
+- Added explicit requirement to publish `latest_governance_status.json` as CI artifact for both success and failure triage paths.
+- Synced plan/tasks docs to mark CI adoption guidance complete and move next slice to concrete repo CI workflow wiring.
+
+2. Files changed:
+- `design-documenatation/implementation/STYLE_DNA_TAXONOMY_SEED_VERSIONING.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+
+3. Decisions made:
+- Hard-gate governance check is the default policy for shared CI/release runs.
+- Warning-only mode remains available for non-blocking branch workflows.
+- Governance status artifact persistence is mandatory for release triage traceability.
+
+4. Outstanding risks/issues:
+- Guidance is documented, but repo CI workflow files are not yet wired with concrete governance steps.
+- CI provider-specific artifact upload syntax remains to be implemented in actual pipeline config.
+
+5. Recommended next task:
+- Implement concrete CI workflow/job wiring for governance hard-gate + artifact upload in repo pipeline files.
+
+## This Session Addendum (SDNA-33)
+
+1. What was completed:
+- Added concrete repo CI workflow wiring for evidence governance enforcement.
+- Implemented GitHub Actions workflow with hard-gate default and warning-only override mode.
+- Implemented CI artifact upload for governance status output with `if: always()` so failure runs still retain triage artifact.
+- Synced plan/tasks/runbook/handover references with exact workflow path and job id.
+
+2. Files changed:
+- `.github/workflows/style-dna-evidence-governance.yml`
+- `design-documenatation/implementation/STYLE_DNA_TAXONOMY_SEED_VERSIONING.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+
+3. Decisions made:
+- Repo CI provider target is GitHub Actions for governance workflow wiring.
+- Workflow job `style_dna_evidence_governance` uses `hard-gate` by default with optional `warning-only` input.
+- Governance artifact naming is standardized as `style-dna-governance-status-<app_env>`.
+
+4. Outstanding risks/issues:
+- Workflow wiring is implemented, but runtime verification evidence for both modes is not yet captured from actual CI runs.
+- Scheduled-run ownership notifications remain dependent on repo/org CI notification settings.
+
+5. Recommended next task:
+- Execute workflow in both modes and capture concrete CI evidence artifacts + schedule ownership verification.
+
+## This Session Addendum (SDNA-34 Prep)
+
+1. What was completed:
+- Added SDNA-34 CI verification runbook with copy/paste `gh` workflow dispatch commands for warning-only and hard-gate modes.
+- Added concrete run inspection and artifact download commands for governance status evidence capture.
+- Added schedule verification checklist and a handover evidence block template for recording run ids, outcomes, and ownership notification verification.
+- Synced implementation plan wording to reflect runbook readiness and pending CI evidence capture.
+
+2. Files changed:
+- `design-documenatation/implementation/STYLE_DNA_TAXONOMY_SEED_VERSIONING.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+
+3. Decisions made:
+- SDNA-34 execution should be performed via `gh workflow run` against the concrete workflow name `Style DNA Evidence Governance`.
+- Evidence capture should include downloaded artifact paths, not only run IDs, to support deterministic handover traceability.
+
+4. Outstanding risks/issues:
+- No CI runs were executed in this session; evidence collection remains pending in target CI environment.
+- Ownership notification verification still depends on repo/org notification configuration and on-call routing.
+
+5. Recommended next task:
+- Execute SDNA-34 runbook in CI and attach concrete warning-only/hard-gate/scheduled run evidence in handover.
+
 ## Suggested First Commands Next Session
 
 1. `set -a; source .env.local; set +a`
