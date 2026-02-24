@@ -79,7 +79,7 @@ Implemented in code:
 - `/admin/style-dna` now exposes pending review queue and status-filtered review history.
 
 Open gaps:
-1. `DISC-002` remains partially open: embedding-model similarity path is not yet wired (deterministic semantic proxy currently used).
+1. `DISC-002` remains partially open: embedding-model similarity path is now wired in canonicalization, but broader taxonomy seeding and governance tooling still needs completion.
 2. DISC-003 residual limitation: submitted test-envelope evidence is validated server-side, but rendered-image authenticity remains operator/process-dependent.
 3. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
 

@@ -67,13 +67,13 @@ function countPendingDiscoveries(dbPath) {
   return Number(rows[0]?.count || 0);
 }
 
-function main() {
+async function main() {
   const dbPath = createTempDbPath();
   try {
     applyAllMigrations(dbPath);
     seedCanonicalTraits(dbPath);
 
-    const result = canonicalizeStyleDnaTraits({
+    const result = await canonicalizeStyleDnaTraits({
       dbPath,
       taxonomyVersion: "style_dna_v1",
       styleDnaRunId: "sdna_run_smoke",

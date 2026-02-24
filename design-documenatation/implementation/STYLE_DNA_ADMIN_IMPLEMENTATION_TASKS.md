@@ -67,6 +67,7 @@ Out of scope:
 3. SD3: Implemented (DISC-002 foundation now in place).
 - worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
 - canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
+- canonicalization semantic matching now supports OpenAI embeddings (`/embeddings`) with `auto` fallback to proxy similarity when embeddings are unavailable.
 - failure path reaches dead-letter behavior in schema-failure smoke.
 4. SD4: Implemented (with polish remaining).
 - `/admin/style-dna` supports baseline setup, image intake, prompt copy/generation, submit, and result lookup.

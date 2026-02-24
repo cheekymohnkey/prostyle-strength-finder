@@ -57,6 +57,10 @@ Capture the current Style-DNA implementation state and active risks so the next 
 9. `DISC-001` is resolved:
 - Style-DNA admin payload validators moved from API-local functions into shared contracts module
 - API now consumes shared validators from `packages/shared-contracts`
+10. `DISC-002` embedding similarity path is now wired:
+- canonicalizer now supports OpenAI embeddings (`/embeddings`) for semantic similarity scoring
+- worker now passes canonicalization semantic mode/config (`auto|embedding|proxy`)
+- canonicalization falls back safely to proxy similarity when embeddings are unavailable
 
 ## Resolved Discrepancies
 
@@ -67,8 +71,8 @@ Capture the current Style-DNA implementation state and active risks so the next 
 ## Still Open Discrepancies
 
 1. `DISC-002` is partially resolved but not complete.
-- Implemented: canonicalization pipeline, alias/discovery persistence, and admin review workflow.
-- Remaining: true embedding-model similarity (current semantic matching uses deterministic proxy), broader taxonomy seeding/governance refinement.
+- Implemented: canonicalization pipeline, alias/discovery persistence, admin review workflow, and embedding-backed semantic similarity path.
+- Remaining: broader taxonomy seeding/governance refinement.
 2. `DISC-003` residual limitation remains.
 - Implemented: submitted test-envelope parity checks at run submit.
 - Remaining: rendered image provenance/authenticity is still process-dependent (no cryptographic attestation from Midjourney output).
@@ -78,22 +82,23 @@ Capture the current Style-DNA implementation state and active risks so the next 
 1. `apps/frontend/app/admin/style-dna/page.tsx`
 2. `apps/api/src/index.js`
 3. `apps/worker/src/index.js`
-4. `scripts/db/migrations/20260224221500_style_dna_trait_taxonomy_governance.sql`
-5. `scripts/db/repository.js`
-6. `scripts/inference/style-dna-canonicalizer.js`
-7. `scripts/inference/style-dna-adapter.js`
-8. `scripts/inference/openai-debug-log.js`
-9. `scripts/style-dna/canonicalization-smoke.js`
-10. `package.json`
-11. `design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md`
-12. `design-documenatation/requirements/REQUIREMENTS_CODE_DISCREPANCIES.md`
-13. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
-14. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
-15. `scripts/inference/prompts/style-dna-baseline-comparison-system.md`
-16. `packages/shared-contracts/src/style-dna-admin.js`
-17. `scripts/style-dna/run-smoke.js`
-18. `scripts/style-dna/schema-failure-smoke.js`
-19. `scripts/admin/frontend-proxy-smoke.js`
+4. `apps/worker/src/config.js`
+5. `scripts/db/migrations/20260224221500_style_dna_trait_taxonomy_governance.sql`
+6. `scripts/db/repository.js`
+7. `scripts/inference/style-dna-canonicalizer.js`
+8. `scripts/inference/style-dna-adapter.js`
+9. `scripts/inference/openai-debug-log.js`
+10. `scripts/style-dna/canonicalization-smoke.js`
+11. `package.json`
+12. `design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md`
+13. `design-documenatation/requirements/REQUIREMENTS_CODE_DISCREPANCIES.md`
+14. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+15. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+16. `scripts/inference/prompts/style-dna-baseline-comparison-system.md`
+17. `packages/shared-contracts/src/style-dna-admin.js`
+18. `scripts/style-dna/run-smoke.js`
+19. `scripts/style-dna/schema-failure-smoke.js`
+20. `scripts/admin/frontend-proxy-smoke.js`
 
 ## Recent Commits
 
@@ -125,7 +130,6 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `npm run style-dna:run-smoke`
 - `npm run style-dna:schema-failure-smoke`
 5. Continue `DISC-002` completion slice:
-- replace semantic proxy with true embedding similarity path
 - add taxonomy seed/admin flows for canonical trait curation at scale
 - add API/worker tests around review actions and alias resolution replay behavior
 
@@ -142,4 +146,4 @@ Capture the current Style-DNA implementation state and active risks so the next 
 
 1. Section 3 core admin workflow is materially improved (create/remove influence, matrix progress, accumulated trait summary, and debug visibility).
 2. Shared-contract drift for Style-DNA payload validation is resolved (`DISC-001`).
-3. Major remaining technical work is DISC-002 completion (embedding-backed semantic snapping + governance hardening) while DISC-003/DISC-004 contract enforcement is now implemented with process-trust residuals.
+3. Major remaining technical work is DISC-002 governance hardening (taxonomy seeding/curation and replay/audit test depth) while DISC-003/DISC-004 contract enforcement is now implemented with process-trust residuals.

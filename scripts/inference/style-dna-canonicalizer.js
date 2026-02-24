@@ -7,10 +7,13 @@ const {
   insertStyleDnaTraitDiscovery,
   updateStyleDnaTraitDiscoveryObservation,
 } = require("../db/repository");
+const { createOpenAiDebugSession } = require("./openai-debug-log");
 
 const DEFAULT_TAXONOMY_VERSION = "style_dna_v1";
 const DEFAULT_LEXICAL_THRESHOLD = 0.7;
 const DEFAULT_SEMANTIC_THRESHOLD = 0.88;
+const DEFAULT_SEMANTIC_MODE = "auto";
+const DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
 const TRAIT_AXES = [
   "composition_and_structure",
   "lighting_and_contrast",
@@ -101,6 +104,150 @@ function semanticProxySimilarity(a, b) {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+function cosineSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length === 0 || b.length === 0 || a.length !== b.length) {
+    return 0;
+  }
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let index = 0; index < a.length; index += 1) {
+    const av = Number(a[index] || 0);
+    const bv = Number(b[index] || 0);
+    dot += av * bv;
+    normA += av * av;
+    normB += bv * bv;
+  }
+  if (normA <= 0 || normB <= 0) {
+    return 0;
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function normalizeSemanticMode(value) {
+  const normalized = String(value || DEFAULT_SEMANTIC_MODE).trim().toLowerCase();
+  if (normalized === "auto" || normalized === "embedding" || normalized === "proxy") {
+    return normalized;
+  }
+  return DEFAULT_SEMANTIC_MODE;
+}
+
+async function fetchEmbeddingVectors(openAi, texts) {
+  const cleanTexts = Array.isArray(texts)
+    ? texts.map((item) => String(item || "").trim()).filter((item) => item !== "")
+    : [];
+  if (cleanTexts.length === 0) {
+    return [];
+  }
+  const model = String(openAi?.embeddingModel || DEFAULT_OPENAI_EMBEDDING_MODEL).trim() || DEFAULT_OPENAI_EMBEDDING_MODEL;
+  const baseUrl = String(openAi?.baseUrl || "https://api.openai.com/v1").trim().replace(/\/+$/, "");
+  const apiKey = String(openAi?.apiKey || "").trim();
+  if (!apiKey) {
+    throw new Error("OpenAI API key is required for embedding semantic mode");
+  }
+
+  const body = {
+    model,
+    input: cleanTexts,
+  };
+  const debug = createOpenAiDebugSession({
+    adapter: "style_dna",
+    operation: "embeddings",
+    model,
+    url: `${baseUrl}/embeddings`,
+  });
+  const requestBodyRaw = JSON.stringify(body);
+  debug.logRequest(requestBodyRaw);
+  const response = await fetch(`${baseUrl}/embeddings`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: requestBodyRaw,
+  });
+  const responseBodyRaw = await response.text();
+  debug.logResponse({
+    status: response.status,
+    bodyRaw: responseBodyRaw,
+  });
+  const payload = (() => {
+    try {
+      return JSON.parse(responseBodyRaw);
+    } catch (_error) {
+      return {};
+    }
+  })();
+  if (!response.ok) {
+    const message = payload?.error?.message || `OpenAI embeddings request failed with status ${response.status}`;
+    debug.logError(message);
+    throw new Error(message);
+  }
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  if (rows.length !== cleanTexts.length) {
+    throw new Error("OpenAI embeddings response size mismatch");
+  }
+  return rows.map((row) => (Array.isArray(row?.embedding) ? row.embedding : []));
+}
+
+function createSemanticSimilarityResolver(options = {}) {
+  const semanticMode = normalizeSemanticMode(options.semanticMode);
+  const openAi = options.openAi || {};
+  const embeddingCache = new Map();
+  let warnedEmbeddingFallback = false;
+
+  async function embeddingSimilarity(query, candidateLabels) {
+    const queryText = String(query || "").trim();
+    const labels = Array.isArray(candidateLabels) ? candidateLabels.map((item) => String(item || "").trim()) : [];
+    if (!queryText || labels.length === 0) {
+      return labels.map(() => 0);
+    }
+    const missingTexts = [];
+    if (!embeddingCache.has(queryText)) {
+      missingTexts.push(queryText);
+    }
+    labels.forEach((label) => {
+      if (label && !embeddingCache.has(label)) {
+        missingTexts.push(label);
+      }
+    });
+    if (missingTexts.length > 0) {
+      const vectors = await fetchEmbeddingVectors(openAi, missingTexts);
+      missingTexts.forEach((text, index) => {
+        embeddingCache.set(text, vectors[index] || []);
+      });
+    }
+    const queryVector = embeddingCache.get(queryText) || [];
+    return labels.map((label) => cosineSimilarity(queryVector, embeddingCache.get(label) || []));
+  }
+
+  function proxySimilarity(query, candidateLabels) {
+    return (Array.isArray(candidateLabels) ? candidateLabels : [])
+      .map((label) => semanticProxySimilarity(query, label));
+  }
+
+  return async (query, candidateLabels) => {
+    if (semanticMode === "proxy") {
+      return proxySimilarity(query, candidateLabels);
+    }
+    const hasEmbeddingConfig = String(openAi?.apiKey || "").trim() !== "";
+    if (semanticMode === "auto" && !hasEmbeddingConfig) {
+      return proxySimilarity(query, candidateLabels);
+    }
+    try {
+      return await embeddingSimilarity(query, candidateLabels);
+    } catch (error) {
+      if (!warnedEmbeddingFallback) {
+        warnedEmbeddingFallback = true;
+        console.warn(
+          `[style-dna-canonicalizer] Embedding similarity unavailable, falling back to proxy similarity: ${error.message}`
+        );
+      }
+      return proxySimilarity(query, candidateLabels);
+    }
+  };
+}
+
 function buildTraitLookups(canonicalRows, aliasRows) {
   const canonicalByAxis = new Map();
   const aliasByAxis = new Map();
@@ -125,11 +272,15 @@ function buildTraitLookups(canonicalRows, aliasRows) {
   };
 }
 
-function topCandidates(canonicalRows, normalizedTrait, maxCount = 3) {
+async function topCandidates(canonicalRows, normalizedTrait, semanticSimilarityResolver, maxCount = 3) {
+  const semanticScores = await semanticSimilarityResolver(
+    normalizedTrait,
+    canonicalRows.map((row) => row.normalized_label)
+  );
   return canonicalRows
-    .map((row) => {
+    .map((row, index) => {
       const lexical = lexicalSimilarity(normalizedTrait, row.normalized_label);
-      const semantic = semanticProxySimilarity(normalizedTrait, row.normalized_label);
+      const semantic = Number(semanticScores[index] || 0);
       return {
         canonicalTraitId: row.canonical_trait_id,
         displayLabel: row.display_label,
@@ -202,12 +353,13 @@ function addDiscoveryRecord(dbPath, {
   return discoveryId;
 }
 
-function canonicalizeStyleDnaTraits({
+async function canonicalizeStyleDnaTraits({
   dbPath,
   atomicTraits,
   taxonomyVersion = DEFAULT_TAXONOMY_VERSION,
   lexicalThreshold = DEFAULT_LEXICAL_THRESHOLD,
   semanticThreshold = DEFAULT_SEMANTIC_THRESHOLD,
+  semantic = {},
   styleDnaRunId = null,
   analysisRunId = null,
 }) {
@@ -224,6 +376,10 @@ function canonicalizeStyleDnaTraits({
     unresolved: 0,
     rejectedAsVague: 0,
   };
+  const semanticSimilarityResolver = createSemanticSimilarityResolver({
+    semanticMode: semantic.mode || semantic.semanticMode || DEFAULT_SEMANTIC_MODE,
+    openAi: semantic.openAi || {},
+  });
 
   for (const axis of TRAIT_AXES) {
     const input = Array.isArray(atomicTraits?.[axis]) ? atomicTraits[axis] : [];
@@ -282,7 +438,7 @@ function canonicalizeStyleDnaTraits({
         }
       }
 
-      const candidates = topCandidates(axisCanonical, normalizedTrait);
+      const candidates = await topCandidates(axisCanonical, normalizedTrait, semanticSimilarityResolver);
       const top = candidates[0] || null;
       if (shouldAutoMerge(top, lexicalThreshold, semanticThreshold)) {
         const canonical = axisCanonical.find((item) => item.canonical_trait_id === top.canonicalTraitId);
@@ -342,8 +498,11 @@ module.exports = {
   DEFAULT_TAXONOMY_VERSION,
   DEFAULT_LEXICAL_THRESHOLD,
   DEFAULT_SEMANTIC_THRESHOLD,
+  DEFAULT_SEMANTIC_MODE,
+  DEFAULT_OPENAI_EMBEDDING_MODEL,
   normalizeTraitText,
   lexicalSimilarity,
   semanticProxySimilarity,
+  createSemanticSimilarityResolver,
   canonicalizeStyleDnaTraits,
 };

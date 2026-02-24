@@ -70,10 +70,15 @@ function loadConfig() {
     inference: {
       mode: (process.env.TRAIT_INFERENCE_MODE || "deterministic").trim(),
       styleDnaMode: (process.env.STYLE_DNA_INFERENCE_MODE || process.env.TRAIT_INFERENCE_MODE || "deterministic").trim(),
+      styleDnaCanonicalizationSemanticMode: (
+        process.env.STYLE_DNA_CANONICALIZATION_SEMANTIC_MODE
+        || "auto"
+      ).trim(),
       openAi: {
         apiKey: process.env.OPENAI_API_KEY || "",
         model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
         baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+        embeddingModel: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
       },
     },
     observability: {

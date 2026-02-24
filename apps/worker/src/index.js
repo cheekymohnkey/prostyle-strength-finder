@@ -340,10 +340,14 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
         testImageBuffer: testObject.body,
       });
       const atomicTraits = comparison.profileAnalysis.profile_analysis.extracted_traits;
-      const canonicalized = canonicalizeStyleDnaTraits({
+      const canonicalized = await canonicalizeStyleDnaTraits({
         dbPath,
         atomicTraits,
         taxonomyVersion: "style_dna_v1",
+        semantic: {
+          mode: config.inference.styleDnaCanonicalizationSemanticMode,
+          openAi: config.inference.openAi,
+        },
         styleDnaRunId,
         analysisRunId,
       });
