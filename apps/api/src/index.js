@@ -78,6 +78,12 @@ const {
   updateStyleDnaRunStatus,
   getStyleDnaRunResultByRunId,
   listStyleDnaRunResultsByStyleInfluenceId,
+  getStyleDnaCanonicalTraitById,
+  listStyleDnaTraitDiscoveries,
+  getStyleDnaTraitDiscoveryById,
+  resolveStyleDnaTraitDiscovery,
+  insertStyleDnaCanonicalTrait,
+  insertStyleDnaTraitAlias,
   getStyleDnaImageById,
   insertStyleDnaImage,
   updateRecommendationSessionStatus,
@@ -95,6 +101,7 @@ const {
   readRecentOpenAiDebugEvents,
   clearOpenAiDebugEvents,
 } = require("../../../scripts/inference/openai-debug-log");
+const { normalizeTraitText } = require("../../../scripts/inference/style-dna-canonicalizer");
 const {
   CONTRACT_VERSION,
   validateRecommendationSubmitPayload,
@@ -791,6 +798,43 @@ function mapStyleDnaRunResultRow(row) {
   };
 }
 
+function mapStyleDnaTraitDiscoveryRow(row) {
+  if (!row) {
+    return null;
+  }
+  const parseArray = (value) => {
+    try {
+      const parsed = JSON.parse(value || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  };
+  const parseObject = (value) => {
+    try {
+      const parsed = JSON.parse(value || "{}");
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+  return {
+    discoveryId: row.discovery_id,
+    taxonomyVersion: row.taxonomy_version,
+    axis: row.axis,
+    rawTraitText: row.raw_trait_text,
+    normalizedTrait: row.normalized_trait,
+    status: row.status,
+    firstSeenAt: row.first_seen_at,
+    lastSeenAt: row.last_seen_at,
+    seenCount: Number(row.seen_count || 0),
+    latestStyleDnaRunId: row.latest_style_dna_run_id || null,
+    latestAnalysisRunId: row.latest_analysis_run_id || null,
+    topCandidates: parseArray(row.top_candidates_json),
+    resolutionPayload: parseObject(row.resolution_payload_json),
+  };
+}
+
 function mapStyleInfluenceCatalogRow(row) {
   if (!row) {
     return null;
@@ -976,6 +1020,48 @@ function validateAdminStyleInfluenceCreatePayload(value) {
     influenceType,
     influenceCode: value.influenceCode.trim(),
   };
+}
+
+function validateStyleDnaTraitDiscoveryReviewPayload(value) {
+  if (!value || typeof value !== "object") {
+    throw new Error("Discovery review payload must be an object");
+  }
+  const action = typeof value.action === "string" ? value.action.trim() : "";
+  if (!["approve_alias", "create_canonical", "reject", "ignore"].includes(action)) {
+    throw new Error("action must be one of: approve_alias, create_canonical, reject, ignore");
+  }
+  const canonicalTraitId = typeof value.canonicalTraitId === "string"
+    ? value.canonicalTraitId.trim()
+    : "";
+  const canonicalDisplayLabel = typeof value.canonicalDisplayLabel === "string"
+    ? value.canonicalDisplayLabel.trim()
+    : "";
+  const note = typeof value.note === "string" ? value.note.trim() : "";
+  if (action === "approve_alias" && canonicalTraitId === "") {
+    throw new Error("canonicalTraitId is required for approve_alias");
+  }
+  if (action === "create_canonical" && canonicalDisplayLabel === "") {
+    throw new Error("canonicalDisplayLabel is required for create_canonical");
+  }
+  return {
+    action,
+    canonicalTraitId,
+    canonicalDisplayLabel,
+    note,
+  };
+}
+
+function canonicalTraitIdFromLabel(axis, label) {
+  const normalized = normalizeTraitText(label)
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .trim()
+    .replace(/\s+/g, "_")
+    .slice(0, 48);
+  const axisPrefix = String(axis || "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .slice(0, 20);
+  const base = normalized || "trait";
+  return `canon_${axisPrefix}_${base}_${crypto.randomUUID().slice(0, 6)}`;
 }
 
 function parseBaselineStyleWeight(parameterEnvelopeJson) {
@@ -3152,6 +3238,197 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       ctx
     );
     return;
+  }
+
+  if (method === "GET" && path === "/v1/admin/style-dna/trait-discoveries") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid trait-discoveries list limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..500",
+      });
+      return;
+    }
+    const status = String(url.searchParams.get("status") || "pending_review").trim();
+    const allowedStatuses = new Set(["pending_review", "approved_alias", "approved_new_canonical", "rejected", "ignored"]);
+    if (!allowedStatuses.has(status)) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid discovery status filter", ctx, {
+        status,
+      });
+      return;
+    }
+    const taxonomyVersion = String(url.searchParams.get("taxonomyVersion") || "style_dna_v1").trim();
+    const axis = String(url.searchParams.get("axis") || "").trim();
+    const discoveries = listStyleDnaTraitDiscoveries(dbPath, {
+      status,
+      taxonomyVersion,
+      axis: axis || undefined,
+      limit,
+    });
+    sendJson(
+      res,
+      200,
+      {
+        discoveries: discoveries.map(mapStyleDnaTraitDiscoveryRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/style-dna/trait-discoveries/")
+    && path.endsWith("/review")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const discoveryId = path.slice("/v1/admin/style-dna/trait-discoveries/".length, -"/review".length).trim();
+    if (discoveryId === "") {
+      sendError(res, 400, "INVALID_REQUEST", "Discovery id is required", ctx);
+      return;
+    }
+    const discovery = getStyleDnaTraitDiscoveryById(dbPath, discoveryId);
+    if (!discovery) {
+      sendError(res, 404, "NOT_FOUND", "Trait discovery not found", ctx, { discoveryId });
+      return;
+    }
+    if (discovery.status !== "pending_review") {
+      sendError(res, 409, "INVALID_STATE", "Trait discovery is no longer pending review", ctx, {
+        discoveryId,
+        status: discovery.status,
+      });
+      return;
+    }
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaTraitDiscoveryReviewPayload(body);
+      const resolutionBase = {
+        action: payload.action,
+        reviewedBy: authenticatedUserId,
+        reviewedAt: new Date().toISOString(),
+        note: payload.note || null,
+      };
+
+      if (payload.action === "approve_alias") {
+        const canonical = getStyleDnaCanonicalTraitById(dbPath, payload.canonicalTraitId);
+        if (!canonical) {
+          sendError(res, 404, "NOT_FOUND", "Canonical trait not found", ctx, {
+            canonicalTraitId: payload.canonicalTraitId,
+          });
+          return;
+        }
+        if (canonical.taxonomy_version !== discovery.taxonomy_version || canonical.axis !== discovery.axis) {
+          sendError(res, 409, "INVALID_STATE", "Canonical trait must match discovery axis and taxonomy version", ctx, {
+            discoveryAxis: discovery.axis,
+            discoveryTaxonomyVersion: discovery.taxonomy_version,
+            canonicalAxis: canonical.axis,
+            canonicalTaxonomyVersion: canonical.taxonomy_version,
+          });
+          return;
+        }
+        insertStyleDnaTraitAlias(dbPath, {
+          aliasId: `sdt_alias_${crypto.randomUUID()}`,
+          taxonomyVersion: discovery.taxonomy_version,
+          axis: discovery.axis,
+          aliasText: discovery.raw_trait_text,
+          normalizedAlias: discovery.normalized_trait,
+          canonicalTraitId: canonical.canonical_trait_id,
+          source: "manual_review",
+          mergeMethod: "manual_review",
+          createdBy: authenticatedUserId,
+          reviewNote: payload.note || "Reviewed in admin trait discovery panel.",
+        });
+        const updated = resolveStyleDnaTraitDiscovery(dbPath, discoveryId, {
+          status: "approved_alias",
+          resolutionPayload: {
+            ...resolutionBase,
+            canonicalTraitId: canonical.canonical_trait_id,
+          },
+        });
+        insertAdminActionAudit(dbPath, {
+          adminActionAuditId: `aud_${crypto.randomUUID()}`,
+          adminUserId: authenticatedUserId,
+          actionType: "style_dna.trait_discovery.review",
+          targetType: "style_dna_trait_discovery",
+          targetId: discoveryId,
+          reason: "approve_alias",
+        });
+        sendJson(res, 200, { discovery: mapStyleDnaTraitDiscoveryRow(updated) }, ctx);
+        return;
+      }
+
+      if (payload.action === "create_canonical") {
+        const canonicalTraitId = canonicalTraitIdFromLabel(discovery.axis, payload.canonicalDisplayLabel);
+        insertStyleDnaCanonicalTrait(dbPath, {
+          canonicalTraitId,
+          taxonomyVersion: discovery.taxonomy_version,
+          axis: discovery.axis,
+          displayLabel: payload.canonicalDisplayLabel,
+          normalizedLabel: normalizeTraitText(payload.canonicalDisplayLabel),
+          createdBy: authenticatedUserId,
+          notes: "Created from trait discovery review.",
+        });
+        insertStyleDnaTraitAlias(dbPath, {
+          aliasId: `sdt_alias_${crypto.randomUUID()}`,
+          taxonomyVersion: discovery.taxonomy_version,
+          axis: discovery.axis,
+          aliasText: discovery.raw_trait_text,
+          normalizedAlias: discovery.normalized_trait,
+          canonicalTraitId,
+          source: "discovery_manual_merge",
+          mergeMethod: "manual_review",
+          createdBy: authenticatedUserId,
+          reviewNote: payload.note || "Created canonical trait from discovery review.",
+        });
+        const updated = resolveStyleDnaTraitDiscovery(dbPath, discoveryId, {
+          status: "approved_new_canonical",
+          resolutionPayload: {
+            ...resolutionBase,
+            canonicalTraitId,
+            canonicalDisplayLabel: payload.canonicalDisplayLabel,
+          },
+        });
+        insertAdminActionAudit(dbPath, {
+          adminActionAuditId: `aud_${crypto.randomUUID()}`,
+          adminUserId: authenticatedUserId,
+          actionType: "style_dna.trait_discovery.review",
+          targetType: "style_dna_trait_discovery",
+          targetId: discoveryId,
+          reason: "create_canonical",
+        });
+        sendJson(res, 200, { discovery: mapStyleDnaTraitDiscoveryRow(updated) }, ctx);
+        return;
+      }
+
+      const status = payload.action === "reject" ? "rejected" : "ignored";
+      const updated = resolveStyleDnaTraitDiscovery(dbPath, discoveryId, {
+        status,
+        resolutionPayload: resolutionBase,
+      });
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.trait_discovery.review",
+        targetType: "style_dna_trait_discovery",
+        targetId: discoveryId,
+        reason: payload.action,
+      });
+      sendJson(res, 200, { discovery: mapStyleDnaTraitDiscoveryRow(updated) }, ctx);
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Trait discovery review failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
   }
 
   if (method === "GET" && path === "/v1/admin/debug/openai") {

@@ -23,6 +23,7 @@ const {
 } = require("../../../scripts/models/model-versioning");
 const { createTraitInferenceAdapter } = require("../../../scripts/inference/trait-adapter");
 const { createStyleDnaInferenceAdapter } = require("../../../scripts/inference/style-dna-adapter");
+const { canonicalizeStyleDnaTraits } = require("../../../scripts/inference/style-dna-canonicalizer");
 const {
   parseAnalysisJobEnvelope,
   createAnalysisRunStatusEvent,
@@ -338,18 +339,29 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
         testMimeType: testImage.mime_type || testObject.contentType,
         testImageBuffer: testObject.body,
       });
+      const atomicTraits = comparison.profileAnalysis.profile_analysis.extracted_traits;
+      const canonicalized = canonicalizeStyleDnaTraits({
+        dbPath,
+        atomicTraits,
+        taxonomyVersion: "style_dna_v1",
+        styleDnaRunId,
+        analysisRunId,
+      });
 
       insertStyleDnaRunResult(dbPath, {
         styleDnaRunResultId: `sdrs_${crypto.randomUUID()}`,
         styleDnaRunId,
         llmRaw: comparison.profileAnalysis,
-        atomicTraits: comparison.profileAnalysis.profile_analysis.extracted_traits,
+        atomicTraits,
         canonicalTraits: {
           dominantDnaTags: comparison.profileAnalysis.profile_analysis.dominant_dna_tags,
           vibeShift: comparison.profileAnalysis.profile_analysis.vibe_shift,
           deltaStrength: comparison.profileAnalysis.profile_analysis.delta_strength,
+          canonicalizedTraits: canonicalized.canonicalizedTraits,
+          unresolvedTraitDiscoveries: canonicalized.unresolvedDiscoveries,
+          canonicalizationStats: canonicalized.canonicalizationStats,
         },
-        taxonomyVersion: "style_dna_v1",
+        taxonomyVersion: canonicalized.taxonomyVersion,
         summary: comparison.profileAnalysis.profile_analysis.vibe_shift,
       });
       insertImageTraitAnalysis(dbPath, {

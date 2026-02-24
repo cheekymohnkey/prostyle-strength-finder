@@ -1490,6 +1490,212 @@ function listStyleDnaRunResultsByStyleInfluenceId(dbPath, styleInfluenceId, inpu
   );
 }
 
+function listActiveStyleDnaCanonicalTraits(dbPath, input = {}) {
+  const where = [
+    `status = 'active'`,
+    `taxonomy_version = ${quote(input.taxonomyVersion || "style_dna_v1")}`,
+  ];
+  if (input.axis) {
+    where.push(`axis = ${quote(input.axis)}`);
+  }
+  return queryJson(
+    dbPath,
+    `SELECT canonical_trait_id, taxonomy_version, axis, display_label, normalized_label, status,
+            created_at, updated_at, created_by, notes
+     FROM style_dna_canonical_traits
+     WHERE ${where.join(" AND ")}
+     ORDER BY axis ASC, display_label ASC;`
+  );
+}
+
+function getStyleDnaCanonicalTraitById(dbPath, canonicalTraitId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT canonical_trait_id, taxonomy_version, axis, display_label, normalized_label, status,
+            created_at, updated_at, created_by, notes
+     FROM style_dna_canonical_traits
+     WHERE canonical_trait_id = ${quote(canonicalTraitId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertStyleDnaCanonicalTrait(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT OR IGNORE INTO style_dna_canonical_traits (
+       canonical_trait_id, taxonomy_version, axis, display_label, normalized_label, status,
+       created_at, updated_at, created_by, notes
+     ) VALUES (
+       ${quote(input.canonicalTraitId)},
+       ${quote(input.taxonomyVersion || "style_dna_v1")},
+       ${quote(input.axis)},
+       ${quote(input.displayLabel)},
+       ${quote(input.normalizedLabel)},
+       ${quote(input.status || "active")},
+       ${quote(createdAt)},
+       ${quote(input.updatedAt || null)},
+       ${quote(input.createdBy || "system")},
+       ${quote(input.notes || null)}
+     );`
+  );
+}
+
+function listActiveStyleDnaTraitAliases(dbPath, input = {}) {
+  const where = [
+    `status = 'active'`,
+    `taxonomy_version = ${quote(input.taxonomyVersion || "style_dna_v1")}`,
+  ];
+  if (input.axis) {
+    where.push(`axis = ${quote(input.axis)}`);
+  }
+  return queryJson(
+    dbPath,
+    `SELECT alias_id, taxonomy_version, axis, alias_text, normalized_alias, canonical_trait_id,
+            source, merge_method, lexical_similarity, semantic_similarity, status,
+            created_at, updated_at, created_by, review_note
+     FROM style_dna_trait_aliases
+     WHERE ${where.join(" AND ")}
+     ORDER BY axis ASC, alias_text ASC;`
+  );
+}
+
+function insertStyleDnaTraitAlias(dbPath, input) {
+  const createdAt = input.createdAt || nowIso();
+  exec(
+    dbPath,
+    `INSERT OR IGNORE INTO style_dna_trait_aliases (
+       alias_id, taxonomy_version, axis, alias_text, normalized_alias, canonical_trait_id,
+       source, merge_method, lexical_similarity, semantic_similarity, status,
+       created_at, updated_at, created_by, review_note
+     ) VALUES (
+       ${quote(input.aliasId)},
+       ${quote(input.taxonomyVersion || "style_dna_v1")},
+       ${quote(input.axis)},
+       ${quote(input.aliasText)},
+       ${quote(input.normalizedAlias)},
+       ${quote(input.canonicalTraitId)},
+       ${quote(input.source || "manual_review")},
+       ${quote(input.mergeMethod || "manual_review")},
+       ${input.lexicalSimilarity === null || input.lexicalSimilarity === undefined ? "NULL" : Number(input.lexicalSimilarity)},
+       ${input.semanticSimilarity === null || input.semanticSimilarity === undefined ? "NULL" : Number(input.semanticSimilarity)},
+       ${quote(input.status || "active")},
+       ${quote(createdAt)},
+       ${quote(input.updatedAt || null)},
+       ${quote(input.createdBy || "system")},
+       ${quote(input.reviewNote || null)}
+     );`
+  );
+}
+
+function getPendingStyleDnaTraitDiscoveryByNormalized(dbPath, input) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT discovery_id, taxonomy_version, axis, raw_trait_text, normalized_trait, status,
+            first_seen_at, last_seen_at, seen_count, latest_style_dna_run_id, latest_analysis_run_id,
+            top_candidates_json, resolution_payload_json
+     FROM style_dna_trait_discoveries
+     WHERE taxonomy_version = ${quote(input.taxonomyVersion || "style_dna_v1")}
+       AND axis = ${quote(input.axis)}
+       AND normalized_trait = ${quote(input.normalizedTrait)}
+       AND status = 'pending_review'
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function insertStyleDnaTraitDiscovery(dbPath, input) {
+  const now = nowIso();
+  exec(
+    dbPath,
+    `INSERT INTO style_dna_trait_discoveries (
+       discovery_id, taxonomy_version, axis, raw_trait_text, normalized_trait, status,
+       first_seen_at, last_seen_at, seen_count, latest_style_dna_run_id, latest_analysis_run_id,
+       top_candidates_json, resolution_payload_json
+     ) VALUES (
+       ${quote(input.discoveryId)},
+       ${quote(input.taxonomyVersion || "style_dna_v1")},
+       ${quote(input.axis)},
+       ${quote(input.rawTraitText)},
+       ${quote(input.normalizedTrait)},
+       ${quote(input.status || "pending_review")},
+       ${quote(input.firstSeenAt || now)},
+       ${quote(input.lastSeenAt || now)},
+       ${Number(input.seenCount || 1)},
+       ${quote(input.latestStyleDnaRunId || null)},
+       ${quote(input.latestAnalysisRunId || null)},
+       ${quote(JSON.stringify(input.topCandidates || []))},
+       ${quote(JSON.stringify(input.resolutionPayload || null))}
+     );`
+  );
+}
+
+function updateStyleDnaTraitDiscoveryObservation(dbPath, discoveryId, input) {
+  exec(
+    dbPath,
+    `UPDATE style_dna_trait_discoveries
+     SET
+       raw_trait_text = ${quote(input.rawTraitText)},
+       last_seen_at = ${quote(input.lastSeenAt || nowIso())},
+       seen_count = seen_count + ${Number(input.seenCountIncrement || 1)},
+       latest_style_dna_run_id = COALESCE(${quote(input.latestStyleDnaRunId || null)}, latest_style_dna_run_id),
+       latest_analysis_run_id = COALESCE(${quote(input.latestAnalysisRunId || null)}, latest_analysis_run_id),
+       top_candidates_json = ${quote(JSON.stringify(input.topCandidates || []))}
+     WHERE discovery_id = ${quote(discoveryId)};`
+  );
+}
+
+function getStyleDnaTraitDiscoveryById(dbPath, discoveryId) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT discovery_id, taxonomy_version, axis, raw_trait_text, normalized_trait, status,
+            first_seen_at, last_seen_at, seen_count, latest_style_dna_run_id, latest_analysis_run_id,
+            top_candidates_json, resolution_payload_json
+     FROM style_dna_trait_discoveries
+     WHERE discovery_id = ${quote(discoveryId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function listStyleDnaTraitDiscoveries(dbPath, input = {}) {
+  const where = [];
+  if (input.status) {
+    where.push(`status = ${quote(input.status)}`);
+  }
+  if (input.taxonomyVersion) {
+    where.push(`taxonomy_version = ${quote(input.taxonomyVersion)}`);
+  }
+  if (input.axis) {
+    where.push(`axis = ${quote(input.axis)}`);
+  }
+  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+  return queryJson(
+    dbPath,
+    `SELECT discovery_id, taxonomy_version, axis, raw_trait_text, normalized_trait, status,
+            first_seen_at, last_seen_at, seen_count, latest_style_dna_run_id, latest_analysis_run_id,
+            top_candidates_json, resolution_payload_json
+     FROM style_dna_trait_discoveries
+     ${whereClause}
+     ORDER BY last_seen_at DESC
+     LIMIT ${Number(input.limit || 100)};`
+  );
+}
+
+function resolveStyleDnaTraitDiscovery(dbPath, discoveryId, input) {
+  exec(
+    dbPath,
+    `UPDATE style_dna_trait_discoveries
+     SET
+       status = ${quote(input.status)},
+       resolution_payload_json = ${quote(JSON.stringify(input.resolutionPayload || {}))},
+       last_seen_at = ${quote(input.lastSeenAt || nowIso())}
+     WHERE discovery_id = ${quote(discoveryId)};`
+  );
+  return getStyleDnaTraitDiscoveryById(dbPath, discoveryId);
+}
+
 module.exports = {
   ensureReady,
   getUserById,
@@ -1584,6 +1790,17 @@ module.exports = {
   getStyleDnaRunResultByRunId,
   insertStyleDnaRunResult,
   listStyleDnaRunResultsByStyleInfluenceId,
+  insertStyleDnaCanonicalTrait,
+  listActiveStyleDnaCanonicalTraits,
+  getStyleDnaCanonicalTraitById,
+  listActiveStyleDnaTraitAliases,
+  insertStyleDnaTraitAlias,
+  getPendingStyleDnaTraitDiscoveryByNormalized,
+  insertStyleDnaTraitDiscovery,
+  updateStyleDnaTraitDiscoveryObservation,
+  getStyleDnaTraitDiscoveryById,
+  listStyleDnaTraitDiscoveries,
+  resolveStyleDnaTraitDiscovery,
   getStyleDnaImageById,
   insertStyleDnaImage,
 };

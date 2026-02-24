@@ -23,7 +23,7 @@ Define a dedicated, execution-ready implementation plan for the admin-only Style
 
 Enable administrators to run rigorous, repeatable baseline-vs-test aesthetic delta analysis with minimal manual overhead and strong auditability.
 
-## Current Execution Snapshot (2026-02-23)
+## Current Execution Snapshot (2026-02-24)
 
 Implemented in code:
 1. Persistence foundation is live:
@@ -36,7 +36,8 @@ Implemented in code:
 - style-dna image upload and image content retrieval
 - prompt job create/get
 - run submit/list/get
-3. Worker path is live for strict-schema style-dna run processing and result persistence.
+3. Worker path is live for strict-schema style-dna run processing, canonicalization, and result persistence.
+- canonicalization module now performs normalization, deterministic canonical/alias resolution, threshold-gated auto-merge, and unresolved discovery queue writes.
 4. Admin UI route `/admin/style-dna` is live with:
 - baseline set selection and prompt coverage indicators
 - loaded-set draft hydration with save-as baseline set workflow
@@ -60,6 +61,7 @@ Implemented in code:
 - `style-dna:baseline-smoke`
 - `style-dna:prompt-generation-smoke`
 - `style-dna:run-smoke`
+- `style-dna:canonicalization-smoke`
 - `style-dna:schema-failure-smoke`
  - set-producing smokes now self-clean smoke-created baseline/prompt/run/image records on success to avoid local data pollution
  - frontend proxy smoke assertions now explicitly enforce Style-DNA negative-path API error contracts (`FORBIDDEN`, `INVALID_STATE`) and reason-text expectations
@@ -70,8 +72,14 @@ Implemented in code:
 - baseline copy prompts include `--v <mjModelVersion>`
 - generated prompt jobs include `--v <mjModelVersion>`
 
+6. Admin API/UI now includes unresolved-trait review workflow:
+- `GET /v1/admin/style-dna/trait-discoveries`
+- `POST /v1/admin/style-dna/trait-discoveries/:discoveryId/review`
+- `/admin/style-dna` now exposes pending review queue and status-filtered review history.
+
 Open gaps:
-1. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
+1. `DISC-002` remains partially open: embedding-model similarity path is not yet wired (deterministic semantic proxy currently used).
+2. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
 
 Launch/readiness status:
 1. `launch:readiness-smoke` full scope includes the full Style-DNA smoke set:
@@ -170,6 +178,8 @@ Use this contract for baseline-vs-test grid analysis tasks.
 3. Prompting rules:
 - keep system prompt in a versioned text file loaded at runtime
 - ask for atomic trait strings (not long prose)
+- require short visual-evidence phrases, not abstract adjectives
+- explicitly reject vague trait labels (`style`, `quality`, `nice lighting`, `good colors`)
 - require delta-only reporting (traits introduced/amplified in Grid B vs Grid A)
 - require JSON-only response
 
@@ -192,6 +202,7 @@ Use this contract for baseline-vs-test grid analysis tasks.
 - LLM outputs open atomic traits
 - backend handles canonical mapping, alias merging, and taxonomy version assignment
 - do not force full taxonomy enums in vision prompt
+- unresolved/low-confidence traits are stored as discovery candidates and excluded from production canonical scoring until approved
 
 ## Recommended sref Matrix (Research-Grounded)
 
@@ -249,6 +260,7 @@ Policy:
 8. Discovery-mode boundary:
 - open-trait discovery can propose candidates
 - production scoring uses canonical traits only until approved
+- unresolved discoveries must remain auditable and reviewable with similarity evidence snapshots
 
 ## Data Model Additions (Proposed)
 

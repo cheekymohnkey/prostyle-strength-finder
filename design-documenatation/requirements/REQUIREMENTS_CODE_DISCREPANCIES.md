@@ -1,7 +1,7 @@
 # Requirements vs Code Discrepancies
 
 Status: Draft  
-Date: 2026-02-23
+Date: 2026-02-24
 
 ## Method
 
@@ -9,10 +9,10 @@ Compared current requirements/planning docs against implemented code paths in AP
 
 ## Confirmed Discrepancies
 
-1. `DISC-002` Canonical trait mapping policy is only minimally implemented.
-- Requirement source: Style-DNA plan defines alias normalization/squashing and taxonomy mapping workflow.
-- Current implementation: worker stores atomic traits and a small canonical snapshot (`dominantDnaTags`, `vibeShift`, `deltaStrength`) without alias registry/synonym merge flow (`apps/worker/src/index.js`).
-- Impact: taxonomy-governance requirements are only partially met; synonym fragmentation risk remains.
+1. `DISC-002` Canonical trait mapping and discovery-mode governance are partially implemented.
+- Requirement source: Style-DNA plan + FR require open-vocabulary atomic extraction, deterministic normalization, embedding-assisted candidate snapping, threshold-gated auto-merge, review routing, and taxonomy-versioned decisions.
+- Current implementation: worker now runs normalization/canonicalization with alias and discovery persistence, and admin review endpoints/UI are present for unresolved traits. Remaining gap: semantic similarity currently uses deterministic proxy scoring instead of true embedding-model similarity; taxonomy seeding and governance breadth are still limited (`apps/worker/src/index.js`, `scripts/inference/style-dna-canonicalizer.js`, `apps/api/src/index.js`, `apps/frontend/app/admin/style-dna/page.tsx`).
+- Impact: core synonym-fragmentation controls now exist, but high-fidelity semantic snapping and mature taxonomy operations are not fully complete.
 
 2. `DISC-003` Run submission does not fully validate the locked parameter envelope beyond control-policy and prompt-tier coverage.
 - Requirement source: plan states baseline reuse/comparisons are tied to locked envelope matching.
@@ -47,5 +47,5 @@ Compared current requirements/planning docs against implemented code paths in AP
 ## Recommended Resolution Order
 
 1. Add shared Style-DNA contracts/validators in `packages/shared-contracts` and consume from API/worker/frontend.
-2. Implement explicit canonical taxonomy mapping module (alias resolution + versioned decisions).
+2. Implement explicit canonical taxonomy mapping pipeline (normalization + deterministic/alias resolution + embedding candidate snapping + threshold/review gating + versioned decisions).
 3. Extend run payload/validation to include test-side envelope evidence, then enforce full parity checks server-side.

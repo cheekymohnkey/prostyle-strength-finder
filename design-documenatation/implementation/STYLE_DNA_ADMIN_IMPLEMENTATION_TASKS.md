@@ -53,7 +53,7 @@ Out of scope:
 4. SD4 Admin UI flow.
 5. SD5 Verification and hardening.
 
-## Current Execution Snapshot (2026-02-23)
+## Current Execution Snapshot (2026-02-24)
 
 1. SD1: Implemented.
 - style-dna persistence migrations are present and applied in smoke runs.
@@ -63,16 +63,19 @@ Out of scope:
 - baseline, prompt-job, run, and image endpoints are implemented with admin RBAC.
 - idempotency behavior is implemented for run submission.
 - server-side matched-control (`--sw 0`) gating for sref policy is now enforced at run submission (`styleWeight=0` control baseline requirement).
-3. SD3: Implemented.
+3. SD3: Implemented (DISC-002 foundation now in place).
 - worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
+- canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
 - failure path reaches dead-letter behavior in schema-failure smoke.
 4. SD4: Implemented (with polish remaining).
 - `/admin/style-dna` supports baseline setup, image intake, prompt copy/generation, submit, and result lookup.
 - loaded baseline sets can be used as editable drafts and saved as new baseline sets.
 - run-submit guardrails now block and explain: stylize-tier mismatch, missing prompt+tier baseline coverage, sref control baseline requirements (`styleWeight=0`), and section-1 envelope drift vs loaded set.
+- trait-discovery review queue and status-filtered review history are now available in Section 3.
 - remaining: minor visual/layout tuning only.
 5. SD5: Mostly implemented.
 - style-dna smoke scripts exist and have passed in prior session verification.
+- `style-dna:canonicalization-smoke` is implemented and passing.
 - prompt generation verification includes model version flag emission (`--v`).
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
 - launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.
@@ -160,16 +163,23 @@ Implementation tasks:
 - raw provider JSON
 - normalized atomic traits
 - canonical mapped traits + taxonomy version
-6. Add retry policy handling:
+6. Implement canonicalization pipeline:
+- normalize phrase (`lowercase`, trim, separator normalization, spacing collapse, safe singularization)
+- resolve by exact canonical match, alias match, normalized match
+- run embedding-assisted candidate lookup when deterministic resolution fails
+- enforce threshold-gated auto-merge policy before canonical assignment
+- persist unresolved traits as discovery candidates with similarity evidence for review
+7. Add retry policy handling:
 - retry transient provider failures
 - dead-letter after max attempts
 - mark non-retryable validation failures explicitly
-7. Emit structured logs with style-dna correlation IDs.
+8. Emit structured logs with style-dna correlation IDs.
 
 Acceptance criteria:
 1. Happy path reaches `succeeded` with persisted result payloads.
 2. Invalid schema response path is handled deterministically.
 3. Retry/dead-letter behavior is observable and auditable.
+4. Ambiguous trait variants are review-gated and do not silently create canonical duplicates.
 
 ## SD4. Admin UI Route and Workflow
 
@@ -192,6 +202,9 @@ Implementation tasks:
 - queued/in_progress/succeeded/failed states
 - structured trait categories
 6. Implement explicit error states for mismatch and missing prerequisites.
+7. Add admin review surface for unresolved trait candidates:
+- list unresolved traits and top canonical candidates with similarity evidence
+- approve alias merge or keep as distinct canonical trait per governance action
 
 Acceptance criteria:
 1. Admin can execute the full workflow in UI without manual API calls.
@@ -218,8 +231,13 @@ Implementation tasks:
 - RBAC enforcement
 - idempotency behavior
 - run lifecycle transitions
-4. Add README runbook section for style-dna admin flow.
-5. Add launch/readiness gate hook to include style-dna smokes when enabled.
+4. Add canonicalization tests for:
+- deterministic normalization/match behavior
+- threshold-gated auto-merge allow/deny cases
+- unresolved-trait review routing
+- taxonomy-version audit persistence
+5. Add README runbook section for style-dna admin flow.
+6. Add launch/readiness gate hook to include style-dna smokes when enabled.
 
 Acceptance criteria:
 1. Smoke scripts run from clean state and return `ok: true`.
@@ -227,6 +245,7 @@ Acceptance criteria:
 3. Existing critical smokes remain green (no regressions).
 4. Prompt-generation smoke verifies deterministic prompt blocks for selected `sw`/`s` matrix tiers.
 5. Set-producing smoke scripts do not leave residual baseline test data after successful execution.
+6. Canonicalization smoke verifies synonym squashing and review-gated unresolved trait behavior.
 
 ## Suggested Ticket Breakdown
 

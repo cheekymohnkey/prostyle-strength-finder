@@ -47,7 +47,7 @@ Current frontend runtime contract:
 5. UI upgrade handover (latest):
 - `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-23.md`
 6. Style-DNA handover (latest):
-- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-23.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
 
 
 ## New Task Start Template

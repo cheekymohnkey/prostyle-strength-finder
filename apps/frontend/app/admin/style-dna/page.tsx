@@ -93,6 +93,38 @@ type TraitSummaryResponse = {
   };
 };
 
+type TraitDiscoveryCandidate = {
+  canonicalTraitId?: string;
+  displayLabel?: string;
+  lexicalSimilarity?: number;
+  semanticSimilarity?: number;
+};
+
+type TraitDiscovery = {
+  discoveryId?: string;
+  taxonomyVersion?: string;
+  axis?: string;
+  rawTraitText?: string;
+  normalizedTrait?: string;
+  status?: string;
+  firstSeenAt?: string;
+  lastSeenAt?: string;
+  seenCount?: number;
+  topCandidates?: TraitDiscoveryCandidate[];
+  resolutionPayload?: {
+    action?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
+    note?: string | null;
+    canonicalTraitId?: string;
+    canonicalDisplayLabel?: string;
+  };
+};
+
+type TraitDiscoveryListResponse = {
+  discoveries?: TraitDiscovery[];
+};
+
 type OpenAiDebugEvent = {
   timestamp?: string;
   sessionId?: string;
@@ -322,6 +354,17 @@ async function fetchStyleInfluenceTraitSummary(styleInfluenceId: string): Promis
   return parseApiResponse<TraitSummaryResponse>(response);
 }
 
+async function fetchTraitDiscoveriesByStatus(
+  status: "pending_review" | "approved_alias" | "approved_new_canonical" | "rejected" | "ignored",
+  limit = 100
+): Promise<TraitDiscoveryListResponse> {
+  const response = await fetch(`/api/proxy/admin/style-dna/trait-discoveries?status=${encodeURIComponent(status)}&limit=${encodeURIComponent(String(limit))}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseApiResponse<TraitDiscoveryListResponse>(response);
+}
+
 async function fetchOpenAiDebugLog(limit = 100): Promise<OpenAiDebugLogResponse> {
   const response = await fetch(`/api/proxy/admin/debug/openai?limit=${encodeURIComponent(String(limit))}`, {
     method: "GET",
@@ -427,6 +470,8 @@ export default function StyleDnaAdminPage() {
   const [section3PromptProgress, setSection3PromptProgress] = useState<Record<string, Section3PromptProgress>>({});
   const [showOpenAiDebugPanel, setShowOpenAiDebugPanel] = useState(false);
   const [openAiDebugPollingEnabled, setOpenAiDebugPollingEnabled] = useState(true);
+  const [discoveryCreateLabelById, setDiscoveryCreateLabelById] = useState<Record<string, string>>({});
+  const [reviewHistoryStatus, setReviewHistoryStatus] = useState<"approved_alias" | "approved_new_canonical" | "rejected" | "ignored">("approved_alias");
   const queryClient = useQueryClient();
 
   const sessionStateQuery = useQuery({
@@ -462,6 +507,18 @@ export default function StyleDnaAdminPage() {
     queryKey: ["admin", "style-dna", "trait-summary", styleInfluenceId.trim()],
     queryFn: () => fetchStyleInfluenceTraitSummary(styleInfluenceId.trim()),
     enabled: styleInfluenceId.trim() !== "" && styleDnaProbeQuery.data?.ready === true,
+  });
+
+  const traitDiscoveriesQuery = useQuery({
+    queryKey: ["admin", "style-dna", "trait-discoveries", "pending_review"],
+    queryFn: () => fetchTraitDiscoveriesByStatus("pending_review", 200),
+    enabled: styleDnaProbeQuery.data?.ready === true,
+    refetchInterval: 15_000,
+  });
+  const traitDiscoveryHistoryQuery = useQuery({
+    queryKey: ["admin", "style-dna", "trait-discoveries", "history", reviewHistoryStatus],
+    queryFn: () => fetchTraitDiscoveriesByStatus(reviewHistoryStatus, 200),
+    enabled: styleDnaProbeQuery.data?.ready === true,
   });
 
   const openAiDebugLogQuery = useQuery({
@@ -1135,6 +1192,43 @@ export default function StyleDnaAdminPage() {
     },
   });
 
+  const reviewTraitDiscoveryMutation = useMutation({
+    mutationFn: async (input: {
+      discoveryId: string;
+      action: "approve_alias" | "create_canonical" | "reject" | "ignore";
+      canonicalTraitId?: string;
+      canonicalDisplayLabel?: string;
+      note?: string;
+    }) => {
+      const response = await fetch(`/api/proxy/admin/style-dna/trait-discoveries/${encodeURIComponent(input.discoveryId)}/review`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          action: input.action,
+          canonicalTraitId: input.canonicalTraitId,
+          canonicalDisplayLabel: input.canonicalDisplayLabel,
+          note: input.note,
+        }),
+      });
+      return parseApiResponse<{ discovery?: TraitDiscovery }>(response);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "trait-discoveries", "pending_review"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "trait-discoveries", "history"],
+      });
+      if (styleInfluenceId.trim()) {
+        await queryClient.invalidateQueries({
+          queryKey: ["admin", "style-dna", "trait-summary", styleInfluenceId.trim()],
+        });
+      }
+    },
+  });
+
   const submitRunMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/proxy/admin/style-dna/runs", {
@@ -1299,6 +1393,16 @@ export default function StyleDnaAdminPage() {
     selectedSection3Row?.testGridImageId ? styleDnaImageContentPath(selectedSection3Row.testGridImageId) : ""
   );
   const styleInfluenceTraitSummary = styleInfluenceTraitSummaryQuery.data?.summary;
+  const pendingTraitDiscoveries = useMemo(() => (
+    [...(traitDiscoveriesQuery.data?.discoveries || [])]
+      .sort((a, b) => Number(b.seenCount || 0) - Number(a.seenCount || 0))
+  ), [traitDiscoveriesQuery.data?.discoveries]);
+  const reviewHistoryDiscoveries = useMemo(() => (
+    [...(traitDiscoveryHistoryQuery.data?.discoveries || [])]
+      .sort((a, b) => (
+        String(b.resolutionPayload?.reviewedAt || b.lastSeenAt || "").localeCompare(String(a.resolutionPayload?.reviewedAt || a.lastSeenAt || ""))
+      ))
+  ), [traitDiscoveryHistoryQuery.data?.discoveries]);
 
   const createBaselineBlockingReasons = useMemo(() => {
     const reasons: string[] = [];
@@ -2473,6 +2577,194 @@ export default function StyleDnaAdminPage() {
                 </div>
               </div>
             </div>
+          ) : null}
+        </div>
+        <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
+          <p className="font-medium">Trait Discovery Review Queue</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Pending unresolved traits requiring alias approval, canonical creation, or rejection.
+          </p>
+          {traitDiscoveriesQuery.isLoading ? (
+            <p className="mt-2 text-[var(--muted)]">Loading pending discoveries...</p>
+          ) : null}
+          {traitDiscoveriesQuery.isError ? (
+            <p className="mt-2 text-red-600">Could not load pending discovery queue.</p>
+          ) : null}
+          {!traitDiscoveriesQuery.isLoading && !traitDiscoveriesQuery.isError && pendingTraitDiscoveries.length === 0 ? (
+            <p className="mt-2 text-[var(--muted)]">No pending trait discoveries.</p>
+          ) : null}
+          {!traitDiscoveriesQuery.isLoading && !traitDiscoveriesQuery.isError && pendingTraitDiscoveries.length > 0 ? (
+            <ul className="mt-3 space-y-3">
+              {pendingTraitDiscoveries.slice(0, 20).map((discovery) => {
+                const discoveryId = String(discovery.discoveryId || "").trim();
+                const topCandidate = Array.isArray(discovery.topCandidates) ? discovery.topCandidates[0] : undefined;
+                const draftCanonicalLabel = discoveryCreateLabelById[discoveryId] || discovery.rawTraitText || "";
+                return (
+                  <li key={discoveryId} className="rounded border border-[var(--line)] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-mono text-xs text-[var(--muted)]">{discoveryId || "(discovery id missing)"}</p>
+                        <p className="mt-1">
+                          <span className="font-medium">Trait:</span> {discovery.rawTraitText || "(empty)"}
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          axis={discovery.axis || "(unknown)"} | seen={Number(discovery.seenCount || 0)}
+                        </p>
+                        {topCandidate ? (
+                          <p className="mt-1 text-xs">
+                            Top candidate: <span className="font-medium">{topCandidate.displayLabel || topCandidate.canonicalTraitId}</span>
+                            {" "}({topCandidate.lexicalSimilarity ?? "-"} lex, {topCandidate.semanticSimilarity ?? "-"} sem)
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-xs text-[var(--muted)]">No candidate suggestions.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!discoveryId || !topCandidate?.canonicalTraitId) {
+                            return;
+                          }
+                          reviewTraitDiscoveryMutation.mutate({
+                            discoveryId,
+                            action: "approve_alias",
+                            canonicalTraitId: String(topCandidate.canonicalTraitId),
+                            note: "Approved top candidate from admin queue.",
+                          });
+                        }}
+                        disabled={!discoveryId || !topCandidate?.canonicalTraitId || reviewTraitDiscoveryMutation.isPending}
+                        className="rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-50"
+                      >
+                        Approve Top Alias
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!discoveryId) {
+                            return;
+                          }
+                          reviewTraitDiscoveryMutation.mutate({
+                            discoveryId,
+                            action: "reject",
+                            note: "Rejected from admin queue.",
+                          });
+                        }}
+                        disabled={!discoveryId || reviewTraitDiscoveryMutation.isPending}
+                        className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!discoveryId) {
+                            return;
+                          }
+                          reviewTraitDiscoveryMutation.mutate({
+                            discoveryId,
+                            action: "ignore",
+                            note: "Ignored from admin queue.",
+                          });
+                        }}
+                        disabled={!discoveryId || reviewTraitDiscoveryMutation.isPending}
+                        className="rounded border border-[var(--line)] px-2 py-1 text-xs text-[var(--muted)] disabled:opacity-50"
+                      >
+                        Ignore
+                      </button>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={draftCanonicalLabel}
+                        onChange={(event) => {
+                          const nextValue = event.currentTarget.value;
+                          setDiscoveryCreateLabelById((previous) => ({
+                            ...previous,
+                            [discoveryId]: nextValue,
+                          }));
+                        }}
+                        placeholder="New canonical label"
+                        className="min-w-[220px] rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!discoveryId || !draftCanonicalLabel.trim()) {
+                            return;
+                          }
+                          reviewTraitDiscoveryMutation.mutate({
+                            discoveryId,
+                            action: "create_canonical",
+                            canonicalDisplayLabel: draftCanonicalLabel.trim(),
+                            note: "Created canonical from admin queue.",
+                          });
+                        }}
+                        disabled={!discoveryId || !draftCanonicalLabel.trim() || reviewTraitDiscoveryMutation.isPending}
+                        className="rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-50"
+                      >
+                        Create Canonical
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+          {reviewTraitDiscoveryMutation.isError ? (
+            <p className="mt-2 text-red-600">Discovery review failed: {mutationErrorMessage(reviewTraitDiscoveryMutation.error)}</p>
+          ) : null}
+        </div>
+        <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-medium">Trait Discovery Review History</p>
+            <select
+              value={reviewHistoryStatus}
+              onChange={(event) => {
+                const next = event.currentTarget.value as "approved_alias" | "approved_new_canonical" | "rejected" | "ignored";
+                setReviewHistoryStatus(next);
+              }}
+              className="rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+            >
+              <option value="approved_alias">Approved Alias</option>
+              <option value="approved_new_canonical">Approved New Canonical</option>
+              <option value="rejected">Rejected</option>
+              <option value="ignored">Ignored</option>
+            </select>
+          </div>
+          {traitDiscoveryHistoryQuery.isLoading ? (
+            <p className="mt-2 text-[var(--muted)]">Loading review history...</p>
+          ) : null}
+          {traitDiscoveryHistoryQuery.isError ? (
+            <p className="mt-2 text-red-600">Could not load review history.</p>
+          ) : null}
+          {!traitDiscoveryHistoryQuery.isLoading && !traitDiscoveryHistoryQuery.isError && reviewHistoryDiscoveries.length === 0 ? (
+            <p className="mt-2 text-[var(--muted)]">No records for this status yet.</p>
+          ) : null}
+          {!traitDiscoveryHistoryQuery.isLoading && !traitDiscoveryHistoryQuery.isError && reviewHistoryDiscoveries.length > 0 ? (
+            <ul className="mt-3 space-y-2">
+              {reviewHistoryDiscoveries.slice(0, 20).map((item) => (
+                <li key={String(item.discoveryId || "")} className="rounded border border-[var(--line)] p-2">
+                  <p className="font-mono text-xs text-[var(--muted)]">{item.discoveryId}</p>
+                  <p className="mt-1">
+                    <span className="font-medium">Trait:</span> {item.rawTraitText || "(empty)"}{" "}
+                    <span className="text-[var(--muted)]">[{item.axis}]</span>
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    Reviewed by {item.resolutionPayload?.reviewedBy || "(unknown)"} at {item.resolutionPayload?.reviewedAt || item.lastSeenAt || "(unknown time)"}
+                  </p>
+                  {item.resolutionPayload?.canonicalDisplayLabel || item.resolutionPayload?.canonicalTraitId ? (
+                    <p className="text-xs">
+                      Canonical: {item.resolutionPayload?.canonicalDisplayLabel || item.resolutionPayload?.canonicalTraitId}
+                    </p>
+                  ) : null}
+                  {item.resolutionPayload?.note ? (
+                    <p className="text-xs text-[var(--muted)]">Note: {item.resolutionPayload.note}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
       </section>
