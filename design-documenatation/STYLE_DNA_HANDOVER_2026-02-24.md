@@ -71,6 +71,9 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `npm run style-dna:canonical-governance-smoke`
 13. Extended frontend proxy smoke coverage:
 - `npm run admin:frontend-proxy-smoke` now validates canonical governance proxy flow (create/dedupe/status + alias create/list + contributor-forbidden check).
+14. Added discovery review replay smoke:
+- `npm run style-dna:discovery-review-replay-smoke`
+- validates discovery review status transitions (`approved_alias`, `approved_new_canonical`, duplicate review `INVALID_STATE`) and replay alias-resolution behavior in canonicalization.
 
 ## Resolved Discrepancies
 
@@ -110,6 +113,7 @@ Capture the current Style-DNA implementation state and active risks so the next 
 19. `scripts/style-dna/schema-failure-smoke.js`
 20. `scripts/admin/frontend-proxy-smoke.js`
 21. `scripts/style-dna/canonical-governance-smoke.js`
+22. `scripts/style-dna/discovery-review-replay-smoke.js`
 
 ## Recent Commits
 

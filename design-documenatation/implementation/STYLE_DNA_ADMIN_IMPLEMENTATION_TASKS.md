@@ -81,6 +81,7 @@ Out of scope:
 - `style-dna:canonicalization-smoke` is implemented and passing.
 - `style-dna:canonicalization-semantic-smoke` is implemented and passing (`proxy` vs `embedding` vs `auto` fallback coverage).
 - `style-dna:canonical-governance-smoke` is implemented and passing (canonical create/dedupe, alias create/list, status deprecate, RBAC).
+- `style-dna:discovery-review-replay-smoke` is implemented and passing (review transition conflict handling + alias replay resolution behavior).
 - `admin:frontend-proxy-smoke` now also validates canonical governance proxy flows (canonical create/dedupe/status, alias create/list, contributor `403` guardrail).
 - prompt generation verification includes model version flag emission (`--v`).
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.

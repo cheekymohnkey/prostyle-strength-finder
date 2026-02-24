@@ -88,6 +88,8 @@ Implemented in code:
 - `style-dna:canonical-governance-smoke`
 9. Frontend proxy smoke now includes canonical governance coverage:
 - `admin:frontend-proxy-smoke` validates canonical create/dedupe/status and alias create/list via `/api/proxy/admin/style-dna/*` routes.
+10. Discovery review replay smoke is now available:
+- `style-dna:discovery-review-replay-smoke` validates trait-discovery review transitions (`approved_alias`, `create_canonical`, duplicate-review `409`) and alias replay canonicalization behavior.
 
 Open gaps:
 1. `DISC-002` remains partially open: embedding-model similarity path is now wired in canonicalization, but broader taxonomy seeding and governance tooling still needs completion.
