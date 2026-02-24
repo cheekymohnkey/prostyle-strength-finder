@@ -125,6 +125,56 @@ type TraitDiscoveryListResponse = {
   discoveries?: TraitDiscovery[];
 };
 
+type CanonicalTrait = {
+  canonicalTraitId?: string;
+  taxonomyVersion?: string;
+  axis?: string;
+  displayLabel?: string;
+  normalizedLabel?: string;
+  status?: "active" | "deprecated" | string;
+  createdAt?: string;
+  updatedAt?: string | null;
+  createdBy?: string;
+  notes?: string | null;
+};
+
+type CanonicalTraitListResponse = {
+  canonicalTraits?: CanonicalTrait[];
+};
+
+type CanonicalTraitMutationResponse = {
+  canonicalTrait?: CanonicalTrait;
+  deduplicated?: boolean;
+  changed?: boolean;
+};
+
+type TraitAlias = {
+  aliasId?: string;
+  taxonomyVersion?: string;
+  axis?: string;
+  aliasText?: string;
+  normalizedAlias?: string;
+  canonicalTraitId?: string;
+  source?: string;
+  mergeMethod?: string;
+  lexicalSimilarity?: number | null;
+  semanticSimilarity?: number | null;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string | null;
+  createdBy?: string;
+  reviewNote?: string | null;
+};
+
+type TraitAliasListResponse = {
+  traitAliases?: TraitAlias[];
+};
+
+type TraitAliasMutationResponse = {
+  traitAlias?: TraitAlias;
+  deduplicated?: boolean;
+};
+
 type OpenAiDebugEvent = {
   timestamp?: string;
   sessionId?: string;
@@ -365,6 +415,41 @@ async function fetchTraitDiscoveriesByStatus(
   return parseApiResponse<TraitDiscoveryListResponse>(response);
 }
 
+async function fetchCanonicalTraits(input: {
+  axis?: string;
+  status?: "active" | "deprecated" | "";
+  limit?: number;
+} = {}): Promise<CanonicalTraitListResponse> {
+  const params = new URLSearchParams();
+  if (input.axis && input.axis.trim() !== "") {
+    params.set("axis", input.axis.trim());
+  }
+  if (input.status && input.status.trim() !== "") {
+    params.set("status", input.status.trim());
+  }
+  params.set("limit", String(input.limit || 500));
+  const response = await fetch(`/api/proxy/admin/style-dna/canonical-traits?${params.toString()}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseApiResponse<CanonicalTraitListResponse>(response);
+}
+
+async function fetchTraitAliases(input: {
+  axis?: string;
+} = {}): Promise<TraitAliasListResponse> {
+  const params = new URLSearchParams();
+  if (input.axis && input.axis.trim() !== "") {
+    params.set("axis", input.axis.trim());
+  }
+  const query = params.toString();
+  const response = await fetch(`/api/proxy/admin/style-dna/trait-aliases${query ? `?${query}` : ""}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseApiResponse<TraitAliasListResponse>(response);
+}
+
 async function fetchOpenAiDebugLog(limit = 100): Promise<OpenAiDebugLogResponse> {
   const response = await fetch(`/api/proxy/admin/debug/openai?limit=${encodeURIComponent(String(limit))}`, {
     method: "GET",
@@ -472,6 +557,13 @@ export default function StyleDnaAdminPage() {
   const [openAiDebugPollingEnabled, setOpenAiDebugPollingEnabled] = useState(true);
   const [discoveryCreateLabelById, setDiscoveryCreateLabelById] = useState<Record<string, string>>({});
   const [reviewHistoryStatus, setReviewHistoryStatus] = useState<"approved_alias" | "approved_new_canonical" | "rejected" | "ignored">("approved_alias");
+  const [canonicalAxisFilter, setCanonicalAxisFilter] = useState("lighting_and_contrast");
+  const [canonicalStatusFilter, setCanonicalStatusFilter] = useState<"active" | "deprecated" | "">("active");
+  const [canonicalCreateLabel, setCanonicalCreateLabel] = useState("");
+  const [canonicalCreateNote, setCanonicalCreateNote] = useState("");
+  const [selectedCanonicalTraitId, setSelectedCanonicalTraitId] = useState("");
+  const [aliasCreateText, setAliasCreateText] = useState("");
+  const [aliasCreateNote, setAliasCreateNote] = useState("");
   const queryClient = useQueryClient();
 
   const sessionStateQuery = useQuery({
@@ -518,6 +610,22 @@ export default function StyleDnaAdminPage() {
   const traitDiscoveryHistoryQuery = useQuery({
     queryKey: ["admin", "style-dna", "trait-discoveries", "history", reviewHistoryStatus],
     queryFn: () => fetchTraitDiscoveriesByStatus(reviewHistoryStatus, 200),
+    enabled: styleDnaProbeQuery.data?.ready === true,
+  });
+  const canonicalTraitsQuery = useQuery({
+    queryKey: ["admin", "style-dna", "canonical-traits", canonicalAxisFilter, canonicalStatusFilter],
+    queryFn: () => fetchCanonicalTraits({
+      axis: canonicalAxisFilter,
+      status: canonicalStatusFilter,
+      limit: 500,
+    }),
+    enabled: styleDnaProbeQuery.data?.ready === true,
+  });
+  const traitAliasesQuery = useQuery({
+    queryKey: ["admin", "style-dna", "trait-aliases", canonicalAxisFilter],
+    queryFn: () => fetchTraitAliases({
+      axis: canonicalAxisFilter,
+    }),
     enabled: styleDnaProbeQuery.data?.ready === true,
   });
 
@@ -1229,6 +1337,92 @@ export default function StyleDnaAdminPage() {
     },
   });
 
+  const createCanonicalTraitMutation = useMutation({
+    mutationFn: async () => {
+      const label = canonicalCreateLabel.trim();
+      if (!label) {
+        throw new Error("Canonical display label is required");
+      }
+      const response = await fetch("/api/proxy/admin/style-dna/canonical-traits", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          axis: canonicalAxisFilter,
+          displayLabel: label,
+          notes: canonicalCreateNote.trim() || undefined,
+        }),
+      });
+      return parseApiResponse<CanonicalTraitMutationResponse>(response);
+    },
+    onSuccess: async (data) => {
+      setCanonicalCreateLabel("");
+      setCanonicalCreateNote("");
+      const createdId = String(data.canonicalTrait?.canonicalTraitId || "").trim();
+      if (createdId) {
+        setSelectedCanonicalTraitId(createdId);
+      }
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "canonical-traits"],
+      });
+    },
+  });
+
+  const updateCanonicalTraitStatusMutation = useMutation({
+    mutationFn: async (input: { canonicalTraitId: string; status: "active" | "deprecated"; note?: string }) => {
+      const response = await fetch(`/api/proxy/admin/style-dna/canonical-traits/${encodeURIComponent(input.canonicalTraitId)}/status`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          status: input.status,
+          note: input.note,
+        }),
+      });
+      return parseApiResponse<CanonicalTraitMutationResponse>(response);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "canonical-traits"],
+      });
+    },
+  });
+
+  const createTraitAliasMutation = useMutation({
+    mutationFn: async () => {
+      const canonicalTraitId = selectedCanonicalTraitId.trim();
+      const aliasText = aliasCreateText.trim();
+      if (!canonicalTraitId) {
+        throw new Error("Select a canonical trait first");
+      }
+      if (!aliasText) {
+        throw new Error("Alias text is required");
+      }
+      const response = await fetch("/api/proxy/admin/style-dna/trait-aliases", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          axis: canonicalAxisFilter,
+          canonicalTraitId,
+          aliasText,
+          note: aliasCreateNote.trim() || undefined,
+        }),
+      });
+      return parseApiResponse<TraitAliasMutationResponse>(response);
+    },
+    onSuccess: async () => {
+      setAliasCreateText("");
+      setAliasCreateNote("");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "trait-aliases"],
+      });
+    },
+  });
+
   const submitRunMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/proxy/admin/style-dna/runs", {
@@ -1413,6 +1607,32 @@ export default function StyleDnaAdminPage() {
         String(b.resolutionPayload?.reviewedAt || b.lastSeenAt || "").localeCompare(String(a.resolutionPayload?.reviewedAt || a.lastSeenAt || ""))
       ))
   ), [traitDiscoveryHistoryQuery.data?.discoveries]);
+  const canonicalTraits = useMemo(() => (
+    [...(canonicalTraitsQuery.data?.canonicalTraits || [])]
+      .sort((a, b) => String(a.displayLabel || "").localeCompare(String(b.displayLabel || "")))
+  ), [canonicalTraitsQuery.data?.canonicalTraits]);
+  const selectedCanonicalTrait = canonicalTraits.find(
+    (item) => String(item.canonicalTraitId || "") === selectedCanonicalTraitId
+  ) || null;
+  const axisTraitAliases = useMemo(() => (
+    [...(traitAliasesQuery.data?.traitAliases || [])]
+      .sort((a, b) => String(a.aliasText || "").localeCompare(String(b.aliasText || "")))
+  ), [traitAliasesQuery.data?.traitAliases]);
+  const selectedCanonicalTraitAliases = useMemo(() => (
+    axisTraitAliases.filter((alias) => String(alias.canonicalTraitId || "") === selectedCanonicalTraitId)
+  ), [axisTraitAliases, selectedCanonicalTraitId]);
+  useEffect(() => {
+    if (canonicalTraits.length === 0) {
+      if (selectedCanonicalTraitId !== "") {
+        setSelectedCanonicalTraitId("");
+      }
+      return;
+    }
+    const exists = canonicalTraits.some((item) => String(item.canonicalTraitId || "") === selectedCanonicalTraitId);
+    if (!exists) {
+      setSelectedCanonicalTraitId(String(canonicalTraits[0].canonicalTraitId || ""));
+    }
+  }, [canonicalTraits, selectedCanonicalTraitId]);
 
   const createBaselineBlockingReasons = useMemo(() => {
     const reasons: string[] = [];
@@ -2728,6 +2948,204 @@ export default function StyleDnaAdminPage() {
           {reviewTraitDiscoveryMutation.isError ? (
             <p className="mt-2 text-red-600">Discovery review failed: {mutationErrorMessage(reviewTraitDiscoveryMutation.error)}</p>
           ) : null}
+        </div>
+        <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
+          <p className="font-medium">Canonical Trait Library</p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Curate canonical traits and aliases used by discovery review and canonicalization.
+          </p>
+          <div className="mt-2 grid gap-2 md:grid-cols-3">
+            <label className="text-xs">
+              Axis
+              <select
+                value={canonicalAxisFilter}
+                onChange={(event) => setCanonicalAxisFilter(event.currentTarget.value)}
+                className="mt-1 w-full rounded border border-[var(--line)] bg-transparent px-2 py-1"
+              >
+                <option value="composition_and_structure">composition_and_structure</option>
+                <option value="lighting_and_contrast">lighting_and_contrast</option>
+                <option value="color_palette">color_palette</option>
+                <option value="texture_and_medium">texture_and_medium</option>
+                <option value="dominant_dna_tags">dominant_dna_tags</option>
+              </select>
+            </label>
+            <label className="text-xs">
+              Status Filter
+              <select
+                value={canonicalStatusFilter}
+                onChange={(event) => setCanonicalStatusFilter(event.currentTarget.value as "active" | "deprecated" | "")}
+                className="mt-1 w-full rounded border border-[var(--line)] bg-transparent px-2 py-1"
+              >
+                <option value="active">active</option>
+                <option value="deprecated">deprecated</option>
+                <option value="">all</option>
+              </select>
+            </label>
+            <div className="text-xs text-[var(--muted)]">
+              <p className="mt-5">Traits: {canonicalTraits.length}</p>
+              <p>Aliases (axis): {axisTraitAliases.length}</p>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="rounded border border-[var(--line)] p-2">
+              <p className="font-medium">Create Canonical Trait</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={canonicalCreateLabel}
+                  onChange={(event) => setCanonicalCreateLabel(event.currentTarget.value)}
+                  placeholder="display label"
+                  className="min-w-[220px] rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+                />
+                <input
+                  type="text"
+                  value={canonicalCreateNote}
+                  onChange={(event) => setCanonicalCreateNote(event.currentTarget.value)}
+                  placeholder="note (optional)"
+                  className="min-w-[220px] rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => createCanonicalTraitMutation.mutate()}
+                  disabled={!canonicalCreateLabel.trim() || createCanonicalTraitMutation.isPending}
+                  className="rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-50"
+                >
+                  Create
+                </button>
+              </div>
+              {createCanonicalTraitMutation.isError ? (
+                <p className="mt-2 text-red-600">Create failed: {mutationErrorMessage(createCanonicalTraitMutation.error)}</p>
+              ) : null}
+            </div>
+            <div className="rounded border border-[var(--line)] p-2">
+              <p className="font-medium">Create Alias</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <select
+                  value={selectedCanonicalTraitId}
+                  onChange={(event) => setSelectedCanonicalTraitId(event.currentTarget.value)}
+                  className="min-w-[220px] rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+                >
+                  {canonicalTraits.map((item) => (
+                    <option key={String(item.canonicalTraitId || "")} value={String(item.canonicalTraitId || "")}>
+                      {item.displayLabel} ({item.status})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={aliasCreateText}
+                  onChange={(event) => setAliasCreateText(event.currentTarget.value)}
+                  placeholder="alias text"
+                  className="min-w-[180px] rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+                />
+                <input
+                  type="text"
+                  value={aliasCreateNote}
+                  onChange={(event) => setAliasCreateNote(event.currentTarget.value)}
+                  placeholder="note (optional)"
+                  className="min-w-[180px] rounded border border-[var(--line)] bg-transparent px-2 py-1 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => createTraitAliasMutation.mutate()}
+                  disabled={!selectedCanonicalTraitId || !aliasCreateText.trim() || createTraitAliasMutation.isPending}
+                  className="rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-50"
+                >
+                  Add Alias
+                </button>
+              </div>
+              {createTraitAliasMutation.isError ? (
+                <p className="mt-2 text-red-600">Alias create failed: {mutationErrorMessage(createTraitAliasMutation.error)}</p>
+              ) : null}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="rounded border border-[var(--line)] p-2">
+              <p className="font-medium">Canonical Traits</p>
+              {canonicalTraitsQuery.isLoading ? (
+                <p className="mt-2 text-[var(--muted)]">Loading canonical traits...</p>
+              ) : null}
+              {canonicalTraitsQuery.isError ? (
+                <p className="mt-2 text-red-600">Could not load canonical traits.</p>
+              ) : null}
+              {!canonicalTraitsQuery.isLoading && !canonicalTraitsQuery.isError && canonicalTraits.length === 0 ? (
+                <p className="mt-2 text-[var(--muted)]">No canonical traits for selected filter.</p>
+              ) : null}
+              {!canonicalTraitsQuery.isLoading && !canonicalTraitsQuery.isError && canonicalTraits.length > 0 ? (
+                <ul className="mt-2 space-y-2">
+                  {canonicalTraits.slice(0, 30).map((trait) => {
+                    const traitId = String(trait.canonicalTraitId || "");
+                    const active = traitId === selectedCanonicalTraitId;
+                    const nextStatus = trait.status === "deprecated" ? "active" : "deprecated";
+                    return (
+                      <li key={traitId} className={`rounded border p-2 ${active ? "border-blue-300 bg-blue-50" : "border-[var(--line)]"}`}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCanonicalTraitId(traitId)}
+                            className="text-left"
+                          >
+                            <p className="text-xs font-mono text-[var(--muted)]">{traitId}</p>
+                            <p className="font-medium">{trait.displayLabel}</p>
+                            <p className="text-xs text-[var(--muted)]">{trait.status} | {trait.axis}</p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!traitId) {
+                                return;
+                              }
+                              updateCanonicalTraitStatusMutation.mutate({
+                                canonicalTraitId: traitId,
+                                status: nextStatus,
+                                note: `Status updated from admin canonical library (${nextStatus}).`,
+                              });
+                            }}
+                            disabled={!traitId || updateCanonicalTraitStatusMutation.isPending}
+                            className="rounded border border-[var(--line)] px-2 py-1 text-xs disabled:opacity-50"
+                          >
+                            Mark {nextStatus}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              {updateCanonicalTraitStatusMutation.isError ? (
+                <p className="mt-2 text-red-600">Status update failed: {mutationErrorMessage(updateCanonicalTraitStatusMutation.error)}</p>
+              ) : null}
+            </div>
+            <div className="rounded border border-[var(--line)] p-2">
+              <p className="font-medium">Aliases For Selected Canonical Trait</p>
+              {traitAliasesQuery.isLoading ? (
+                <p className="mt-2 text-[var(--muted)]">Loading aliases...</p>
+              ) : null}
+              {traitAliasesQuery.isError ? (
+                <p className="mt-2 text-red-600">Could not load aliases.</p>
+              ) : null}
+              {!traitAliasesQuery.isLoading && !traitAliasesQuery.isError && !selectedCanonicalTrait ? (
+                <p className="mt-2 text-[var(--muted)]">Select a canonical trait to inspect aliases.</p>
+              ) : null}
+              {!traitAliasesQuery.isLoading && !traitAliasesQuery.isError && selectedCanonicalTrait && selectedCanonicalTraitAliases.length === 0 ? (
+                <p className="mt-2 text-[var(--muted)]">No aliases for selected canonical trait.</p>
+              ) : null}
+              {!traitAliasesQuery.isLoading && !traitAliasesQuery.isError && selectedCanonicalTraitAliases.length > 0 ? (
+                <ul className="mt-2 space-y-1">
+                  {selectedCanonicalTraitAliases.slice(0, 40).map((alias) => (
+                    <li key={String(alias.aliasId || "")} className="rounded border border-[var(--line)] p-2">
+                      <p className="font-medium">{alias.aliasText}</p>
+                      <p className="text-xs text-[var(--muted)]">
+                        {alias.source} | {alias.mergeMethod}
+                        {alias.semanticSimilarity !== null && alias.semanticSimilarity !== undefined ? ` | sem=${alias.semanticSimilarity}` : ""}
+                        {alias.lexicalSimilarity !== null && alias.lexicalSimilarity !== undefined ? ` | lex=${alias.lexicalSimilarity}` : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </div>
         </div>
         <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
