@@ -131,6 +131,22 @@ Trait inference mode switch:
 2. LLM-backed: set `TRAIT_INFERENCE_MODE=llm` and `OPENAI_API_KEY=<your-key>`
 3. Editable LLM system prompt: `scripts/inference/prompts/trait-system.md`
 
+OpenAI debug logging (local admin troubleshooting):
+
+1. Enable in `.env.local`:
+   - `OPENAI_DEBUG_LOGGING=true`
+   - optional: `OPENAI_DEBUG_LOG_PATH=./data/logs/openai-debug.jsonl`
+   - optional: `OPENAI_DEBUG_MAX_BODY_CHARS=200000`
+2. Restart stack:
+   - `scripts/dev-stack.sh restart`
+3. Open Style-DNA admin page and toggle `Show OpenAI Debug` in Section 3.
+4. Debug API endpoints:
+   - `GET /v1/admin/debug/openai?limit=100`
+   - `POST /v1/admin/debug/openai/clear`
+5. Notes:
+   - Debug logs are raw request/response payloads and should remain local/dev-only.
+   - If no events appear, confirm the run reached an OpenAI call (worker failures before inference produce no OpenAI debug events).
+
 Admin governance smoke:
 
 1. `set -a && source .env.local.example && set +a`

@@ -73,6 +73,46 @@ type StyleDnaRunLookupResponse = {
   };
 };
 
+type TraitSummaryResponse = {
+  styleInfluenceId?: string;
+  summary?: {
+    completedRunCount?: number;
+    completedPromptCount?: number;
+    completedCellCount?: number;
+    averageDeltaStrength?: number | null;
+    topDnaTags?: Array<{ value?: string; count?: number }>;
+    topVibeShifts?: Array<{ value?: string; count?: number }>;
+    topAtomicTraits?: Array<{ axis?: string; trait?: string; count?: number }>;
+    recentRuns?: Array<{
+      styleDnaRunId?: string;
+      promptKey?: string;
+      stylizeTier?: number;
+      summary?: string | null;
+      createdAt?: string;
+    }>;
+  };
+};
+
+type OpenAiDebugEvent = {
+  timestamp?: string;
+  sessionId?: string;
+  adapter?: string;
+  operation?: string;
+  model?: string | null;
+  url?: string | null;
+  phase?: string;
+  status?: number;
+  requestBodyRaw?: string;
+  responseBodyRaw?: string;
+  errorMessage?: string;
+};
+
+type OpenAiDebugLogResponse = {
+  enabled?: boolean;
+  logPath?: string;
+  events?: OpenAiDebugEvent[];
+};
+
 type Section3PromptProgress = {
   copied?: boolean;
   generatedPromptText?: string;
@@ -274,6 +314,22 @@ async function fetchBaselineSetList(): Promise<BaselineSetListResponse> {
   return parseApiResponse<BaselineSetListResponse>(response);
 }
 
+async function fetchStyleInfluenceTraitSummary(styleInfluenceId: string): Promise<TraitSummaryResponse> {
+  const response = await fetch(`/api/proxy/admin/style-dna/style-influences/${encodeURIComponent(styleInfluenceId)}/trait-summary?limit=1000`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseApiResponse<TraitSummaryResponse>(response);
+}
+
+async function fetchOpenAiDebugLog(limit = 100): Promise<OpenAiDebugLogResponse> {
+  const response = await fetch(`/api/proxy/admin/debug/openai?limit=${encodeURIComponent(String(limit))}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+  return parseApiResponse<OpenAiDebugLogResponse>(response);
+}
+
 function fileExtensionForMimeType(mimeType: string): string {
   if (mimeType === "image/png") {
     return "png";
@@ -369,6 +425,8 @@ export default function StyleDnaAdminPage() {
   const [baselineFilePreviewUrl, setBaselineFilePreviewUrl] = useState("");
   const [testFilePreviewUrl, setTestFilePreviewUrl] = useState("");
   const [section3PromptProgress, setSection3PromptProgress] = useState<Record<string, Section3PromptProgress>>({});
+  const [showOpenAiDebugPanel, setShowOpenAiDebugPanel] = useState(false);
+  const [openAiDebugPollingEnabled, setOpenAiDebugPollingEnabled] = useState(true);
   const queryClient = useQueryClient();
 
   const sessionStateQuery = useQuery({
@@ -399,6 +457,26 @@ export default function StyleDnaAdminPage() {
     queryFn: () => fetchBaselineSetDetail(baselineRenderSetId.trim()),
     enabled: baselineRenderSetId.trim() !== "" && styleDnaProbeQuery.data?.ready === true,
   });
+
+  const styleInfluenceTraitSummaryQuery = useQuery({
+    queryKey: ["admin", "style-dna", "trait-summary", styleInfluenceId.trim()],
+    queryFn: () => fetchStyleInfluenceTraitSummary(styleInfluenceId.trim()),
+    enabled: styleInfluenceId.trim() !== "" && styleDnaProbeQuery.data?.ready === true,
+  });
+
+  const openAiDebugLogQuery = useQuery({
+    queryKey: ["admin", "debug", "openai"],
+    queryFn: () => fetchOpenAiDebugLog(100),
+    enabled: showOpenAiDebugPanel && openAiDebugPollingEnabled && styleDnaProbeQuery.data?.ready === true,
+    refetchInterval: showOpenAiDebugPanel && openAiDebugPollingEnabled ? 5000 : false,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (openAiDebugLogQuery.error instanceof ApiRequestError && openAiDebugLogQuery.error.status === 404) {
+      setOpenAiDebugPollingEnabled(false);
+    }
+  }, [openAiDebugLogQuery.error]);
 
   const baselinePromptDefinitions = useMemo(() => (
     [...(baselineSetDetailQuery.data?.promptDefinitions || [])]
@@ -1090,6 +1168,9 @@ export default function StyleDnaAdminPage() {
           },
         }));
       }
+      void queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "trait-summary", styleInfluenceId.trim()],
+      });
     },
   });
 
@@ -1122,6 +1203,25 @@ export default function StyleDnaAdminPage() {
           result: data.result || previous[key]?.result,
         },
       }));
+      if (String(run?.status || "") === "succeeded" && styleInfluenceId.trim() !== "") {
+        void queryClient.invalidateQueries({
+          queryKey: ["admin", "style-dna", "trait-summary", styleInfluenceId.trim()],
+        });
+      }
+    },
+  });
+
+  const clearOpenAiDebugLogMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/proxy/admin/debug/openai/clear", {
+        method: "POST",
+      });
+      return parseApiResponse<{ cleared?: boolean }>(response);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "debug", "openai"],
+      });
     },
   });
 
@@ -1198,6 +1298,7 @@ export default function StyleDnaAdminPage() {
   const section3TestPreviewUrl = testPreviewUrl || (
     selectedSection3Row?.testGridImageId ? styleDnaImageContentPath(selectedSection3Row.testGridImageId) : ""
   );
+  const styleInfluenceTraitSummary = styleInfluenceTraitSummaryQuery.data?.summary;
 
   const createBaselineBlockingReasons = useMemo(() => {
     const reasons: string[] = [];
@@ -2070,6 +2171,86 @@ export default function StyleDnaAdminPage() {
             {lookupRunMutation.isPending ? "Loading..." : "Get Run Status"}
           </button>
         </div>
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => {
+              setShowOpenAiDebugPanel((value) => {
+                const next = !value;
+                if (next) {
+                  setOpenAiDebugPollingEnabled(true);
+                }
+                return next;
+              });
+            }}
+            className="rounded-lg border border-[var(--line)] px-3 py-1 text-xs"
+          >
+            {showOpenAiDebugPanel ? "Hide OpenAI Debug" : "Show OpenAI Debug"}
+          </button>
+        </div>
+        {showOpenAiDebugPanel ? (
+          <div className="mt-3 rounded-lg border border-[var(--line)] p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-medium">OpenAI Request/Response Debug</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenAiDebugPollingEnabled(true);
+                    void openAiDebugLogQuery.refetch();
+                  }}
+                  className="rounded border border-[var(--line)] px-2 py-1 text-xs"
+                >
+                  Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => clearOpenAiDebugLogMutation.mutate()}
+                  disabled={clearOpenAiDebugLogMutation.isPending}
+                  className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 disabled:opacity-60"
+                >
+                  {clearOpenAiDebugLogMutation.isPending ? "Clearing..." : "Clear Log"}
+                </button>
+              </div>
+            </div>
+            {openAiDebugLogQuery.isLoading ? (
+              <p className="mt-2 text-[var(--muted)]">Loading debug log...</p>
+            ) : null}
+            {openAiDebugLogQuery.isError ? (
+              <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-red-700">
+                <p className="text-sm">Could not load debug log: {mutationErrorMessage(openAiDebugLogQuery.error)}</p>
+                {openAiDebugLogQuery.error instanceof ApiRequestError && openAiDebugLogQuery.error.status === 404 ? (
+                  <p className="mt-1 text-xs">
+                    Debug endpoint not found on the running API. Restart API/frontend on latest code, then click Refresh.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {!openAiDebugLogQuery.isLoading && !openAiDebugLogQuery.isError ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-[var(--muted)]">
+                  Enabled: {openAiDebugLogQuery.data?.enabled ? "true" : "false"} | Path: {openAiDebugLogQuery.data?.logPath || "(unknown)"}
+                </p>
+                {openAiDebugLogQuery.data?.events?.length ? (
+                  <div className="max-h-80 space-y-2 overflow-y-auto">
+                    {(openAiDebugLogQuery.data.events || []).map((event, index) => (
+                      <details key={`${event.timestamp || "t"}-${event.sessionId || "s"}-${index}`} className="rounded border border-[var(--line)] p-2">
+                        <summary className="cursor-pointer text-xs">
+                          [{event.timestamp || "-"}] {event.adapter || "unknown"} {event.phase || "event"} {event.status ? `(status ${event.status})` : ""}
+                        </summary>
+                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs">
+                          {JSON.stringify(event, null, 2)}
+                        </pre>
+                      </details>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[var(--muted)]">No debug events yet.</p>
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {generatePromptBlockingReasons.length > 0 ? (
           <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <p className="font-medium">Prompt generation is disabled:</p>
@@ -2234,6 +2415,66 @@ export default function StyleDnaAdminPage() {
             <p><span className="font-medium">Delta:</span> {selectedSection3Row.result.canonicalTraits?.deltaStrength?.score_1_to_10 ?? "-"}</p>
           </div>
         ) : null}
+        <div className="mt-4 rounded-lg border border-[var(--line)] p-3 text-sm">
+          <p className="font-medium">Accumulated Trait Analysis</p>
+          {!styleInfluenceId.trim() ? (
+            <p className="mt-2 text-[var(--muted)]">Select a Style Influence Id to view accumulated analysis.</p>
+          ) : null}
+          {styleInfluenceTraitSummaryQuery.isLoading ? (
+            <p className="mt-2 text-[var(--muted)]">Loading accumulated analysis...</p>
+          ) : null}
+          {styleInfluenceTraitSummaryQuery.isError ? (
+            <p className="mt-2 text-red-600">Could not load accumulated analysis.</p>
+          ) : null}
+          {styleInfluenceId.trim() && !styleInfluenceTraitSummaryQuery.isLoading && !styleInfluenceTraitSummaryQuery.isError && styleInfluenceTraitSummary ? (
+            <div className="mt-2 space-y-3">
+              <div className="grid gap-2 md:grid-cols-4">
+                <p><span className="font-medium">Completed runs:</span> {styleInfluenceTraitSummary.completedRunCount ?? 0}</p>
+                <p><span className="font-medium">Prompt keys:</span> {styleInfluenceTraitSummary.completedPromptCount ?? 0}</p>
+                <p><span className="font-medium">Cells:</span> {styleInfluenceTraitSummary.completedCellCount ?? 0}</p>
+                <p><span className="font-medium">Avg delta:</span> {styleInfluenceTraitSummary.averageDeltaStrength ?? "-"}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded border border-[var(--line)] p-2">
+                  <p className="font-medium">Top DNA Tags</p>
+                  {styleInfluenceTraitSummary.topDnaTags?.length ? (
+                    <ul className="mt-1 space-y-1">
+                      {styleInfluenceTraitSummary.topDnaTags.slice(0, 5).map((item) => (
+                        <li key={`dna-${item.value}`} className="text-xs">{item.value} ({item.count})</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs text-[var(--muted)]">(none)</p>
+                  )}
+                </div>
+                <div className="rounded border border-[var(--line)] p-2">
+                  <p className="font-medium">Top Vibe Shifts</p>
+                  {styleInfluenceTraitSummary.topVibeShifts?.length ? (
+                    <ul className="mt-1 space-y-1">
+                      {styleInfluenceTraitSummary.topVibeShifts.slice(0, 5).map((item) => (
+                        <li key={`vibe-${item.value}`} className="text-xs">{item.value} ({item.count})</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs text-[var(--muted)]">(none)</p>
+                  )}
+                </div>
+                <div className="rounded border border-[var(--line)] p-2">
+                  <p className="font-medium">Top Atomic Traits</p>
+                  {styleInfluenceTraitSummary.topAtomicTraits?.length ? (
+                    <ul className="mt-1 space-y-1">
+                      {styleInfluenceTraitSummary.topAtomicTraits.slice(0, 5).map((item) => (
+                        <li key={`atomic-${item.axis}-${item.trait}`} className="text-xs">{item.axis}: {item.trait} ({item.count})</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-xs text-[var(--muted)]">(none)</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </section>
     </main>
   );

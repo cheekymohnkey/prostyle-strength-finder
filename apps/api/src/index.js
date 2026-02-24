@@ -77,6 +77,7 @@ const {
   insertStyleDnaRun,
   updateStyleDnaRunStatus,
   getStyleDnaRunResultByRunId,
+  listStyleDnaRunResultsByStyleInfluenceId,
   getStyleDnaImageById,
   insertStyleDnaImage,
   updateRecommendationSessionStatus,
@@ -88,6 +89,12 @@ const {
   resolveModelSelection,
   setCurrentDefaultModels,
 } = require("../../../scripts/models/model-versioning");
+const {
+  isDebugEnabled,
+  resolveLogPath,
+  readRecentOpenAiDebugEvents,
+  clearOpenAiDebugEvents,
+} = require("../../../scripts/inference/openai-debug-log");
 const {
   CONTRACT_VERSION,
   validateRecommendationSubmitPayload,
@@ -795,6 +802,107 @@ function mapStyleInfluenceCatalogRow(row) {
     pinned: Boolean(row.pinned_flag),
     createdBy: row.created_by,
     createdAt: row.created_at,
+  };
+}
+
+function parseJsonObject(value, fallback = {}) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object") {
+      return fallback;
+    }
+    return parsed;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function summarizeStyleDnaTraits(rows) {
+  const tagCounts = new Map();
+  const vibeShiftCounts = new Map();
+  const atomicTraitCounts = new Map();
+  const completedPromptKeys = new Set();
+  const completedCells = new Set();
+  let deltaTotal = 0;
+  let deltaCount = 0;
+
+  rows.forEach((row) => {
+    if (typeof row.prompt_key === "string" && row.prompt_key.trim() !== "") {
+      completedPromptKeys.add(row.prompt_key.trim());
+    }
+    completedCells.add(`${String(row.prompt_key || "").trim()}::${Number(row.stylize_tier || 0)}`);
+
+    const canonical = parseJsonObject(row.canonical_traits_json);
+    const atomic = parseJsonObject(row.atomic_traits_json);
+    const delta = Number(canonical.deltaStrength?.score_1_to_10);
+    if (Number.isFinite(delta)) {
+      deltaTotal += delta;
+      deltaCount += 1;
+    }
+
+    const vibeShift = typeof canonical.vibeShift === "string" ? canonical.vibeShift.trim() : "";
+    if (vibeShift !== "") {
+      vibeShiftCounts.set(vibeShift, Number(vibeShiftCounts.get(vibeShift) || 0) + 1);
+    }
+
+    const tags = Array.isArray(canonical.dominantDnaTags) ? canonical.dominantDnaTags : [];
+    tags.forEach((tag) => {
+      const value = String(tag || "").trim();
+      if (value === "") {
+        return;
+      }
+      tagCounts.set(value, Number(tagCounts.get(value) || 0) + 1);
+    });
+
+    Object.entries(atomic).forEach(([axis, entries]) => {
+      if (!Array.isArray(entries)) {
+        return;
+      }
+      entries.forEach((entry) => {
+        const trait = String(entry || "").trim();
+        if (trait === "" || trait.toLowerCase() === "no change") {
+          return;
+        }
+        const key = `${axis}::${trait}`;
+        atomicTraitCounts.set(key, Number(atomicTraitCounts.get(key) || 0) + 1);
+      });
+    });
+  });
+
+  const asSortedList = (counts) => (
+    Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))
+      .map(([value, count]) => ({ value, count }))
+  );
+
+  return {
+    completedRunCount: rows.length,
+    completedPromptCount: completedPromptKeys.size,
+    completedCellCount: completedCells.size,
+    averageDeltaStrength: deltaCount > 0 ? Number((deltaTotal / deltaCount).toFixed(2)) : null,
+    topDnaTags: asSortedList(tagCounts).slice(0, 10),
+    topVibeShifts: asSortedList(vibeShiftCounts).slice(0, 10),
+    topAtomicTraits: asSortedList(atomicTraitCounts)
+      .slice(0, 20)
+      .map((entry) => {
+        const [axis, trait] = String(entry.value).split("::");
+        return {
+          axis,
+          trait,
+          count: entry.count,
+        };
+      }),
+    recentRuns: rows.slice(0, 20).map((row) => ({
+      styleDnaRunId: row.style_dna_run_id,
+      promptKey: row.prompt_key,
+      stylizeTier: Number(row.stylize_tier || 0),
+      taxonomyVersion: row.taxonomy_version,
+      summary: row.summary || null,
+      createdAt: row.created_at,
+    })),
   };
 }
 
@@ -3158,6 +3266,98 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       {
         run: mapStyleDnaRunRow(run),
         result: mapStyleDnaRunResultRow(result),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "GET" && path.startsWith("/v1/admin/style-dna/style-influences/") && path.endsWith("/trait-summary")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const suffix = "/trait-summary";
+    const styleInfluenceId = path
+      .slice("/v1/admin/style-dna/style-influences/".length, -suffix.length)
+      .trim();
+    if (styleInfluenceId === "") {
+      sendError(res, 400, "INVALID_REQUEST", "Style influence id is required", ctx);
+      return;
+    }
+
+    const styleInfluence = getStyleInfluenceById(dbPath, styleInfluenceId);
+    if (!styleInfluence) {
+      sendError(res, 404, "NOT_FOUND", "Style influence not found", ctx);
+      return;
+    }
+
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 500;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 2000) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid trait-summary limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..2000",
+      });
+      return;
+    }
+
+    const rows = listStyleDnaRunResultsByStyleInfluenceId(dbPath, styleInfluenceId, { limit });
+    sendJson(
+      res,
+      200,
+      {
+        styleInfluenceId,
+        summary: summarizeStyleDnaTraits(rows),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "GET" && path === "/v1/admin/debug/openai") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid debug log limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..500",
+      });
+      return;
+    }
+    sendJson(
+      res,
+      200,
+      {
+        enabled: isDebugEnabled(),
+        logPath: resolveLogPath(),
+        events: readRecentOpenAiDebugEvents(limit),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/debug/openai/clear") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    clearOpenAiDebugEvents();
+    sendJson(
+      res,
+      200,
+      {
+        cleared: true,
       },
       ctx
     );

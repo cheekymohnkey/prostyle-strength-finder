@@ -1475,6 +1475,21 @@ function insertStyleDnaImage(dbPath, input) {
   );
 }
 
+function listStyleDnaRunResultsByStyleInfluenceId(dbPath, styleInfluenceId, input = {}) {
+  return queryJson(
+    dbPath,
+    `SELECT runs.style_dna_run_id, runs.prompt_key, runs.stylize_tier, runs.status, runs.created_at,
+            results.style_dna_run_result_id, results.atomic_traits_json, results.canonical_traits_json,
+            results.taxonomy_version, results.summary
+     FROM style_dna_runs runs
+     INNER JOIN style_dna_run_results results
+       ON results.style_dna_run_id = runs.style_dna_run_id
+     WHERE runs.style_influence_id = ${quote(styleInfluenceId)}
+     ORDER BY runs.created_at DESC
+     LIMIT ${Number(input.limit || 500)};`
+  );
+}
+
 module.exports = {
   ensureReady,
   getUserById,
@@ -1568,6 +1583,7 @@ module.exports = {
   updateStyleDnaRunStatus,
   getStyleDnaRunResultByRunId,
   insertStyleDnaRunResult,
+  listStyleDnaRunResultsByStyleInfluenceId,
   getStyleDnaImageById,
   insertStyleDnaImage,
 };

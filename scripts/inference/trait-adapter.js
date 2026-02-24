@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { createOpenAiDebugSession } = require("./openai-debug-log");
 
 const DEFAULT_TRAIT_KEYS = [
   "dark_moody",
@@ -81,17 +82,37 @@ async function callOpenAiTraitInference(openAi, input) {
     ],
   };
 
+  const debug = createOpenAiDebugSession({
+    adapter: "trait",
+    operation: "chat.completions",
+    model: openAi.model,
+    url: `${openAi.baseUrl}/chat/completions`,
+  });
+  const requestBodyRaw = JSON.stringify(body);
+  debug.logRequest(requestBodyRaw);
   const response = await fetch(`${openAi.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${openAi.apiKey}`,
     },
-    body: JSON.stringify(body),
+    body: requestBodyRaw,
   });
-  const responseJson = await response.json().catch(() => ({}));
+  const responseBodyRaw = await response.text();
+  debug.logResponse({
+    status: response.status,
+    bodyRaw: responseBodyRaw,
+  });
+  const responseJson = (() => {
+    try {
+      return JSON.parse(responseBodyRaw);
+    } catch (_error) {
+      return {};
+    }
+  })();
   if (!response.ok) {
     const message = responseJson?.error?.message || `OpenAI request failed with status ${response.status}`;
+    debug.logError(message);
     throw new Error(message);
   }
 

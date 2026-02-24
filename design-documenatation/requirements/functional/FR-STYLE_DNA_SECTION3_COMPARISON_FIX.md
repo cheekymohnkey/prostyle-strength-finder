@@ -55,6 +55,8 @@ Primary operator intent:
 15. `FR-SD3-015` Newly created style influences shall be immediately visible in the Section 3 Style Influence list without requiring manual DB edits or external workflow steps.
 16. `FR-SD3-016` Section 3 shall provide an admin `Delete/Remove` action for style influences to handle incorrect type creation (for example, accidentally created as `sref` instead of `profile`).
 17. `FR-SD3-017` When a style influence is removed, Section 3 shall allow immediate creation of a replacement style influence with the correct type and auto-select it.
+18. `FR-SD3-018` Section 3 shall provide an accumulated trait-analysis view for the selected Style Influence, summarizing persisted run results (for example: completed run count, average delta, top tags/traits).
+19. `FR-SD3-019` Section 3 should provide a toggleable local-development debug panel that can display raw OpenAI request/response logs and allow manual refresh/clear operations for troubleshooting.
 
 ## Matrix Requirements
 
@@ -100,6 +102,7 @@ Primary operator intent:
 10. Admin can run and store results with partial matrix coverage, while seeing the remaining recommended cells.
 11. Admin can create a new Midjourney style adjustment ID directly in Section 3 and use it immediately in prompt generation/run submission.
 12. Admin can remove an incorrectly typed style influence from Section 3 and replace it with a correctly typed new record in the same workflow.
+13. Admin can select a style influence and immediately see accumulated persisted trait-analysis summaries for that influence.
 
 ## Decisions Captured
 
@@ -116,6 +119,7 @@ Primary operator intent:
 4. Current run contract does not carry per-run `styleWeight` as an explicit field; UI matrix output includes `--sw` in generated prompts, but backend trusts uploaded-image intent.
 5. Admin-side style influence creation from Section 3 is exposed via admin create/list style influence contracts and used directly by the UI.
 6. Style influence removal should use admin governance remove semantics (status transition) so auditability is preserved.
+7. Aggregated trait summaries should be computed from persisted `style_dna_run_results` joined to runs for the selected style influence.
 
 ## Implementation Status (Current)
 
@@ -134,3 +138,4 @@ Not yet fully enforced server-side:
 2. Cell-level run identity is UI-managed; backend currently keys runs by submitted prompt/tier/image/idempotency.
 3. Section 3 now supports direct creation of new style influences from Midjourney IDs and refreshes selector options after create.
 4. Section 3 now exposes a dedicated remove/delete control for style influences in the UI, using governance remove semantics.
+5. Section 3 now exposes an accumulated trait-analysis panel for the selected style influence, backed by an admin summary endpoint.

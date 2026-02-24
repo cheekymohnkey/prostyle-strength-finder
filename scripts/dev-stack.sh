@@ -46,8 +46,26 @@ fi
 
 export PATH="${NODE_PATH_PREFIX}:$PATH"
 export WORKER_RUN_ONCE=false
-# Keep API and worker on the same absolute local storage root regardless of process cwd.
-export STORAGE_LOCAL_DIR="${STORAGE_LOCAL_DIR:-$ROOT_DIR/data/storage}"
+# Keep API and worker on the same absolute local paths regardless of process cwd.
+if [[ -n "${STORAGE_LOCAL_DIR:-}" ]]; then
+  case "$STORAGE_LOCAL_DIR" in
+    /*) ;;
+    *) STORAGE_LOCAL_DIR="$ROOT_DIR/${STORAGE_LOCAL_DIR#./}" ;;
+  esac
+else
+  STORAGE_LOCAL_DIR="$ROOT_DIR/data/storage"
+fi
+export STORAGE_LOCAL_DIR
+
+if [[ -n "${OPENAI_DEBUG_LOG_PATH:-}" ]]; then
+  case "$OPENAI_DEBUG_LOG_PATH" in
+    /*) ;;
+    *) OPENAI_DEBUG_LOG_PATH="$ROOT_DIR/${OPENAI_DEBUG_LOG_PATH#./}" ;;
+  esac
+else
+  OPENAI_DEBUG_LOG_PATH="$ROOT_DIR/data/logs/openai-debug.jsonl"
+fi
+export OPENAI_DEBUG_LOG_PATH
 
 is_running() {
   local pid_file="$1"

@@ -55,6 +55,9 @@ For the current phase, these are the only supported environments beyond local: `
 | `OPENAI_API_KEY` | Conditional | API, Worker | string | Required when `TRAIT_INFERENCE_MODE=llm`. |
 | `OPENAI_MODEL` | No | API, Worker | string | OpenAI model id for trait inference (default `gpt-4.1-mini`). |
 | `OPENAI_BASE_URL` | No | API, Worker | URL | Base URL for OpenAI-compatible endpoint (default `https://api.openai.com/v1`). |
+| `OPENAI_DEBUG_LOGGING` | No | API, Worker | `true|false` | Local debug switch to persist raw OpenAI request/response events for admin troubleshooting. |
+| `OPENAI_DEBUG_LOG_PATH` | No | API, Worker | path | Optional JSONL path for OpenAI debug events (default `./data/logs/openai-debug.jsonl`). |
+| `OPENAI_DEBUG_MAX_BODY_CHARS` | No | API, Worker | integer | Per-request/response payload cap written to debug log; large payloads are truncated. |
 | `LOG_LEVEL` | Yes | API, Worker | `debug|info|warn|error` | Structured logging level. |
 | `SERVICE_NAME` | Yes | API, Worker | string | Service identifier in logs. |
 | `LOG_INCLUDE_CORRELATION_IDS` | No | API, Worker | `true|false` | Defaults to `true` when omitted. |

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { createOpenAiDebugSession } = require("./openai-debug-log");
 
 const STYLE_DNA_SYSTEM_PROMPT_PATH = path.join(__dirname, "prompts", "style-dna-baseline-comparison-system.md");
 const STYLE_DNA_SCHEMA_PATH = path.join(__dirname, "schemas", "style-dna-profile-analysis.schema.json");
@@ -151,18 +152,39 @@ async function callOpenAiStyleDnaInference(openAi, input) {
     },
   };
 
+  const debug = createOpenAiDebugSession({
+    adapter: "style_dna",
+    operation: "chat.completions",
+    model: openAi.model,
+    url: `${openAi.baseUrl}/chat/completions`,
+  });
+  const requestBodyRaw = JSON.stringify(body);
+  debug.logRequest(requestBodyRaw);
+
   const response = await fetch(`${openAi.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${openAi.apiKey}`,
     },
-    body: JSON.stringify(body),
+    body: requestBodyRaw,
   });
 
-  const responseJson = await response.json().catch(() => ({}));
+  const responseBodyRaw = await response.text();
+  debug.logResponse({
+    status: response.status,
+    bodyRaw: responseBodyRaw,
+  });
+  const responseJson = (() => {
+    try {
+      return JSON.parse(responseBodyRaw);
+    } catch (_error) {
+      return {};
+    }
+  })();
   if (!response.ok) {
     const message = responseJson?.error?.message || `OpenAI request failed with status ${response.status}`;
+    debug.logError(message);
     throw new Error(message);
   }
 
