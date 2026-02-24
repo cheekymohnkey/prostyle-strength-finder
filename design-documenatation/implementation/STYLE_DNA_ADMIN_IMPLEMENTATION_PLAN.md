@@ -92,15 +92,66 @@ Implemented in code:
  - includes alias status update (`active`/`deprecated`) assertions via proxy.
 10. Discovery review replay smoke is now available:
 - `style-dna:discovery-review-replay-smoke` validates trait-discovery review transitions (`approved_alias`, `create_canonical`, duplicate-review `409`) and alias replay canonicalization behavior.
+11. Taxonomy seed admin flow is now available:
+- `POST /v1/admin/style-dna/taxonomy-seed` applies idempotent canonical+alias seed entries with optional deprecated-status reactivation and conflict reporting.
+- `style-dna:taxonomy-seed-smoke` validates seed idempotency and deprecate/reactivate replay behavior.
+12. Versioned taxonomy seed library tooling is now available:
+- seed bundle file: `scripts/style-dna/seeds/style-dna-taxonomy-seed-v1.json`
+- batch importer: `npm run style-dna:taxonomy-seed-apply`
+- library idempotency smoke: `npm run style-dna:taxonomy-seed-library-smoke`
+13. Taxonomy diff/report tooling is now available:
+- file-vs-db diff command: `npm run style-dna:taxonomy-seed-diff`
+- supports audit artifact output via `--output <path>`
+- deterministic diff smoke: `npm run style-dna:taxonomy-seed-diff-smoke`
+14. Taxonomy seed coverage validation tooling is now available:
+- per-axis coverage validator: `npm run style-dna:taxonomy-seed-coverage`
+- supports configurable thresholds (`--min-canonical`, `--min-aliases`) and optional report output (`--output`)
+- coverage smoke: `npm run style-dna:taxonomy-seed-coverage-smoke` (includes explicit under-covered fixture deficits)
+15. Taxonomy apply coverage-gate enforcement is now available:
+- `npm run style-dna:taxonomy-seed-apply` now supports `--require-coverage` with configurable thresholds (`--min-canonical`, `--min-aliases`)
+- when coverage fails, apply is blocked before DB writes with deterministic deficit output (`reason: coverage_requirements_failed`)
+- enforcement smoke: `npm run style-dna:taxonomy-seed-apply-coverage-smoke`
+16. Readiness validation now includes taxonomy coverage smoke in full-scope launch checks:
+- `scripts/launch/readiness-smoke.js` now runs `style-dna:taxonomy-seed-coverage-smoke`
+17. Expanded v2 taxonomy seed bundle and rollout validation are now available:
+- v2 seed bundle: `scripts/style-dna/seeds/style-dna-taxonomy-seed-v2.json` (`taxonomyVersion: style_dna_v2`)
+- rollout smoke: `npm run style-dna:taxonomy-seed-v2-rollout-smoke` (coverage, idempotent apply, zero-gap diff, and v1+v2 coexistence checks)
+- rollout workflow/runbook: `design-documenatation/implementation/STYLE_DNA_TAXONOMY_SEED_VERSIONING.md`
+18. Consolidated rollout artifact generator is now available:
+- command: `npm run style-dna:taxonomy-seed-rollout-artifacts`
+- generates standardized evidence artifacts (`coverage`, `diff_before`, `apply`, `diff_after`, `summary`) under one `runId`
+- artifact smoke: `npm run style-dna:taxonomy-seed-rollout-artifacts-smoke`
+19. Rollout artifact index/prune tooling is now available:
+- index command: `npm run style-dna:taxonomy-seed-rollout-artifacts-index`
+- prune command (safe dry-run default): `npm run style-dna:taxonomy-seed-rollout-artifacts-prune`
+- index/prune smoke: `npm run style-dna:taxonomy-seed-rollout-artifacts-index-prune-smoke`
+20. Rollout artifact export + manifest tooling is now available:
+- export command: `npm run style-dna:taxonomy-seed-rollout-artifacts-export`
+- supports run-targeted export (`--run-id`) and latest-by-taxonomy export (`--latest --taxonomy-version ...`)
+- writes deterministic export manifest (`<run_id>__export_manifest.json`) in destination directory
+- export smoke: `npm run style-dna:taxonomy-seed-rollout-artifacts-export-smoke`
+21. Rollout artifact upload/publish tooling is now available:
+- upload command: `npm run style-dna:taxonomy-seed-rollout-artifacts-upload` (manifest-driven package upload + deterministic receipt hash)
+- publish wrapper: `npm run style-dna:taxonomy-seed-rollout-artifacts-publish` (export then upload)
+- upload smoke: `npm run style-dna:taxonomy-seed-rollout-artifacts-upload-smoke` (receipt determinism + missing-source failure path)
+22. Readiness full scope now includes rollout upload policy coverage:
+- `scripts/launch/readiness-smoke.js` now runs `style-dna:taxonomy-seed-rollout-artifacts-upload-smoke`
+- this smoke validates local and storage-adapter publish paths plus policy guardrails
+23. CI rollout upload smoke wrapper is now available:
+- command: `npm run style-dna:taxonomy-seed-rollout-artifacts-upload-ci`
+- supports `isolated` (default) and `shared` storage-policy modes
+- shared mode enforces env contract (`APP_ENV`, `S3_BUCKET`, `AWS_REGION`) before smoke execution
 
 Open gaps:
-1. `DISC-002` remains partially open: embedding-model similarity path is now wired in canonicalization, but broader taxonomy seeding and governance tooling still needs completion.
+1. `DISC-002` remains partially open: v2 bundle, rollout workflow, consolidated artifacts, index/prune, export, upload/publish tooling, storage-adapter destination policy integration, CI execution wrapper, shared-mode runbook guidance, and provider-backed shared-mode execution evidence are implemented; remaining work is evidence retention/export standardization.
 2. DISC-003 residual limitation: submitted test-envelope evidence is validated server-side, but rendered-image authenticity remains operator/process-dependent.
 3. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
 
 Launch/readiness status:
 1. `launch:readiness-smoke` full scope includes the full Style-DNA smoke set:
 - `style-dna:tier-validation-smoke`
+- `style-dna:taxonomy-seed-coverage-smoke`
+- `style-dna:taxonomy-seed-rollout-artifacts-upload-smoke`
 - `style-dna:baseline-smoke`
 - `style-dna:prompt-generation-smoke`
 - `style-dna:run-smoke`

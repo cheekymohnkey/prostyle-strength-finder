@@ -65,6 +65,7 @@ Out of scope:
 - server-side matched-control (`--sw 0`) gating for sref policy is now enforced at run submission (`styleWeight=0` control baseline requirement).
 - run submission contract now includes `submittedTestEnvelope` and server-side locked-envelope parity checks.
 - canonical trait governance endpoints are now implemented (`canonical-traits` list/create/status + `trait-aliases` list/create/status).
+- taxonomy seed endpoint is now implemented (`POST /v1/admin/style-dna/taxonomy-seed`) with idempotent apply, deprecated-status reactivation, and conflict reporting.
 3. SD3: Implemented (DISC-002 foundation now in place).
 - worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
 - canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
@@ -82,11 +83,22 @@ Out of scope:
 - `style-dna:canonicalization-smoke` is implemented and passing.
 - `style-dna:canonicalization-semantic-smoke` is implemented and passing (`proxy` vs `embedding` vs `auto` fallback coverage).
 - `style-dna:canonical-governance-smoke` is implemented and passing (canonical create/dedupe, alias create/list, status deprecate, RBAC).
+- `style-dna:taxonomy-seed-smoke` is implemented and passing (seed idempotency + deprecate/reactivate replay behavior).
+- `style-dna:taxonomy-seed-library-smoke` is implemented and passing (versioned seed library batch import idempotency).
+- `style-dna:taxonomy-seed-diff-smoke` is implemented and passing (deterministic diff report + conflict/reactivation visibility).
+- `style-dna:taxonomy-seed-coverage-smoke` is implemented and passing (per-axis coverage pass/fail with explicit deficits).
+- `style-dna:taxonomy-seed-apply-coverage-smoke` is implemented and passing (apply flow coverage gate blocks writes on under-covered bundles).
+- `style-dna:taxonomy-seed-v2-rollout-smoke` is implemented and passing (v2 coverage, idempotent apply, zero-gap diff, and v1+v2 coexistence).
+- `style-dna:taxonomy-seed-rollout-artifacts-smoke` is implemented and passing (standardized rollout artifact generation and blocked-run behavior checks).
+- `style-dna:taxonomy-seed-rollout-artifacts-index-prune-smoke` is implemented and passing (deterministic artifact indexing and safe keep-count pruning).
+- `style-dna:taxonomy-seed-rollout-artifacts-export-smoke` is implemented and passing (selected-run and latest-by-taxonomy export with manifest + missing-run guardrails).
+- `style-dna:taxonomy-seed-rollout-artifacts-upload-smoke` is implemented and passing (manifest-driven upload receipt determinism + missing-source failure path + publish wrapper).
+- `style-dna:taxonomy-seed-rollout-artifacts-upload-ci` is implemented and passing (CI wrapper with isolated/shared storage-policy execution modes and shared-env contract checks).
 - `style-dna:discovery-review-replay-smoke` is implemented and passing (review transition conflict handling + alias replay resolution behavior).
 - `admin:frontend-proxy-smoke` now also validates canonical governance proxy flows (canonical create/dedupe/status, alias create/list, contributor `403` guardrail).
 - prompt generation verification includes model version flag emission (`--v`).
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
-- launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.
+- launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `taxonomy-seed-coverage`, `taxonomy-seed-rollout-artifacts-upload`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.
 - style-dna run smoke now explicitly verifies idempotent run-submit behavior (same idempotency key returns deduplicated existing run id).
 - style-dna run smoke now explicitly verifies locked-envelope mismatch rejection at run submit.
 - style-dna run smoke now explicitly verifies admin RBAC on run submit/list/get (`403 FORBIDDEN` for contributor token).
@@ -270,6 +282,49 @@ Acceptance criteria:
 10. `SDNA-10` status/results panel rendering.
 11. `SDNA-11` smoke scripts and integration tests.
 12. `SDNA-12` docs/runbook and launch gate updates.
+13. `SDNA-13` taxonomy seeding + replay-safety tests (`DISC-002` completion).
+14. `SDNA-14` versioned taxonomy seed library + import tooling.
+15. `SDNA-15` taxonomy diff/report tooling for governance preview.
+16. `SDNA-16` taxonomy seed per-axis coverage validation tooling.
+17. `SDNA-17` coverage-gated seed apply enforcement + readiness integration.
+18. `SDNA-18` expanded v2 seed bundle + versioned rollout workflow.
+19. `SDNA-19` consolidated rollout artifact generation + naming standards.
+20. `SDNA-20` artifact index + prune tooling.
+21. `SDNA-21` artifact export + manifest tooling.
+22. `SDNA-22` artifact upload/publish receipt workflow.
+
+## Next Task (SDNA-29 / DISC-002 Evidence Retention Standardization)
+
+Objective:
+1. Standardize evidence retention/export flow for shared-mode CI wrapper outputs.
+
+Scope:
+1. Define deterministic destination path/pattern for shared-mode execution evidence artifacts.
+2. Add runbook guidance for storing and linking shared-mode evidence outputs.
+3. Update handover with retention standard and example evidence references.
+
+Out of scope:
+1. Broad UI redesign of Section 3.
+2. New non-admin/public taxonomy endpoints.
+3. Unrelated style-dna run contract changes.
+
+Definition of done:
+1. Evidence retention pattern is documented and reusable across environments.
+2. Handover records command, env assumptions, and retained evidence locations.
+3. Regression checks remain green.
+4. Task handoff documents files changed, decisions made, risks, and recommended next slice.
+
+Verification commands:
+1. `npm run contracts`
+2. `npm run style-dna:taxonomy-seed-library-smoke`
+3. `npm run style-dna:taxonomy-seed-diff-smoke`
+4. `npm run style-dna:taxonomy-seed-coverage-smoke`
+5. `npm run style-dna:taxonomy-seed-apply-coverage-smoke`
+6. `npm run style-dna:taxonomy-seed-v2-rollout-smoke`
+7. `npm run style-dna:taxonomy-seed-rollout-artifacts-smoke`
+8. `npm run style-dna:taxonomy-seed-rollout-artifacts-index-prune-smoke`
+9. `npm run style-dna:taxonomy-seed-rollout-artifacts-export-smoke`
+10. `npm run style-dna:taxonomy-seed-rollout-artifacts-upload-smoke`
 
 ## Verification Runbook (Target End-State)
 

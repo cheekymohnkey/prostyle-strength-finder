@@ -80,6 +80,8 @@ function main() {
     { name: "contracts", cmd: "npm run contracts" },
     { name: "db_reset", cmd: "npm run db:reset" },
     { name: "style_dna_tier_validation_smoke", cmd: "npm run style-dna:tier-validation-smoke" },
+    { name: "style_dna_taxonomy_seed_coverage_smoke", cmd: "npm run style-dna:taxonomy-seed-coverage-smoke" },
+    { name: "style_dna_taxonomy_seed_rollout_artifacts_upload_smoke", cmd: "npm run style-dna:taxonomy-seed-rollout-artifacts-upload-smoke" },
     { name: "style_dna_baseline_smoke", cmd: "npm run style-dna:baseline-smoke" },
     { name: "style_dna_prompt_generation_smoke", cmd: "npm run style-dna:prompt-generation-smoke" },
     { name: "style_dna_run_smoke", cmd: "npm run style-dna:run-smoke" },

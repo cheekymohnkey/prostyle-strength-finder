@@ -1,0 +1,66 @@
+{
+  "taxonomyVersion": "style_dna_v1",
+  "reactivateDeprecated": true,
+  "entries": [
+    {
+      "axis": "lighting_and_contrast",
+      "displayLabel": "rim lighting in haze",
+      "aliases": ["rim halo haze", "hazy rim light", "edge glow haze"],
+      "notes": "Seeded baseline lighting family."
+    },
+    {
+      "axis": "lighting_and_contrast",
+      "displayLabel": "high-key diffuse wash",
+      "aliases": ["soft high key wash", "bright diffuse key", "airy diffuse light"],
+      "notes": "Seeded baseline lighting family."
+    },
+    {
+      "axis": "color_palette",
+      "displayLabel": "cyan magenta grade",
+      "aliases": ["teal magenta grade", "cyan pink grade", "cool neon split tone"],
+      "notes": "Seeded baseline palette family."
+    },
+    {
+      "axis": "color_palette",
+      "displayLabel": "muted earth neutrals",
+      "aliases": ["desaturated earth tones", "warm neutral clay palette", "soft terracotta neutral"],
+      "notes": "Seeded baseline palette family."
+    },
+    {
+      "axis": "texture_and_medium",
+      "displayLabel": "anodized halation grain",
+      "aliases": ["halation metal grain", "anodized bloom grain", "filmic anodized texture"],
+      "notes": "Seeded baseline texture family."
+    },
+    {
+      "axis": "texture_and_medium",
+      "displayLabel": "airbrush gradient haze",
+      "aliases": ["soft airbrush blend", "misty airbrush fade", "painterly gradient haze"],
+      "notes": "Seeded baseline texture family."
+    },
+    {
+      "axis": "composition_and_structure",
+      "displayLabel": "center-weighted portrait framing",
+      "aliases": ["central portrait framing", "front-centered subject framing", "head-on centered portrait"],
+      "notes": "Seeded baseline composition family."
+    },
+    {
+      "axis": "composition_and_structure",
+      "displayLabel": "wide negative-space staging",
+      "aliases": ["broad negative space layout", "spacious margin composition", "open field staging"],
+      "notes": "Seeded baseline composition family."
+    },
+    {
+      "axis": "dominant_dna_tags",
+      "displayLabel": "cinematic neon editorial",
+      "aliases": ["neon editorial cinema", "cinematic neon look", "editorial neon film mood"],
+      "notes": "Seeded baseline dominant DNA tag."
+    },
+    {
+      "axis": "dominant_dna_tags",
+      "displayLabel": "heritage filmic romance",
+      "aliases": ["romantic heritage film look", "filmic heritage mood", "vintage romance film style"],
+      "notes": "Seeded baseline dominant DNA tag."
+    }
+  ]
+}

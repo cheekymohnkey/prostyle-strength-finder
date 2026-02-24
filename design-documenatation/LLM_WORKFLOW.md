@@ -22,14 +22,7 @@ Always anchor tasks to:
 04. `design-documenatation/TECHNICAL_DECISIONS.md`
 05. `design-documenatation/requirements/REQUIREMENTS_INDEX.md`
 06. `design-documenatation/requirements/PRODUCT_REQUIREMENTS_HIGH_LEVEL.md`
-07. `design-documenatation/requirements/functional/FR-RECOMMENDATION_AND_FEEDBACK.md`
-08. `design-documenatation/requirements/functional/FR-ADMIN_AND_CONTRIBUTOR_OPERATIONS.md`
-09. `design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md`
-10. `design-documenatation/requirements/non-functional/NFR-SECURITY_AND_ACCESS.md`
-11. `design-documenatation/requirements/non-functional/NFR-RELIABILITY_AND_OPERATIONS.md`
-12. `design-documenatation/requirements/non-functional/NFR-PERFORMANCE_AND_QUALITY.md`
-13. `design-documenatation/MVP_PATH.md`
-14. `design-documenatation/implementation/IMPLEMENTATION_PLAN.md`
+07. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
 
 ## Implementation Plan Links
 
@@ -62,14 +55,7 @@ Use these docs as source of truth:
 - design-documenatation/TECHNICAL_DECISIONS.md
 - design-documenatation/requirements/REQUIREMENTS_INDEX.md
 - design-documenatation/requirements/PRODUCT_REQUIREMENTS_HIGH_LEVEL.md
-- design-documenatation/requirements/functional/FR-RECOMMENDATION_AND_FEEDBACK.md
-- design-documenatation/requirements/functional/FR-ADMIN_AND_CONTRIBUTOR_OPERATIONS.md
-- design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md
-- design-documenatation/requirements/non-functional/NFR-SECURITY_AND_ACCESS.md
-- design-documenatation/requirements/non-functional/NFR-RELIABILITY_AND_OPERATIONS.md
-- design-documenatation/requirements/non-functional/NFR-PERFORMANCE_AND_QUALITY.md
-- design-documenatation/MVP_PATH.md
-- design-documenatation/implementation/IMPLEMENTATION_PLAN.md
+- design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md
 
 Task objective:
 <one concrete objective>

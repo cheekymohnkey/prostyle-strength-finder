@@ -111,6 +111,10 @@ const {
 } = require("../../../scripts/inference/openai-debug-log");
 const { normalizeTraitText } = require("../../../scripts/inference/style-dna-canonicalizer");
 const {
+  canonicalTraitIdFromLabel,
+  applyStyleDnaTaxonomySeed,
+} = require("../../../scripts/style-dna/taxonomy-seed-service");
+const {
   CONTRACT_VERSION,
   validateRecommendationSubmitPayload,
   validateRecommendationExtractionPayload,
@@ -134,6 +138,7 @@ const {
   validateStyleDnaCanonicalTraitStatusPayload,
   validateStyleDnaTraitAliasCreatePayload,
   validateStyleDnaTraitAliasStatusPayload,
+  validateStyleDnaTaxonomySeedPayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -1106,19 +1111,6 @@ function validateStyleDnaTraitDiscoveryReviewPayload(value) {
     canonicalDisplayLabel,
     note,
   };
-}
-
-function canonicalTraitIdFromLabel(axis, label) {
-  const normalized = normalizeTraitText(label)
-    .replace(/[^a-z0-9 ]+/g, " ")
-    .trim()
-    .replace(/\s+/g, "_")
-    .slice(0, 48);
-  const axisPrefix = String(axis || "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .slice(0, 20);
-  const base = normalized || "trait";
-  return `canon_${axisPrefix}_${base}_${crypto.randomUUID().slice(0, 6)}`;
 }
 
 function parseBaselineParameterEnvelope(parameterEnvelopeJson) {
@@ -3361,6 +3353,42 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       ctx
     );
     return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-dna/taxonomy-seed") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaTaxonomySeedPayload(body);
+      const seedResult = applyStyleDnaTaxonomySeed(dbPath, authenticatedUserId, payload);
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.taxonomy_seed.apply",
+        targetType: "style_dna_taxonomy",
+        targetId: payload.taxonomyVersion,
+        reason: `entries=${seedResult.summary.entryCount};canonicalCreated=${seedResult.summary.canonicalTraits.created};aliasCreated=${seedResult.summary.traitAliases.created};aliasConflicts=${seedResult.summary.traitAliases.conflicts}`,
+      });
+      sendJson(
+        res,
+        200,
+        {
+          taxonomyVersion: payload.taxonomyVersion,
+          summary: seedResult.summary,
+          conflicts: seedResult.conflicts,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Taxonomy seed apply failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
   }
 
   if (method === "GET" && path === "/v1/admin/style-dna/canonical-traits") {

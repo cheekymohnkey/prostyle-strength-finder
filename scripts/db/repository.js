@@ -1648,6 +1648,21 @@ function getActiveStyleDnaTraitAliasByNormalized(dbPath, input) {
   return rows[0] || null;
 }
 
+function getStyleDnaTraitAliasByNormalized(dbPath, input) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT alias_id, taxonomy_version, axis, alias_text, normalized_alias, canonical_trait_id,
+            source, merge_method, lexical_similarity, semantic_similarity, status,
+            created_at, updated_at, created_by, review_note
+     FROM style_dna_trait_aliases
+     WHERE taxonomy_version = ${quote(input.taxonomyVersion || "style_dna_v1")}
+       AND axis = ${quote(input.axis)}
+       AND normalized_alias = ${quote(input.normalizedAlias)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
 function getStyleDnaTraitAliasById(dbPath, aliasId) {
   const rows = queryJson(
     dbPath,
@@ -1913,6 +1928,7 @@ module.exports = {
   listActiveStyleDnaTraitAliases,
   listStyleDnaTraitAliases,
   getActiveStyleDnaTraitAliasByNormalized,
+  getStyleDnaTraitAliasByNormalized,
   getStyleDnaTraitAliasById,
   insertStyleDnaTraitAlias,
   updateStyleDnaTraitAliasStatus,

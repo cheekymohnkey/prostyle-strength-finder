@@ -17,6 +17,7 @@ Guidelines:
 ## Storage Scripts
 
 - `npm run storage:smoke`: Run local put/get/delete smoke validation through the storage adapter.
+- `npm run style-dna:taxonomy-seed-rollout-artifacts-upload-ci`: Run CI wrapper for rollout upload smoke (`isolated` default, `--storage-policy-mode shared` for shared storage env contract validation).
 
 ## Recommendation Scripts
 

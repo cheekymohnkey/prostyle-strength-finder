@@ -298,6 +298,56 @@ function validateStyleDnaTraitAliasStatusPayload(value) {
   };
 }
 
+function validateStyleDnaTaxonomySeedPayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Style-DNA taxonomy seed payload must be an object");
+  }
+  const taxonomyVersion = value.taxonomyVersion === undefined
+    ? "style_dna_v1"
+    : assertRequiredString(value.taxonomyVersion, "taxonomyVersion");
+  const reactivateDeprecated = value.reactivateDeprecated === undefined
+    ? true
+    : Boolean(value.reactivateDeprecated);
+  if (!Array.isArray(value.entries) || value.entries.length === 0) {
+    throw new Error("entries must be a non-empty array");
+  }
+  const entries = value.entries.map((entry, index) => {
+    if (!isObject(entry)) {
+      throw new Error(`entries[${index}] must be an object`);
+    }
+    const axis = assertRequiredString(entry.axis, `entries[${index}].axis`);
+    if (!STYLE_DNA_TRAIT_AXES.includes(axis)) {
+      throw new Error(`entries[${index}].axis must be one of: composition_and_structure, lighting_and_contrast, color_palette, texture_and_medium, dominant_dna_tags`);
+    }
+    const displayLabel = assertRequiredString(entry.displayLabel, `entries[${index}].displayLabel`);
+    const notes = typeof entry.notes === "string" && entry.notes.trim() !== ""
+      ? entry.notes.trim()
+      : null;
+    const aliases = Array.isArray(entry.aliases)
+      ? Array.from(
+        new Set(
+          entry.aliases
+            .map((alias, aliasIndex) => {
+              const text = assertRequiredString(alias, `entries[${index}].aliases[${aliasIndex}]`);
+              return text;
+            })
+        )
+      )
+      : [];
+    return {
+      axis,
+      displayLabel,
+      notes,
+      aliases,
+    };
+  });
+  return {
+    taxonomyVersion,
+    reactivateDeprecated,
+    entries,
+  };
+}
+
 module.exports = {
   STYLE_DNA_STYLIZE_TIERS,
   STYLE_DNA_ADJUSTMENT_TYPES,
@@ -314,4 +364,5 @@ module.exports = {
   validateStyleDnaCanonicalTraitStatusPayload,
   validateStyleDnaTraitAliasCreatePayload,
   validateStyleDnaTraitAliasStatusPayload,
+  validateStyleDnaTaxonomySeedPayload,
 };

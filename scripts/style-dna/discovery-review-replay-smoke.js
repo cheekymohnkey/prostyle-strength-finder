@@ -107,20 +107,22 @@ async function main() {
   assertDatabaseReady(databaseUrl);
   seedAdmin(dbPath);
 
+  const uniqueSuffix = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
   const canonicalTraitId = `canon_review_smoke_${Date.now()}`;
+  const canonicalDisplayLabel = `rim lighting in haze ${uniqueSuffix}`;
   insertStyleDnaCanonicalTrait(dbPath, {
     canonicalTraitId,
     taxonomyVersion: "style_dna_v1",
     axis: "lighting_and_contrast",
-    displayLabel: "rim lighting in haze",
-    normalizedLabel: normalizeTraitText("rim lighting in haze"),
+    displayLabel: canonicalDisplayLabel,
+    normalizedLabel: normalizeTraitText(canonicalDisplayLabel),
     createdBy: "smoke",
     notes: "discovery review replay smoke canonical seed",
   });
 
-  const reviewAliasTraitRaw = "rim halo haze var";
+  const reviewAliasTraitRaw = `rim halo haze var ${uniqueSuffix}`;
   const reviewAliasTraitNormalized = normalizeTraitText(reviewAliasTraitRaw);
-  const createCanonicalTraitRaw = "chrome bloom fringe var";
+  const createCanonicalTraitRaw = `chrome bloom fringe var ${uniqueSuffix}`;
   const createCanonicalTraitNormalized = normalizeTraitText(createCanonicalTraitRaw);
 
   // Force unresolved creation (no auto-merge) so review endpoint has pending discoveries to process.

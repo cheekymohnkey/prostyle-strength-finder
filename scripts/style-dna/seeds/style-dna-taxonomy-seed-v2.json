@@ -1,0 +1,126 @@
+{
+  "taxonomyVersion": "style_dna_v2",
+  "reactivateDeprecated": true,
+  "entries": [
+    {
+      "axis": "lighting_and_contrast",
+      "displayLabel": "rim lighting in haze",
+      "aliases": ["rim halo haze", "hazy rim light", "edge glow haze", "rim-lit haze bloom"],
+      "notes": "V2 lighting family."
+    },
+    {
+      "axis": "lighting_and_contrast",
+      "displayLabel": "high-key diffuse wash",
+      "aliases": ["soft high key wash", "bright diffuse key", "airy diffuse light", "milky high-key spread"],
+      "notes": "V2 lighting family."
+    },
+    {
+      "axis": "lighting_and_contrast",
+      "displayLabel": "directional side-shadow sculpt",
+      "aliases": ["side-lit shadow sculpt", "lateral shadow carve", "directional side carve", "hard side-shadow contour"],
+      "notes": "V2 lighting family."
+    },
+    {
+      "axis": "lighting_and_contrast",
+      "displayLabel": "backlit silhouette flare",
+      "aliases": ["rear-lit silhouette flare", "backlight halo silhouette", "flare-backed silhouette", "reverse light silhouette glow"],
+      "notes": "V2 lighting family."
+    },
+    {
+      "axis": "color_palette",
+      "displayLabel": "cyan magenta grade",
+      "aliases": ["teal magenta grade", "cyan pink grade", "cool neon split tone", "cyan-magenta chroma wash"],
+      "notes": "V2 color family."
+    },
+    {
+      "axis": "color_palette",
+      "displayLabel": "muted earth neutrals",
+      "aliases": ["desaturated earth tones", "warm neutral clay palette", "soft terracotta neutral", "dusty natural neutrals"],
+      "notes": "V2 color family."
+    },
+    {
+      "axis": "color_palette",
+      "displayLabel": "electric jewel highlights",
+      "aliases": ["jewel-tone pop highlights", "electric gem accents", "saturated jewel spark", "high-chroma jewel pops"],
+      "notes": "V2 color family."
+    },
+    {
+      "axis": "color_palette",
+      "displayLabel": "monochrome graphite wash",
+      "aliases": ["graphite monochrome grade", "charcoal grayscale wash", "mono graphite toning", "steel-gray mono cast"],
+      "notes": "V2 color family."
+    },
+    {
+      "axis": "texture_and_medium",
+      "displayLabel": "anodized halation grain",
+      "aliases": ["halation metal grain", "anodized bloom grain", "filmic anodized texture", "metallic halation dust"],
+      "notes": "V2 texture family."
+    },
+    {
+      "axis": "texture_and_medium",
+      "displayLabel": "airbrush gradient haze",
+      "aliases": ["soft airbrush blend", "misty airbrush fade", "painterly gradient haze", "sprayed tonal haze"],
+      "notes": "V2 texture family."
+    },
+    {
+      "axis": "texture_and_medium",
+      "displayLabel": "linen matte canvas tooth",
+      "aliases": ["matte linen grain", "canvas-fiber tooth", "textile canvas drag", "woven matte texture"],
+      "notes": "V2 texture family."
+    },
+    {
+      "axis": "texture_and_medium",
+      "displayLabel": "gloss lacquer sheen",
+      "aliases": ["lacquered gloss skin", "high-gloss varnish sheen", "polished lacquer finish", "varnished reflective coat"],
+      "notes": "V2 texture family."
+    },
+    {
+      "axis": "composition_and_structure",
+      "displayLabel": "center-weighted portrait framing",
+      "aliases": ["central portrait framing", "front-centered subject framing", "head-on centered portrait", "symmetrical portrait center"],
+      "notes": "V2 composition family."
+    },
+    {
+      "axis": "composition_and_structure",
+      "displayLabel": "wide negative-space staging",
+      "aliases": ["broad negative space layout", "spacious margin composition", "open field staging", "expansive void framing"],
+      "notes": "V2 composition family."
+    },
+    {
+      "axis": "composition_and_structure",
+      "displayLabel": "layered foreground depth stack",
+      "aliases": ["stacked foreground layers", "depth-layer staging", "tiered foreground composition", "multi-plane depth stack"],
+      "notes": "V2 composition family."
+    },
+    {
+      "axis": "composition_and_structure",
+      "displayLabel": "diagonal dynamic sweep",
+      "aliases": ["diagonal motion sweep", "angled dynamic flow", "slanted compositional drive", "diagonal momentum framing"],
+      "notes": "V2 composition family."
+    },
+    {
+      "axis": "dominant_dna_tags",
+      "displayLabel": "cinematic neon editorial",
+      "aliases": ["neon editorial cinema", "cinematic neon look", "editorial neon film mood", "urban neon cinematic"],
+      "notes": "V2 DNA tag family."
+    },
+    {
+      "axis": "dominant_dna_tags",
+      "displayLabel": "heritage filmic romance",
+      "aliases": ["romantic heritage film look", "filmic heritage mood", "vintage romance film style", "nostalgic cinematic romance"],
+      "notes": "V2 DNA tag family."
+    },
+    {
+      "axis": "dominant_dna_tags",
+      "displayLabel": "minimal luxe modernism",
+      "aliases": ["luxury minimal modern", "clean luxe modern", "minimal upscale modern", "refined minimal chic"],
+      "notes": "V2 DNA tag family."
+    },
+    {
+      "axis": "dominant_dna_tags",
+      "displayLabel": "retro-futurist synthwave",
+      "aliases": ["synthwave retro-future", "retro neon futurism", "outrun retro-futurism", "vaporwave future-retro"],
+      "notes": "V2 DNA tag family."
+    }
+  ]
+}
