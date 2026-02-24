@@ -64,6 +64,11 @@ Capture the current Style-DNA implementation state and active risks so the next 
 11. Added canonicalization semantic-mode regression smoke:
 - `npm run style-dna:canonicalization-semantic-smoke`
 - covers proxy behavior, embedding behavior, and auto-mode embedding-failure fallback behavior
+12. Added canonical trait governance API + smoke:
+- `GET/POST /v1/admin/style-dna/canonical-traits`
+- `POST /v1/admin/style-dna/canonical-traits/:canonicalTraitId/status`
+- `GET/POST /v1/admin/style-dna/trait-aliases`
+- `npm run style-dna:canonical-governance-smoke`
 
 ## Resolved Discrepancies
 
@@ -102,6 +107,7 @@ Capture the current Style-DNA implementation state and active risks so the next 
 18. `scripts/style-dna/run-smoke.js`
 19. `scripts/style-dna/schema-failure-smoke.js`
 20. `scripts/admin/frontend-proxy-smoke.js`
+21. `scripts/style-dna/canonical-governance-smoke.js`
 
 ## Recent Commits
 

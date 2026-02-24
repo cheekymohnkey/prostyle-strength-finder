@@ -64,6 +64,7 @@ Out of scope:
 - idempotency behavior is implemented for run submission.
 - server-side matched-control (`--sw 0`) gating for sref policy is now enforced at run submission (`styleWeight=0` control baseline requirement).
 - run submission contract now includes `submittedTestEnvelope` and server-side locked-envelope parity checks.
+- canonical trait governance endpoints are now implemented (`canonical-traits` list/create/status + `trait-aliases` list/create).
 3. SD3: Implemented (DISC-002 foundation now in place).
 - worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
 - canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
@@ -79,6 +80,7 @@ Out of scope:
 - style-dna smoke scripts exist and have passed in prior session verification.
 - `style-dna:canonicalization-smoke` is implemented and passing.
 - `style-dna:canonicalization-semantic-smoke` is implemented and passing (`proxy` vs `embedding` vs `auto` fallback coverage).
+- `style-dna:canonical-governance-smoke` is implemented and passing (canonical create/dedupe, alias create/list, status deprecate, RBAC).
 - prompt generation verification includes model version flag emission (`--v`).
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
 - launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.

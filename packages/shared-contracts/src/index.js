@@ -55,11 +55,16 @@ const {
   STYLE_DNA_ADJUSTMENT_TYPES,
   STYLE_DNA_IMAGE_KINDS,
   STYLE_DNA_IMAGE_MIME_TYPES,
+  STYLE_DNA_TRAIT_AXES,
+  STYLE_DNA_CANONICAL_STATUSES,
   validateStyleDnaBaselineSetPayload,
   validateStyleDnaBaselineSetItemPayload,
   validateStyleDnaPromptJobPayload,
   validateStyleDnaRunPayload,
   validateStyleDnaImageUploadPayload,
+  validateStyleDnaCanonicalTraitCreatePayload,
+  validateStyleDnaCanonicalTraitStatusPayload,
+  validateStyleDnaTraitAliasCreatePayload,
 } = require("./style-dna-admin");
 const { createApiErrorResponse } = require("./api-error");
 
@@ -109,10 +114,15 @@ module.exports = {
   STYLE_DNA_ADJUSTMENT_TYPES,
   STYLE_DNA_IMAGE_KINDS,
   STYLE_DNA_IMAGE_MIME_TYPES,
+  STYLE_DNA_TRAIT_AXES,
+  STYLE_DNA_CANONICAL_STATUSES,
   validateStyleDnaBaselineSetPayload,
   validateStyleDnaBaselineSetItemPayload,
   validateStyleDnaPromptJobPayload,
   validateStyleDnaRunPayload,
   validateStyleDnaImageUploadPayload,
+  validateStyleDnaCanonicalTraitCreatePayload,
+  validateStyleDnaCanonicalTraitStatusPayload,
+  validateStyleDnaTraitAliasCreatePayload,
   createApiErrorResponse,
 };

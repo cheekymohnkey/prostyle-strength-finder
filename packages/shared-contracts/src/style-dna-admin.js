@@ -2,6 +2,14 @@ const STYLE_DNA_STYLIZE_TIERS = [0, 100, 1000];
 const STYLE_DNA_ADJUSTMENT_TYPES = ["sref", "profile"];
 const STYLE_DNA_IMAGE_KINDS = ["baseline", "test"];
 const STYLE_DNA_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const STYLE_DNA_TRAIT_AXES = [
+  "composition_and_structure",
+  "lighting_and_contrast",
+  "color_palette",
+  "texture_and_medium",
+  "dominant_dna_tags",
+];
+const STYLE_DNA_CANONICAL_STATUSES = ["active", "deprecated"];
 
 const STYLIZE_TIER_SET = new Set(STYLE_DNA_STYLIZE_TIERS);
 
@@ -208,14 +216,84 @@ function validateStyleDnaImageUploadPayload(value) {
   };
 }
 
+function validateStyleDnaCanonicalTraitCreatePayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Style-DNA canonical trait payload must be an object");
+  }
+  const taxonomyVersion = value.taxonomyVersion === undefined
+    ? "style_dna_v1"
+    : assertRequiredString(value.taxonomyVersion, "taxonomyVersion");
+  const axis = assertRequiredString(value.axis, "axis");
+  if (!STYLE_DNA_TRAIT_AXES.includes(axis)) {
+    throw new Error("axis must be one of: composition_and_structure, lighting_and_contrast, color_palette, texture_and_medium, dominant_dna_tags");
+  }
+  const displayLabel = assertRequiredString(value.displayLabel, "displayLabel");
+  const notes = typeof value.notes === "string" && value.notes.trim() !== ""
+    ? value.notes.trim()
+    : null;
+  return {
+    taxonomyVersion,
+    axis,
+    displayLabel,
+    notes,
+  };
+}
+
+function validateStyleDnaCanonicalTraitStatusPayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Style-DNA canonical trait status payload must be an object");
+  }
+  const status = assertRequiredString(value.status, "status");
+  if (!STYLE_DNA_CANONICAL_STATUSES.includes(status)) {
+    throw new Error("status must be one of: active, deprecated");
+  }
+  const note = typeof value.note === "string" && value.note.trim() !== ""
+    ? value.note.trim()
+    : null;
+  return {
+    status,
+    note,
+  };
+}
+
+function validateStyleDnaTraitAliasCreatePayload(value) {
+  if (!isObject(value)) {
+    throw new Error("Style-DNA trait alias payload must be an object");
+  }
+  const taxonomyVersion = value.taxonomyVersion === undefined
+    ? "style_dna_v1"
+    : assertRequiredString(value.taxonomyVersion, "taxonomyVersion");
+  const axis = assertRequiredString(value.axis, "axis");
+  if (!STYLE_DNA_TRAIT_AXES.includes(axis)) {
+    throw new Error("axis must be one of: composition_and_structure, lighting_and_contrast, color_palette, texture_and_medium, dominant_dna_tags");
+  }
+  const aliasText = assertRequiredString(value.aliasText, "aliasText");
+  const canonicalTraitId = assertRequiredString(value.canonicalTraitId, "canonicalTraitId");
+  const note = typeof value.note === "string" && value.note.trim() !== ""
+    ? value.note.trim()
+    : null;
+  return {
+    taxonomyVersion,
+    axis,
+    aliasText,
+    canonicalTraitId,
+    note,
+  };
+}
+
 module.exports = {
   STYLE_DNA_STYLIZE_TIERS,
   STYLE_DNA_ADJUSTMENT_TYPES,
   STYLE_DNA_IMAGE_KINDS,
   STYLE_DNA_IMAGE_MIME_TYPES,
+  STYLE_DNA_TRAIT_AXES,
+  STYLE_DNA_CANONICAL_STATUSES,
   validateStyleDnaBaselineSetPayload,
   validateStyleDnaBaselineSetItemPayload,
   validateStyleDnaPromptJobPayload,
   validateStyleDnaRunPayload,
   validateStyleDnaImageUploadPayload,
+  validateStyleDnaCanonicalTraitCreatePayload,
+  validateStyleDnaCanonicalTraitStatusPayload,
+  validateStyleDnaTraitAliasCreatePayload,
 };

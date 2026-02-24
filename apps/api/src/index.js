@@ -79,11 +79,17 @@ const {
   getStyleDnaRunResultByRunId,
   listStyleDnaRunResultsByStyleInfluenceId,
   getStyleDnaCanonicalTraitById,
+  getStyleDnaCanonicalTraitByNormalized,
+  updateStyleDnaCanonicalTraitStatus,
+  listStyleDnaCanonicalTraits,
   listStyleDnaTraitDiscoveries,
   getStyleDnaTraitDiscoveryById,
   resolveStyleDnaTraitDiscovery,
   insertStyleDnaCanonicalTrait,
   insertStyleDnaTraitAlias,
+  getActiveStyleDnaTraitAliasByNormalized,
+  listActiveStyleDnaCanonicalTraits,
+  listActiveStyleDnaTraitAliases,
   getStyleDnaImageById,
   insertStyleDnaImage,
   updateRecommendationSessionStatus,
@@ -122,6 +128,9 @@ const {
   validateStyleDnaPromptJobPayload,
   validateStyleDnaRunPayload,
   validateStyleDnaImageUploadPayload,
+  validateStyleDnaCanonicalTraitCreatePayload,
+  validateStyleDnaCanonicalTraitStatusPayload,
+  validateStyleDnaTraitAliasCreatePayload,
   validateAnalysisJobEnvelope,
   createApiErrorResponse,
 } = require("../../../packages/shared-contracts/src");
@@ -832,6 +841,51 @@ function mapStyleDnaTraitDiscoveryRow(row) {
     latestAnalysisRunId: row.latest_analysis_run_id || null,
     topCandidates: parseArray(row.top_candidates_json),
     resolutionPayload: parseObject(row.resolution_payload_json),
+  };
+}
+
+function mapStyleDnaCanonicalTraitRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    canonicalTraitId: row.canonical_trait_id,
+    taxonomyVersion: row.taxonomy_version,
+    axis: row.axis,
+    displayLabel: row.display_label,
+    normalizedLabel: row.normalized_label,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || null,
+    createdBy: row.created_by,
+    notes: row.notes || null,
+  };
+}
+
+function mapStyleDnaTraitAliasRow(row) {
+  if (!row) {
+    return null;
+  }
+  return {
+    aliasId: row.alias_id,
+    taxonomyVersion: row.taxonomy_version,
+    axis: row.axis,
+    aliasText: row.alias_text,
+    normalizedAlias: row.normalized_alias,
+    canonicalTraitId: row.canonical_trait_id,
+    source: row.source,
+    mergeMethod: row.merge_method,
+    lexicalSimilarity: row.lexical_similarity === null || row.lexical_similarity === undefined
+      ? null
+      : Number(row.lexical_similarity),
+    semanticSimilarity: row.semantic_similarity === null || row.semantic_similarity === undefined
+      ? null
+      : Number(row.semantic_similarity),
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at || null,
+    createdBy: row.created_by,
+    reviewNote: row.review_note || null,
   };
 }
 
@@ -3304,6 +3358,291 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       ctx
     );
     return;
+  }
+
+  if (method === "GET" && path === "/v1/admin/style-dna/canonical-traits") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const limitRaw = typeof url.searchParams.get("limit") === "string"
+      ? url.searchParams.get("limit").trim()
+      : "";
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : 200;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid canonical-traits list limit", ctx, {
+        limit: limitRaw || String(limit),
+        allowedRange: "1..500",
+      });
+      return;
+    }
+    const taxonomyVersion = String(url.searchParams.get("taxonomyVersion") || "style_dna_v1").trim();
+    const axis = String(url.searchParams.get("axis") || "").trim();
+    const status = String(url.searchParams.get("status") || "").trim();
+    const allowedStatuses = new Set(["active", "deprecated", ""]);
+    if (!allowedStatuses.has(status)) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid canonical trait status filter", ctx, {
+        status,
+      });
+      return;
+    }
+    const traits = listStyleDnaCanonicalTraits(dbPath, {
+      taxonomyVersion,
+      axis: axis || undefined,
+      status: status || undefined,
+      limit,
+    });
+    sendJson(
+      res,
+      200,
+      {
+        canonicalTraits: traits.map(mapStyleDnaCanonicalTraitRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-dna/canonical-traits") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaCanonicalTraitCreatePayload(body);
+      const normalizedLabel = normalizeTraitText(payload.displayLabel);
+      const existing = getStyleDnaCanonicalTraitByNormalized(dbPath, {
+        taxonomyVersion: payload.taxonomyVersion,
+        axis: payload.axis,
+        normalizedLabel,
+      });
+      if (existing) {
+        sendJson(
+          res,
+          200,
+          {
+            canonicalTrait: mapStyleDnaCanonicalTraitRow(existing),
+            deduplicated: true,
+          },
+          ctx
+        );
+        return;
+      }
+      const canonicalTraitId = canonicalTraitIdFromLabel(payload.axis, payload.displayLabel);
+      insertStyleDnaCanonicalTrait(dbPath, {
+        canonicalTraitId,
+        taxonomyVersion: payload.taxonomyVersion,
+        axis: payload.axis,
+        displayLabel: payload.displayLabel,
+        normalizedLabel,
+        createdBy: authenticatedUserId,
+        notes: payload.notes || "Created from canonical trait admin curation.",
+      });
+      const created = getStyleDnaCanonicalTraitById(dbPath, canonicalTraitId)
+        || getStyleDnaCanonicalTraitByNormalized(dbPath, {
+          taxonomyVersion: payload.taxonomyVersion,
+          axis: payload.axis,
+          normalizedLabel,
+        });
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.canonical_trait.create",
+        targetType: "style_dna_canonical_trait",
+        targetId: canonicalTraitId,
+        reason: payload.notes || null,
+      });
+      sendJson(
+        res,
+        201,
+        {
+          canonicalTrait: mapStyleDnaCanonicalTraitRow(created),
+          deduplicated: false,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Canonical trait create failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "POST"
+    && path.startsWith("/v1/admin/style-dna/canonical-traits/")
+    && path.endsWith("/status")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const canonicalTraitId = path.slice("/v1/admin/style-dna/canonical-traits/".length, -"/status".length).trim();
+    if (canonicalTraitId === "") {
+      sendError(res, 400, "INVALID_REQUEST", "Canonical trait id is required", ctx);
+      return;
+    }
+    const canonical = getStyleDnaCanonicalTraitById(dbPath, canonicalTraitId);
+    if (!canonical) {
+      sendError(res, 404, "NOT_FOUND", "Canonical trait not found", ctx, {
+        canonicalTraitId,
+      });
+      return;
+    }
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaCanonicalTraitStatusPayload(body);
+      if (payload.status === canonical.status) {
+        sendJson(
+          res,
+          200,
+          {
+            canonicalTrait: mapStyleDnaCanonicalTraitRow(canonical),
+            changed: false,
+          },
+          ctx
+        );
+        return;
+      }
+      updateStyleDnaCanonicalTraitStatus(dbPath, canonicalTraitId, {
+        status: payload.status,
+        notes: payload.note,
+        updatedAt: new Date().toISOString(),
+      });
+      const updated = getStyleDnaCanonicalTraitById(dbPath, canonicalTraitId);
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.canonical_trait.status_update",
+        targetType: "style_dna_canonical_trait",
+        targetId: canonicalTraitId,
+        reason: payload.note || payload.status,
+      });
+      sendJson(
+        res,
+        200,
+        {
+          canonicalTrait: mapStyleDnaCanonicalTraitRow(updated),
+          changed: true,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Canonical trait status update failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
+  }
+
+  if (method === "GET" && path === "/v1/admin/style-dna/trait-aliases") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    const taxonomyVersion = String(url.searchParams.get("taxonomyVersion") || "style_dna_v1").trim();
+    const axis = String(url.searchParams.get("axis") || "").trim();
+    const aliases = listActiveStyleDnaTraitAliases(dbPath, {
+      taxonomyVersion,
+      axis: axis || undefined,
+    });
+    sendJson(
+      res,
+      200,
+      {
+        traitAliases: aliases.map(mapStyleDnaTraitAliasRow),
+      },
+      ctx
+    );
+    return;
+  }
+
+  if (method === "POST" && path === "/v1/admin/style-dna/trait-aliases") {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+    try {
+      const body = await parseJsonBody(req);
+      const payload = validateStyleDnaTraitAliasCreatePayload(body);
+      const canonical = getStyleDnaCanonicalTraitById(dbPath, payload.canonicalTraitId);
+      if (!canonical) {
+        sendError(res, 404, "NOT_FOUND", "Canonical trait not found", ctx, {
+          canonicalTraitId: payload.canonicalTraitId,
+        });
+        return;
+      }
+      if (canonical.taxonomy_version !== payload.taxonomyVersion || canonical.axis !== payload.axis) {
+        sendError(res, 409, "INVALID_STATE", "Canonical trait must match alias axis and taxonomy version", ctx, {
+          canonicalAxis: canonical.axis,
+          canonicalTaxonomyVersion: canonical.taxonomy_version,
+          aliasAxis: payload.axis,
+          aliasTaxonomyVersion: payload.taxonomyVersion,
+        });
+        return;
+      }
+      const normalizedAlias = normalizeTraitText(payload.aliasText);
+      const existingAlias = getActiveStyleDnaTraitAliasByNormalized(dbPath, {
+        taxonomyVersion: payload.taxonomyVersion,
+        axis: payload.axis,
+        normalizedAlias,
+      });
+      if (existingAlias) {
+        sendJson(
+          res,
+          200,
+          {
+            traitAlias: mapStyleDnaTraitAliasRow(existingAlias),
+            deduplicated: true,
+          },
+          ctx
+        );
+        return;
+      }
+      const aliasId = `sdt_alias_${crypto.randomUUID()}`;
+      insertStyleDnaTraitAlias(dbPath, {
+        aliasId,
+        taxonomyVersion: payload.taxonomyVersion,
+        axis: payload.axis,
+        aliasText: payload.aliasText,
+        normalizedAlias,
+        canonicalTraitId: payload.canonicalTraitId,
+        source: "manual_review",
+        mergeMethod: "manual_review",
+        createdBy: authenticatedUserId,
+        reviewNote: payload.note || "Created from canonical trait admin curation.",
+      });
+      const createdAlias = getActiveStyleDnaTraitAliasByNormalized(dbPath, {
+        taxonomyVersion: payload.taxonomyVersion,
+        axis: payload.axis,
+        normalizedAlias,
+      });
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.trait_alias.create",
+        targetType: "style_dna_trait_alias",
+        targetId: aliasId,
+        reason: payload.note || null,
+      });
+      sendJson(
+        res,
+        201,
+        {
+          traitAlias: mapStyleDnaTraitAliasRow(createdAlias),
+          deduplicated: false,
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 400, "INVALID_REQUEST", "Trait alias create failed validation", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
   }
 
   if (method === "GET" && path === "/v1/admin/style-dna/trait-discoveries") {

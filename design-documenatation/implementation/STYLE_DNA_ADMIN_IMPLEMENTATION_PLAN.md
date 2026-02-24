@@ -78,6 +78,14 @@ Implemented in code:
 - `GET /v1/admin/style-dna/trait-discoveries`
 - `POST /v1/admin/style-dna/trait-discoveries/:discoveryId/review`
 - `/admin/style-dna` now exposes pending review queue and status-filtered review history.
+7. Canonical trait governance API slice is now live:
+- `GET /v1/admin/style-dna/canonical-traits`
+- `POST /v1/admin/style-dna/canonical-traits`
+- `POST /v1/admin/style-dna/canonical-traits/:canonicalTraitId/status`
+- `GET /v1/admin/style-dna/trait-aliases`
+- `POST /v1/admin/style-dna/trait-aliases`
+8. Canonical governance smoke is now available:
+- `style-dna:canonical-governance-smoke`
 
 Open gaps:
 1. `DISC-002` remains partially open: embedding-model similarity path is now wired in canonicalization, but broader taxonomy seeding and governance tooling still needs completion.
