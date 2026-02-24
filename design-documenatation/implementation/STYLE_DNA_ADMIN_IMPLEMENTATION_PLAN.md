@@ -36,6 +36,7 @@ Implemented in code:
 - style-dna image upload and image content retrieval
 - prompt job create/get
 - run submit/list/get
+- run submit now requires `submittedTestEnvelope` evidence and enforces locked-envelope parity checks server-side
 3. Worker path is live for strict-schema style-dna run processing, canonicalization, and result persistence.
 - canonicalization module now performs normalization, deterministic canonical/alias resolution, threshold-gated auto-merge, and unresolved discovery queue writes.
 4. Admin UI route `/admin/style-dna` is live with:
@@ -79,7 +80,8 @@ Implemented in code:
 
 Open gaps:
 1. `DISC-002` remains partially open: embedding-model similarity path is not yet wired (deterministic semantic proxy currently used).
-2. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
+2. DISC-003 residual limitation: submitted test-envelope evidence is validated server-side, but rendered-image authenticity remains operator/process-dependent.
+3. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
 
 Launch/readiness status:
 1. `launch:readiness-smoke` full scope includes the full Style-DNA smoke set:

@@ -410,6 +410,13 @@ async function main() {
     const testGridImageId = testImageUpload?.image?.styleDnaImageId;
     assertCondition(typeof testGridImageId === "string" && testGridImageId !== "", "Missing test image id");
     createdImageIds.push(testGridImageId);
+    const submittedTestEnvelope = {
+      mjModelFamily: "standard",
+      mjModelVersion: "7",
+      aspectRatio: "3:4",
+      stylizeTier,
+      styleWeight: 1000,
+    };
 
     const runSubmit = await requestJson(
       `${baseUrl}/admin/style-dna/runs`,
@@ -428,6 +435,7 @@ async function main() {
           promptKey,
           stylizeTier,
           testGridImageId,
+          submittedTestEnvelope,
         }),
       },
       202

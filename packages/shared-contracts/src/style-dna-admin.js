@@ -124,6 +124,43 @@ function validateStyleDnaRunPayload(value) {
     parseIntegerField(value.stylizeTier, "stylizeTier"),
     "stylizeTier"
   );
+  if (!isObject(value.submittedTestEnvelope)) {
+    throw new Error("submittedTestEnvelope must be an object");
+  }
+  const submittedTestEnvelope = value.submittedTestEnvelope;
+  const submittedMjModelFamily = assertRequiredString(submittedTestEnvelope.mjModelFamily, "submittedTestEnvelope.mjModelFamily");
+  const submittedMjModelVersion = assertRequiredString(submittedTestEnvelope.mjModelVersion, "submittedTestEnvelope.mjModelVersion");
+  const submittedStylizeTier = ensureAllowedStylizeTier(
+    parseIntegerField(submittedTestEnvelope.stylizeTier, "submittedTestEnvelope.stylizeTier"),
+    "submittedTestEnvelope.stylizeTier"
+  );
+  const normalizeOptionalScalar = (fieldName, rawValue) => {
+    if (rawValue === undefined || rawValue === null || String(rawValue).trim() === "") {
+      return null;
+    }
+    return String(rawValue).trim();
+  };
+  const submittedStyleRaw = submittedTestEnvelope.styleRaw;
+  if (submittedStyleRaw !== undefined && typeof submittedStyleRaw !== "boolean") {
+    throw new Error("submittedTestEnvelope.styleRaw must be boolean when provided");
+  }
+  let submittedStyleWeight = null;
+  if (submittedTestEnvelope.styleWeight !== undefined && submittedTestEnvelope.styleWeight !== null && String(submittedTestEnvelope.styleWeight).trim() !== "") {
+    const parsedStyleWeight = Number(submittedTestEnvelope.styleWeight);
+    if (!Number.isFinite(parsedStyleWeight)) {
+      throw new Error("submittedTestEnvelope.styleWeight must be numeric when provided");
+    }
+    submittedStyleWeight = parsedStyleWeight;
+  }
+  if (styleAdjustmentType === "sref" && submittedStyleWeight === null) {
+    throw new Error("submittedTestEnvelope.styleWeight is required for sref runs");
+  }
+  if (styleAdjustmentType === "profile" && submittedStyleWeight !== null) {
+    throw new Error("submittedTestEnvelope.styleWeight is not allowed for profile runs");
+  }
+  if (submittedStylizeTier !== stylizeTier) {
+    throw new Error("submittedTestEnvelope.stylizeTier must match stylizeTier");
+  }
 
   return {
     idempotencyKey: typeof value.idempotencyKey === "string" && value.idempotencyKey.trim() !== ""
@@ -136,6 +173,16 @@ function validateStyleDnaRunPayload(value) {
     promptKey,
     stylizeTier,
     testGridImageId,
+    submittedTestEnvelope: {
+      mjModelFamily: submittedMjModelFamily,
+      mjModelVersion: submittedMjModelVersion,
+      seed: normalizeOptionalScalar("submittedTestEnvelope.seed", submittedTestEnvelope.seed),
+      quality: normalizeOptionalScalar("submittedTestEnvelope.quality", submittedTestEnvelope.quality),
+      aspectRatio: normalizeOptionalScalar("submittedTestEnvelope.aspectRatio", submittedTestEnvelope.aspectRatio),
+      styleRaw: submittedStyleRaw === undefined ? null : submittedStyleRaw,
+      stylizeTier: submittedStylizeTier,
+      styleWeight: submittedStyleWeight,
+    },
   };
 }
 

@@ -14,15 +14,10 @@ Compared current requirements/planning docs against implemented code paths in AP
 - Current implementation: worker now runs normalization/canonicalization with alias and discovery persistence, and admin review endpoints/UI are present for unresolved traits. Remaining gap: semantic similarity currently uses deterministic proxy scoring instead of true embedding-model similarity; taxonomy seeding and governance breadth are still limited (`apps/worker/src/index.js`, `scripts/inference/style-dna-canonicalizer.js`, `apps/api/src/index.js`, `apps/frontend/app/admin/style-dna/page.tsx`).
 - Impact: core synonym-fragmentation controls now exist, but high-fidelity semantic snapping and mature taxonomy operations are not fully complete.
 
-2. `DISC-003` Run submission does not fully validate the locked parameter envelope beyond control-policy and prompt-tier coverage.
+2. `DISC-003` Run submission locked-envelope parity is implemented with residual trust limitations.
 - Requirement source: plan states baseline reuse/comparisons are tied to locked envelope matching.
-- Current implementation: run submit checks `styleWeight=0` for `sref` and baseline prompt+tier coverage, but does not compare a submitted test envelope object because it is not part of run payload (`apps/api/src/index.js`).
-- Impact: server cannot independently prove full envelope parity at submit-time; this remains process/UI-driven.
-
-3. `DISC-004` Section 3 matrix includes `--sw` variants in generated prompts, but backend run contract does not model per-run `styleWeight`.
-- Requirement source: Section 3 matrix requirements include explicit `sref` cells with differing `--sw` values.
-- Current implementation: UI generates matrix prompt text including `--sw`; run submit payload has no `styleWeight` field and server does not validate test-side `--sw` as submitted metadata (`apps/api/src/index.js`, `apps/frontend/app/admin/style-dna/page.tsx`).
-- Impact: matrix-cell provenance for `--sw` depends on operator discipline and UI state rather than server-enforced run parameters.
+- Current implementation: run submit now requires `submittedTestEnvelope` and enforces parity for model/version, stylize tier, and locked baseline envelope fields with explicit `mismatchFields` (`apps/api/src/index.js`, `packages/shared-contracts/src/style-dna-admin.js`, `apps/frontend/app/admin/style-dna/page.tsx`).
+- Impact: server-side process parity is now materially stronger; remaining limitation is authenticity of externally rendered test evidence cannot be cryptographically proven from Midjourney output alone.
 
 ## Recently Resolved
 
@@ -32,6 +27,9 @@ Compared current requirements/planning docs against implemented code paths in AP
 2. `DISC-001` Style-DNA payload contracts shared in `packages/shared-contracts`.
 - Resolution: Style-DNA admin payload validators are now defined/exported in shared contracts and consumed by API instead of API-local duplicates.
 - Files: `packages/shared-contracts/src/style-dna-admin.js`, `packages/shared-contracts/src/index.js`, `apps/api/src/index.js`.
+3. `DISC-004` Section 3 run contract modeling of per-run `styleWeight`.
+- Resolution: run submit payload now carries `submittedTestEnvelope.styleWeight` and server validates it for `sref` workflows.
+- Files: `packages/shared-contracts/src/style-dna-admin.js`, `apps/api/src/index.js`, `apps/frontend/app/admin/style-dna/page.tsx`.
 
 ## Documentation Drift Fixed in This Change
 
@@ -48,4 +46,4 @@ Compared current requirements/planning docs against implemented code paths in AP
 
 1. Add shared Style-DNA contracts/validators in `packages/shared-contracts` and consume from API/worker/frontend.
 2. Implement explicit canonical taxonomy mapping pipeline (normalization + deterministic/alias resolution + embedding candidate snapping + threshold/review gating + versioned decisions).
-3. Extend run payload/validation to include test-side envelope evidence, then enforce full parity checks server-side.
+3. Complete DISC-002 remaining work: integrate real embedding similarity and mature taxonomy governance workflows.

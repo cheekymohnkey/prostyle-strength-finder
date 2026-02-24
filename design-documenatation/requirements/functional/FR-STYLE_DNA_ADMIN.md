@@ -32,6 +32,7 @@ Section-specific extension:
 16. `FR-SD-016` Automatic alias-to-canonical merge shall require configured lexical and embedding thresholds; otherwise traits shall be routed to review without automatic canonical enrollment.
 17. `FR-SD-017` Production scoring/read models shall use canonical traits only; unresolved open traits shall be retained as discovery candidates pending governance approval.
 18. `FR-SD-018` Canonicalization and alias decisions shall be versioned and auditable (`taxonomy_version`, decision source, timestamp, reviewer when manual).
+19. `FR-SD-019` Run submission shall include submitted test-envelope evidence (`mjModelFamily`, `mjModelVersion`, `stylizeTier`, and applicable locked fields including `styleWeight` for `sref`) and server shall reject envelope mismatches against the baseline set with explicit mismatch reasons.
 
 ## User Acceptance Criteria
 

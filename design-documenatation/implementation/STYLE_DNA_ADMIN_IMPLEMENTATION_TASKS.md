@@ -63,6 +63,7 @@ Out of scope:
 - baseline, prompt-job, run, and image endpoints are implemented with admin RBAC.
 - idempotency behavior is implemented for run submission.
 - server-side matched-control (`--sw 0`) gating for sref policy is now enforced at run submission (`styleWeight=0` control baseline requirement).
+- run submission contract now includes `submittedTestEnvelope` and server-side locked-envelope parity checks.
 3. SD3: Implemented (DISC-002 foundation now in place).
 - worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
 - canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
@@ -80,6 +81,7 @@ Out of scope:
 - set-producing style-dna smokes now clean up smoke-created baseline suites/sets/items, prompt jobs/items, runs/results, and smoke images after successful verification.
 - launch/readiness gate integration includes full style-dna smoke set (`tier-validation`, `baseline`, `prompt-generation`, `run`, `schema-failure`) in `launch:readiness-smoke` full scope.
 - style-dna run smoke now explicitly verifies idempotent run-submit behavior (same idempotency key returns deduplicated existing run id).
+- style-dna run smoke now explicitly verifies locked-envelope mismatch rejection at run submit.
 - style-dna run smoke now explicitly verifies admin RBAC on run submit/list/get (`403 FORBIDDEN` for contributor token).
 - style-dna run smoke now captures lifecycle progression evidence (pre-worker `queued`, terminal `succeeded` with result).
 - schema-failure smoke fixture now explicitly sets control-baseline envelope (`styleWeight=0`) so the failure-path test remains compatible with enforced sref guardrails.

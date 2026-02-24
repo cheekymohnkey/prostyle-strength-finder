@@ -759,6 +759,16 @@ async function main() {
           promptKey: "pk_001",
           stylizeTier: 100,
           testGridImageId: testImageId,
+          submittedTestEnvelope: {
+            mjModelFamily: "standard",
+            mjModelVersion: "7",
+            seed: "42",
+            quality: "1",
+            aspectRatio: "1:1",
+            styleRaw: true,
+            stylizeTier: 100,
+            styleWeight: 1000,
+          },
         }),
       }
     );
@@ -866,6 +876,16 @@ async function main() {
           promptKey: "pk_001",
           stylizeTier: 0,
           testGridImageId: testImageId,
+          submittedTestEnvelope: {
+            mjModelFamily: "standard",
+            mjModelVersion: "7",
+            seed: "42",
+            quality: "1",
+            aspectRatio: "1:1",
+            styleRaw: true,
+            stylizeTier: 0,
+            styleWeight: 1000,
+          },
         }),
       }
     );
@@ -896,6 +916,16 @@ async function main() {
           promptKey: "pk_001",
           stylizeTier: 100,
           testGridImageId: testImageId,
+          submittedTestEnvelope: {
+            mjModelFamily: "standard",
+            mjModelVersion: "7",
+            seed: "42",
+            quality: "1",
+            aspectRatio: "1:1",
+            styleRaw: true,
+            stylizeTier: 100,
+            styleWeight: 1000,
+          },
         }),
       }
     );

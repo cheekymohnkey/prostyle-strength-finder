@@ -46,10 +46,15 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `GET /v1/admin/style-dna/trait-discoveries`
 - `POST /v1/admin/style-dna/trait-discoveries/:discoveryId/review`
 - Section 3 review queue UI + status-filtered review history UI
-7. Local-dev runtime hardening completed:
+7. `DISC-003` locked-envelope parity is now enforced server-side at run submit:
+- run payload now requires `submittedTestEnvelope` evidence
+- API rejects mismatches with explicit `mismatchFields` details (`INVALID_STATE`)
+- frontend submit path now includes submitted test-envelope metadata
+- run/schema-failure/frontend-proxy smokes updated for new contract
+8. Local-dev runtime hardening completed:
 - `scripts/dev-stack.sh` now normalizes local paths so API/worker share the same storage/debug locations even when env uses relative paths
 - Next dev origin config adjusted to avoid HMR cross-origin issues (`allowedDevOrigins` host normalization)
-8. `DISC-001` is resolved:
+9. `DISC-001` is resolved:
 - Style-DNA admin payload validators moved from API-local functions into shared contracts module
 - API now consumes shared validators from `packages/shared-contracts`
 
@@ -64,8 +69,9 @@ Capture the current Style-DNA implementation state and active risks so the next 
 1. `DISC-002` is partially resolved but not complete.
 - Implemented: canonicalization pipeline, alias/discovery persistence, and admin review workflow.
 - Remaining: true embedding-model similarity (current semantic matching uses deterministic proxy), broader taxonomy seeding/governance refinement.
-2. `DISC-003` Full locked-envelope parity is not fully server-enforced at run submission.
-3. `DISC-004` Matrix `--sw` variants are UI-generated but backend run contract still does not model per-run `styleWeight`.
+2. `DISC-003` residual limitation remains.
+- Implemented: submitted test-envelope parity checks at run submit.
+- Remaining: rendered image provenance/authenticity is still process-dependent (no cryptographic attestation from Midjourney output).
 
 ## Key Files Added/Changed This Slice
 
@@ -84,6 +90,10 @@ Capture the current Style-DNA implementation state and active risks so the next 
 13. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
 14. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 15. `scripts/inference/prompts/style-dna-baseline-comparison-system.md`
+16. `packages/shared-contracts/src/style-dna-admin.js`
+17. `scripts/style-dna/run-smoke.js`
+18. `scripts/style-dna/schema-failure-smoke.js`
+19. `scripts/admin/frontend-proxy-smoke.js`
 
 ## Recent Commits
 
@@ -111,7 +121,10 @@ Capture the current Style-DNA implementation state and active risks so the next 
 - `npm run contracts`
 - `npm run typecheck --workspace=@prostyle/frontend`
 - `npm run style-dna:canonicalization-smoke`
-4. Continue `DISC-002` completion slice:
+4. If env is configured, run DISC-003 regression checks:
+- `npm run style-dna:run-smoke`
+- `npm run style-dna:schema-failure-smoke`
+5. Continue `DISC-002` completion slice:
 - replace semantic proxy with true embedding similarity path
 - add taxonomy seed/admin flows for canonical trait curation at scale
 - add API/worker tests around review actions and alias resolution replay behavior
@@ -123,9 +136,10 @@ Capture the current Style-DNA implementation state and active risks so the next 
 3. `npm run contracts`
 4. `npm run typecheck --workspace=@prostyle/frontend`
 5. `npm run style-dna:canonicalization-smoke`
+6. `npm run style-dna:run-smoke`
 
 ## Handoff Summary
 
 1. Section 3 core admin workflow is materially improved (create/remove influence, matrix progress, accumulated trait summary, and debug visibility).
 2. Shared-contract drift for Style-DNA payload validation is resolved (`DISC-001`).
-3. Major remaining technical work is canonical taxonomy mapping (`DISC-002`) plus stricter server contract enforcement for envelope/style-weight lineage (`DISC-003`, `DISC-004`).
+3. Major remaining technical work is DISC-002 completion (embedding-backed semantic snapping + governance hardening) while DISC-003/DISC-004 contract enforcement is now implemented with process-trust residuals.

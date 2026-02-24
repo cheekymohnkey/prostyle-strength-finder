@@ -1244,6 +1244,16 @@ export default function StyleDnaAdminPage() {
           promptKey: promptKey.trim(),
           stylizeTier: Number(selectedSection3Cell?.stylizeTier || stylizeTier),
           testGridImageId: selectedSection3PromptTestImageId.trim(),
+          submittedTestEnvelope: {
+            mjModelFamily: mjModelFamily.trim(),
+            mjModelVersion: mjModelVersion.trim(),
+            seed: seed.trim(),
+            quality: quality.trim(),
+            aspectRatio: aspectRatio.trim(),
+            styleRaw: loadedEnvelope?.styleRaw === undefined ? null : Boolean(loadedEnvelope.styleRaw),
+            stylizeTier: Number(selectedSection3Cell?.stylizeTier || stylizeTier),
+            styleWeight: styleAdjustmentType === "sref" ? Number(selectedSection3Cell?.styleWeight) : null,
+          },
         }),
       });
       return parseApiResponse<StyleDnaRunSubmitResponse>(response);
@@ -1522,6 +1532,9 @@ export default function StyleDnaAdminPage() {
     }
     if (!selectedSection3PromptTestImageId.trim()) {
       reasons.push("Upload a test grid image for the selected prompt first.");
+    }
+    if (styleAdjustmentType === "sref" && !Number.isFinite(Number(selectedSection3Cell?.styleWeight))) {
+      reasons.push("sref runs require a valid test styleWeight in the selected cell.");
     }
     if (styleAdjustmentType === "sref" && !Number.isFinite(baselineStyleWeight)) {
       reasons.push("sref runs require a baseline set with explicit styleWeight=0 control envelope.");

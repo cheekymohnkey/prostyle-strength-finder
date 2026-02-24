@@ -1064,19 +1064,46 @@ function canonicalTraitIdFromLabel(axis, label) {
   return `canon_${axisPrefix}_${base}_${crypto.randomUUID().slice(0, 6)}`;
 }
 
-function parseBaselineStyleWeight(parameterEnvelopeJson) {
+function parseBaselineParameterEnvelope(parameterEnvelopeJson) {
   try {
     const parsed = JSON.parse(parameterEnvelopeJson || "{}");
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
+      return {
+        seed: null,
+        quality: null,
+        aspectRatio: null,
+        styleRaw: null,
+        styleWeight: null,
+      };
     }
-    if (parsed.styleWeight === undefined || parsed.styleWeight === null) {
-      return null;
-    }
-    const numeric = Number(parsed.styleWeight);
-    return Number.isFinite(numeric) ? numeric : null;
+    const normalizeOptionalScalar = (value) => {
+      if (value === undefined || value === null || String(value).trim() === "") {
+        return null;
+      }
+      return String(value).trim();
+    };
+    const styleWeight = (() => {
+      if (parsed.styleWeight === undefined || parsed.styleWeight === null || String(parsed.styleWeight).trim() === "") {
+        return null;
+      }
+      const numeric = Number(parsed.styleWeight);
+      return Number.isFinite(numeric) ? numeric : null;
+    })();
+    return {
+      seed: normalizeOptionalScalar(parsed.seed),
+      quality: normalizeOptionalScalar(parsed.quality),
+      aspectRatio: normalizeOptionalScalar(parsed.aspectRatio),
+      styleRaw: typeof parsed.styleRaw === "boolean" ? parsed.styleRaw : null,
+      styleWeight,
+    };
   } catch (_error) {
-    return null;
+    return {
+      seed: null,
+      quality: null,
+      aspectRatio: null,
+      styleRaw: null,
+      styleWeight: null,
+    };
   }
 }
 
@@ -2997,8 +3024,46 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
         return;
       }
+      const baselineEnvelope = parseBaselineParameterEnvelope(baselineSet.parameter_envelope_json);
+      const submittedEnvelope = payload.submittedTestEnvelope;
+      const lockedEnvelopeMismatches = [];
+      if (String(submittedEnvelope.mjModelFamily || "").trim() !== String(baselineSet.mj_model_family || "").trim()) {
+        lockedEnvelopeMismatches.push("mjModelFamily");
+      }
+      if (String(submittedEnvelope.mjModelVersion || "").trim() !== String(baselineSet.mj_model_version || "").trim()) {
+        lockedEnvelopeMismatches.push("mjModelVersion");
+      }
+      if (Number(submittedEnvelope.stylizeTier) !== Number(payload.stylizeTier)) {
+        lockedEnvelopeMismatches.push("stylizeTier");
+      }
+      if (baselineEnvelope.seed !== null && String(submittedEnvelope.seed || "").trim() !== baselineEnvelope.seed) {
+        lockedEnvelopeMismatches.push("seed");
+      }
+      if (baselineEnvelope.quality !== null && String(submittedEnvelope.quality || "").trim() !== baselineEnvelope.quality) {
+        lockedEnvelopeMismatches.push("quality");
+      }
+      if (baselineEnvelope.aspectRatio !== null && String(submittedEnvelope.aspectRatio || "").trim() !== baselineEnvelope.aspectRatio) {
+        lockedEnvelopeMismatches.push("aspectRatio");
+      }
+      if (baselineEnvelope.styleRaw !== null && submittedEnvelope.styleRaw !== baselineEnvelope.styleRaw) {
+        lockedEnvelopeMismatches.push("styleRaw");
+      }
+      if (lockedEnvelopeMismatches.length > 0) {
+        sendError(
+          res,
+          409,
+          "INVALID_STATE",
+          "Locked envelope mismatch between submitted test evidence and baseline set",
+          ctx,
+          {
+            mismatchFields: lockedEnvelopeMismatches,
+            baselineRenderSetId: payload.baselineRenderSetId,
+          }
+        );
+        return;
+      }
       if (payload.styleAdjustmentType === "sref") {
-        const baselineStyleWeight = parseBaselineStyleWeight(baselineSet.parameter_envelope_json);
+        const baselineStyleWeight = baselineEnvelope.styleWeight;
         if (baselineStyleWeight !== 0) {
           sendError(
             res,
@@ -3071,6 +3136,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
           styleAdjustmentMidjourneyId: payload.styleAdjustmentMidjourneyId,
           promptKey: payload.promptKey,
           stylizeTier: payload.stylizeTier,
+          submittedTestEnvelope: payload.submittedTestEnvelope,
           baselineGridImageId: baselineItem.grid_image_id,
           testGridImageId: payload.testGridImageId,
         },

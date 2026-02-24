@@ -394,6 +394,13 @@ async function main() {
 
     const styleAdjustmentType = "sref";
     const styleAdjustmentMidjourneyId = "sref-123456789";
+    const submittedTestEnvelope = {
+      mjModelFamily: "standard",
+      mjModelVersion: "7",
+      aspectRatio: "3:4",
+      stylizeTier,
+      styleWeight: 1000,
+    };
     const promptJob = await requestJson(
       `${baseUrl}/admin/style-dna/prompt-jobs`,
       {
@@ -454,6 +461,7 @@ async function main() {
           promptKey,
           stylizeTier,
           testGridImageId,
+          submittedTestEnvelope,
         }),
       },
       403
@@ -481,6 +489,7 @@ async function main() {
           promptKey,
           stylizeTier,
           testGridImageId,
+          submittedTestEnvelope,
         }),
       }
     );
@@ -498,6 +507,44 @@ async function main() {
     assertCondition(
       missingControlMessage.includes("Matched-control baseline is required"),
       `Expected matched-control policy message, got: ${missingControlMessage || "(empty)"}`
+    );
+
+    const envelopeMismatchResponse = await fetch(
+      `${baseUrl}/admin/style-dna/runs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: `style-dna-run-smoke:envelope-mismatch:${Date.now()}`,
+          styleInfluenceId: "si_style_dna_smoke",
+          baselineRenderSetId,
+          styleAdjustmentType,
+          styleAdjustmentMidjourneyId,
+          promptKey,
+          stylizeTier,
+          testGridImageId,
+          submittedTestEnvelope: {
+            ...submittedTestEnvelope,
+            mjModelVersion: "6",
+          },
+        }),
+      }
+    );
+    const envelopeMismatchJson = await envelopeMismatchResponse.json().catch(() => ({}));
+    assertCondition(
+      envelopeMismatchResponse.status === 409,
+      `Expected 409 for envelope mismatch, got ${envelopeMismatchResponse.status}: ${JSON.stringify(envelopeMismatchJson)}`
+    );
+    assertCondition(
+      extractApiErrorCode(envelopeMismatchJson) === "INVALID_STATE",
+      `Expected INVALID_STATE for envelope mismatch, got ${JSON.stringify(envelopeMismatchJson)}`
+    );
+    assertCondition(
+      extractApiErrorText(envelopeMismatchJson).includes("locked envelope mismatch"),
+      `Expected locked envelope mismatch message, got ${JSON.stringify(envelopeMismatchJson)}`
     );
 
     const runIdempotencyKey = `style-dna-run-smoke:${Date.now()}`;
@@ -518,6 +565,7 @@ async function main() {
           promptKey,
           stylizeTier,
           testGridImageId,
+          submittedTestEnvelope,
         }),
       },
       202
@@ -559,6 +607,7 @@ async function main() {
           promptKey,
           stylizeTier,
           testGridImageId,
+          submittedTestEnvelope,
         }),
       },
       200
