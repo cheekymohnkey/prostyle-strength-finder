@@ -33,6 +33,7 @@ Section-specific extension:
 17. `FR-SD-017` Production scoring/read models shall use canonical traits only; unresolved open traits shall be retained as discovery candidates pending governance approval.
 18. `FR-SD-018` Canonicalization and alias decisions shall be versioned and auditable (`taxonomy_version`, decision source, timestamp, reviewer when manual).
 19. `FR-SD-019` Run submission shall include submitted test-envelope evidence (`mjModelFamily`, `mjModelVersion`, `stylizeTier`, and applicable locked fields including `styleWeight` for `sref`) and server shall reject envelope mismatches against the baseline set with explicit mismatch reasons.
+20. `FR-SD-020` Admin workflow shall support baseline set deletion with cascade cleanup of baseline-linked prompt jobs, runs/results, related analysis records, and unreferenced Style-DNA image records/objects.
 
 ## User Acceptance Criteria
 
@@ -40,3 +41,4 @@ Section-specific extension:
 2. Incompatible or incomplete baseline state prevents run submission with actionable errors.
 3. Repeat submissions with same idempotency key return existing run.
 4. Trait synonyms do not fragment reporting because unresolved or ambiguous traits are review-gated instead of silently creating canonical duplicates.
+5. Deleting a baseline set removes baseline-linked artifacts from API read paths (subsequent baseline set lookup returns `404`) and records an admin audit event.

@@ -43,6 +43,7 @@
     "contributor:essentials-smoke": "node scripts/contributor/essentials-smoke.js",
     "style-dna:tier-validation-smoke": "node scripts/style-dna/tier-validation-smoke.js",
     "style-dna:baseline-smoke": "node scripts/style-dna/baseline-smoke.js",
+    "style-dna:baseline-delete-cascade-smoke": "node scripts/style-dna/baseline-delete-cascade-smoke.js",
     "style-dna:seed-canonical-baselines": "node scripts/style-dna/seed-canonical-baselines.js",
     "style-dna:prompt-generation-smoke": "node scripts/style-dna/prompt-generation-smoke.js",
     "style-dna:run-smoke": "node scripts/style-dna/run-smoke.js",
@@ -72,6 +73,6 @@
     "style-dna:taxonomy-seed-evidence-governance-check": "node scripts/style-dna/taxonomy-seed-evidence-governance-check.js",
     "style-dna:discovery-review-replay-smoke": "node scripts/style-dna/discovery-review-replay-smoke.js",
     "style-dna:schema-failure-smoke": "node scripts/style-dna/schema-failure-smoke.js",
-    "style-dna:smokes:with-restore": "scripts/db/run-with-db-restore.sh /bin/zsh -lc \"npm run style-dna:tier-validation-smoke && npm run style-dna:baseline-smoke && npm run style-dna:prompt-generation-smoke && npm run style-dna:canonicalization-smoke && npm run style-dna:run-smoke && npm run style-dna:schema-failure-smoke\""
+    "style-dna:smokes:with-restore": "scripts/db/run-with-db-restore.sh /bin/zsh -lc \"npm run style-dna:tier-validation-smoke && npm run style-dna:baseline-smoke && npm run style-dna:baseline-delete-cascade-smoke && npm run style-dna:prompt-generation-smoke && npm run style-dna:canonicalization-smoke && npm run style-dna:run-smoke && npm run style-dna:schema-failure-smoke\""
   }
 }

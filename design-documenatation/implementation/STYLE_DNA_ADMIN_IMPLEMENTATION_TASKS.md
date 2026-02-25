@@ -144,6 +144,7 @@ Implementation tasks:
 - `GET /v1/admin/style-dna/baseline-sets`
 - `GET /v1/admin/style-dna/baseline-sets/:baselineRenderSetId`
 - `POST /v1/admin/style-dna/baseline-sets/:baselineRenderSetId/items`
+- `DELETE /v1/admin/style-dna/baseline-sets/:baselineRenderSetId`
 2. Prompt generation endpoints:
 - `POST /v1/admin/style-dna/prompt-jobs`
 - `GET /v1/admin/style-dna/prompt-jobs/:promptJobId`
@@ -160,6 +161,11 @@ Implementation tasks:
 7. Enforce and surface control-baseline policy for sref runs:
 - comparisons require baseline coverage produced under `--sw 0`
 - baseline and test must match stylize tier (`s`) and locked envelope fields
+8. Baseline-set delete shall perform deterministic cascade cleanup for baseline-linked records:
+- prompt jobs/items
+- style-dna runs/results
+- related analysis runs/jobs and image trait analyses
+- unreferenced style-dna image records (and storage object cleanup best-effort)
 
 Acceptance criteria:
 1. All endpoints are contract-validated and role-protected.

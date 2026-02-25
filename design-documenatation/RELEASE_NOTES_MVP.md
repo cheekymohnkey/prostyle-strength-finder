@@ -60,3 +60,11 @@ Reference:
 1. MVP excludes MidJourney render job submission/execution.
 2. Current implementation baseline uses SQLite + AWS S3/SQS foundations; Lightsail deployment remains a planned target and is not yet provisioned in this repo.
 3. Active environment strategy is `local` + `prod`; `uat` is retained as an optional future environment.
+
+## Post-MVP Patch Updates
+
+Date: 2026-02-25
+
+1. Added admin baseline set deletion endpoint with cascade cleanup across baseline items, style-DNA prompt/run artifacts, linked style-DNA analysis artifacts, audit references, and orphan style-DNA image records.
+2. Added admin UI control in Style-DNA page for deleting selected baseline sets with confirmation and cache invalidation.
+3. Added dedicated regression smoke: `npm run style-dna:baseline-delete-cascade-smoke` and wired it into `style-dna:smokes:with-restore`.

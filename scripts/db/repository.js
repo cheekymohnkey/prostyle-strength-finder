@@ -1254,6 +1254,293 @@ function deleteBaselineRenderSetItem(dbPath, baselineRenderSetId, promptKey, sty
   );
 }
 
+function deleteBaselineRenderSetCascade(dbPath, baselineRenderSetId) {
+  const baselineSet = getBaselineRenderSetById(dbPath, baselineRenderSetId);
+  if (!baselineSet) {
+    return null;
+  }
+
+  const summaryRows = queryJson(
+    dbPath,
+    `SELECT
+       (SELECT COUNT(*) FROM baseline_render_set_items WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}) AS baseline_item_count,
+       (SELECT COUNT(*) FROM style_dna_prompt_jobs WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}) AS prompt_job_count,
+       (SELECT COUNT(*)
+        FROM style_dna_prompt_job_items
+        WHERE prompt_job_id IN (
+          SELECT prompt_job_id
+          FROM style_dna_prompt_jobs
+          WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+        )) AS prompt_job_item_count,
+       (SELECT COUNT(*) FROM style_dna_runs WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}) AS style_dna_run_count,
+       (SELECT COUNT(*)
+        FROM style_dna_run_results
+        WHERE style_dna_run_id IN (
+          SELECT style_dna_run_id
+          FROM style_dna_runs
+          WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+        )) AS style_dna_run_result_count,
+       (SELECT COUNT(*)
+        FROM analysis_runs
+        WHERE analysis_run_id IN (
+          SELECT analysis_run_id
+          FROM style_dna_runs
+          WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+            AND analysis_run_id IS NOT NULL
+        )) AS analysis_run_count,
+       (SELECT COUNT(*)
+        FROM analysis_jobs
+        WHERE job_id IN (
+          SELECT ar.job_id
+          FROM analysis_runs ar
+          WHERE ar.analysis_run_id IN (
+            SELECT analysis_run_id
+            FROM style_dna_runs
+            WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+              AND analysis_run_id IS NOT NULL
+          )
+        )) AS analysis_job_count,
+       (SELECT COUNT(*)
+        FROM image_trait_analyses
+        WHERE analysis_run_id IN (
+          SELECT analysis_run_id
+          FROM style_dna_runs
+          WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+            AND analysis_run_id IS NOT NULL
+        )) AS image_trait_analysis_count,
+       (SELECT COUNT(*)
+        FROM style_dna_images
+        WHERE style_dna_image_id IN (
+          SELECT grid_image_id
+          FROM baseline_render_set_items
+          WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+          UNION
+          SELECT baseline_grid_image_id
+          FROM style_dna_runs
+          WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+          UNION
+          SELECT test_grid_image_id
+          FROM style_dna_runs
+          WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+        )) AS candidate_image_count;`
+  );
+  const summary = summaryRows[0] || {};
+
+  const candidateImageRows = queryJson(
+    dbPath,
+    `SELECT style_dna_image_id, storage_key
+     FROM style_dna_images
+     WHERE style_dna_image_id IN (
+       SELECT grid_image_id
+       FROM baseline_render_set_items
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+       UNION
+       SELECT baseline_grid_image_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+       UNION
+       SELECT test_grid_image_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+     );`
+  );
+
+  exec(
+    dbPath,
+    `BEGIN;
+     CREATE TEMP TABLE IF NOT EXISTS __baseline_delete_image_candidates (
+       style_dna_image_id TEXT PRIMARY KEY
+     );
+     DELETE FROM __baseline_delete_image_candidates;
+     INSERT OR IGNORE INTO __baseline_delete_image_candidates(style_dna_image_id)
+       SELECT grid_image_id
+       FROM baseline_render_set_items
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+       UNION
+       SELECT baseline_grid_image_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+       UNION
+       SELECT test_grid_image_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)};
+
+     CREATE TEMP TABLE IF NOT EXISTS __baseline_delete_analysis_jobs (
+       job_id TEXT PRIMARY KEY
+     );
+     DELETE FROM __baseline_delete_analysis_jobs;
+     INSERT OR IGNORE INTO __baseline_delete_analysis_jobs(job_id)
+       SELECT DISTINCT ar.job_id
+       FROM analysis_runs ar
+       WHERE ar.analysis_run_id IN (
+         SELECT analysis_run_id
+         FROM style_dna_runs
+         WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+           AND analysis_run_id IS NOT NULL
+       );
+
+     UPDATE style_dna_trait_discoveries
+     SET latest_style_dna_run_id = NULL
+     WHERE latest_style_dna_run_id IN (
+       SELECT style_dna_run_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+     );
+
+     UPDATE style_dna_trait_discoveries
+     SET latest_analysis_run_id = NULL
+     WHERE latest_analysis_run_id IN (
+       SELECT analysis_run_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+         AND analysis_run_id IS NOT NULL
+     );
+
+     DELETE FROM admin_actions_audit
+     WHERE (target_type = 'style_dna_baseline_set' AND target_id = ${quote(baselineRenderSetId)})
+        OR (target_type = 'style_dna_prompt_job' AND target_id IN (
+             SELECT prompt_job_id
+             FROM style_dna_prompt_jobs
+             WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+           ))
+        OR (target_type = 'style_dna_run' AND target_id IN (
+             SELECT style_dna_run_id
+             FROM style_dna_runs
+             WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+           ));
+
+     DELETE FROM style_dna_run_results
+     WHERE style_dna_run_id IN (
+       SELECT style_dna_run_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+     );
+
+     DELETE FROM image_trait_analyses
+     WHERE analysis_run_id IN (
+       SELECT analysis_run_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+         AND analysis_run_id IS NOT NULL
+     )
+       OR job_id IN (SELECT job_id FROM __baseline_delete_analysis_jobs);
+
+     DELETE FROM analysis_runs
+     WHERE analysis_run_id IN (
+       SELECT analysis_run_id
+       FROM style_dna_runs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+         AND analysis_run_id IS NOT NULL
+     );
+
+     DELETE FROM analysis_jobs
+     WHERE job_id IN (SELECT job_id FROM __baseline_delete_analysis_jobs)
+       AND run_type = 'style_dna';
+
+     DELETE FROM style_dna_runs
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)};
+
+     DELETE FROM style_dna_prompt_job_items
+     WHERE prompt_job_id IN (
+       SELECT prompt_job_id
+       FROM style_dna_prompt_jobs
+       WHERE baseline_render_set_id = ${quote(baselineRenderSetId)}
+     );
+
+     DELETE FROM style_dna_prompt_jobs
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)};
+
+     DELETE FROM baseline_render_set_items
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)};
+
+     DELETE FROM baseline_render_sets
+     WHERE baseline_render_set_id = ${quote(baselineRenderSetId)};
+
+     DELETE FROM baseline_prompt_suite_item_metadata
+     WHERE suite_id = ${quote(baselineSet.suite_id)}
+       AND NOT EXISTS (
+         SELECT 1
+         FROM baseline_render_sets
+         WHERE suite_id = ${quote(baselineSet.suite_id)}
+       );
+
+     DELETE FROM baseline_prompt_suite_items
+     WHERE suite_id = ${quote(baselineSet.suite_id)}
+       AND NOT EXISTS (
+         SELECT 1
+         FROM baseline_render_sets
+         WHERE suite_id = ${quote(baselineSet.suite_id)}
+       );
+
+     DELETE FROM baseline_prompt_suites
+     WHERE suite_id = ${quote(baselineSet.suite_id)}
+       AND NOT EXISTS (
+         SELECT 1
+         FROM baseline_render_sets
+         WHERE suite_id = ${quote(baselineSet.suite_id)}
+       );
+
+     DELETE FROM style_dna_images
+     WHERE style_dna_image_id IN (
+       SELECT style_dna_image_id
+       FROM __baseline_delete_image_candidates
+     )
+       AND style_dna_image_id NOT IN (
+         SELECT grid_image_id FROM baseline_render_set_items
+         UNION
+         SELECT baseline_grid_image_id FROM style_dna_runs
+         UNION
+         SELECT test_grid_image_id FROM style_dna_runs
+       );
+
+     DROP TABLE IF EXISTS __baseline_delete_analysis_jobs;
+     DROP TABLE IF EXISTS __baseline_delete_image_candidates;
+     COMMIT;`
+  );
+
+  const candidateImageIds = candidateImageRows
+    .map((row) => String(row.style_dna_image_id || "").trim())
+    .filter((value) => value !== "");
+
+  let deletedImages = [];
+  if (candidateImageIds.length > 0) {
+    const remainingRows = queryJson(
+      dbPath,
+      `SELECT style_dna_image_id
+       FROM style_dna_images
+       WHERE style_dna_image_id IN (${candidateImageIds.map((value) => quote(value)).join(", ")});`
+    );
+    const remainingIds = new Set(remainingRows.map((row) => String(row.style_dna_image_id || "").trim()));
+    deletedImages = candidateImageRows
+      .filter((row) => !remainingIds.has(String(row.style_dna_image_id || "").trim()))
+      .map((row) => ({
+        styleDnaImageId: String(row.style_dna_image_id || "").trim(),
+        storageKey: String(row.storage_key || "").trim(),
+      }));
+  }
+
+  const suiteDeleted = getBaselinePromptSuiteById(dbPath, baselineSet.suite_id) === null;
+
+  return {
+    baselineRenderSetId,
+    suiteId: baselineSet.suite_id,
+    suiteDeleted,
+    summary: {
+      baselineItemCount: Number(summary.baseline_item_count || 0),
+      promptJobCount: Number(summary.prompt_job_count || 0),
+      promptJobItemCount: Number(summary.prompt_job_item_count || 0),
+      styleDnaRunCount: Number(summary.style_dna_run_count || 0),
+      styleDnaRunResultCount: Number(summary.style_dna_run_result_count || 0),
+      analysisRunCount: Number(summary.analysis_run_count || 0),
+      analysisJobCount: Number(summary.analysis_job_count || 0),
+      imageTraitAnalysisCount: Number(summary.image_trait_analysis_count || 0),
+      candidateImageCount: Number(summary.candidate_image_count || 0),
+      deletedImageCount: deletedImages.length,
+    },
+    deletedImages,
+  };
+}
+
 function insertStyleDnaPromptJob(dbPath, input) {
   const createdAt = input.createdAt || nowIso();
   exec(
@@ -1907,6 +2194,7 @@ module.exports = {
   insertBaselineRenderSetItem,
   upsertBaselineRenderSetItem,
   deleteBaselineRenderSetItem,
+  deleteBaselineRenderSetCascade,
   insertStyleDnaPromptJob,
   getStyleDnaPromptJobById,
   insertStyleDnaPromptJobItem,

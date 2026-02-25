@@ -605,3 +605,32 @@ Capture the current Style-DNA implementation state and active risks so the next 
 1. Section 3 core admin workflow is materially improved (create/remove influence, matrix progress, accumulated trait summary, and debug visibility).
 2. Shared-contract drift for Style-DNA payload validation is resolved (`DISC-001`).
 3. Major remaining technical work is DISC-002 governance hardening (taxonomy seeding/curation and replay/audit test depth) while DISC-003/DISC-004 contract enforcement is now implemented with process-trust residuals.
+
+## This Session Addendum (SDNA-35)
+
+1. What was completed:
+- Added baseline set delete capability in admin workflow (UI + API).
+- Added cascade-delete repository flow to remove baseline-linked prompt jobs/items, style-dna runs/results, related analysis records, and unreferenced style-dna image records.
+- Added storage cleanup step for deleted image objects using storage-adapter `deleteObject` (best-effort with failure reporting).
+
+2. API/UX additions:
+- New endpoint: `DELETE /v1/admin/style-dna/baseline-sets/:baselineRenderSetId`
+- Section 1 UI action: `Delete Baseline Set` with explicit destructive confirmation.
+- Delete response now includes `cascadeSummary` and `storageCleanup` result details.
+
+3. Files changed:
+- `scripts/db/repository.js`
+- `apps/api/src/index.js`
+- `apps/frontend/app/admin/style-dna/page.tsx`
+- `design-documenatation/requirements/functional/FR-STYLE_DNA_ADMIN.md`
+- `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+
+4. Validation evidence:
+- `npm run typecheck --workspace=@prostyle/frontend`
+- `npm run style-dna:baseline-smoke`
+- `npm run admin:frontend-proxy-smoke`
+
+5. Notes:
+- Cascade cleanup is scoped to baseline-linked artifacts for the selected baseline render set.
+- Shared suite prompt definitions are removed only when no baseline sets remain for that suite.

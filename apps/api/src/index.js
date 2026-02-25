@@ -67,6 +67,7 @@ const {
   listBaselineRenderSetItems,
   upsertBaselineRenderSetItem,
   deleteBaselineRenderSetItem,
+  deleteBaselineRenderSetCascade,
   insertStyleDnaPromptJob,
   getStyleDnaPromptJobById,
   insertStyleDnaPromptJobItem,
@@ -2746,6 +2747,86 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       ctx
     );
     return;
+  }
+
+  if (method === "DELETE"
+    && path.startsWith("/v1/admin/style-dna/baseline-sets/")
+    && !path.endsWith("/items")) {
+    if (!requireAdminUser(dbPath, authenticatedUserId)) {
+      sendError(res, 403, "FORBIDDEN", "Admin role is required", ctx);
+      return;
+    }
+
+    const baselineRenderSetId = path.slice("/v1/admin/style-dna/baseline-sets/".length).trim();
+    if (!baselineRenderSetId) {
+      sendError(res, 400, "INVALID_REQUEST", "Baseline set id is required", ctx);
+      return;
+    }
+
+    try {
+      const deleted = deleteBaselineRenderSetCascade(dbPath, baselineRenderSetId);
+      if (!deleted) {
+        sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+        return;
+      }
+
+      const storageDeleteFailures = [];
+      let storageDeleteSuccessCount = 0;
+      for (const image of deleted.deletedImages) {
+        if (!image.storageKey) {
+          continue;
+        }
+        try {
+          await storageAdapter.deleteObject({
+            key: image.storageKey,
+          });
+          storageDeleteSuccessCount += 1;
+        } catch (error) {
+          storageDeleteFailures.push({
+            styleDnaImageId: image.styleDnaImageId,
+            storageKey: image.storageKey,
+            reason: error?.message || "storage delete failed",
+          });
+        }
+      }
+
+      insertAdminActionAudit(dbPath, {
+        adminActionAuditId: `aud_${crypto.randomUUID()}`,
+        adminUserId: authenticatedUserId,
+        actionType: "style_dna.baseline_set.delete",
+        targetType: "style_dna_baseline_set",
+        targetId: baselineRenderSetId,
+        reason: JSON.stringify({
+          suiteId: deleted.suiteId,
+          summary: deleted.summary,
+          storageDeleteFailures: storageDeleteFailures.length,
+        }),
+      });
+
+      sendJson(
+        res,
+        200,
+        {
+          deleted: true,
+          baselineRenderSetId,
+          suiteId: deleted.suiteId,
+          suiteDeleted: deleted.suiteDeleted,
+          cascadeSummary: deleted.summary,
+          storageCleanup: {
+            deletedObjectCount: storageDeleteSuccessCount,
+            failedObjectCount: storageDeleteFailures.length,
+            failures: storageDeleteFailures,
+          },
+        },
+        ctx
+      );
+      return;
+    } catch (error) {
+      sendError(res, 500, "INTERNAL_ERROR", "Baseline set delete failed", ctx, {
+        reason: error.message,
+      });
+      return;
+    }
   }
 
   if (method === "GET"

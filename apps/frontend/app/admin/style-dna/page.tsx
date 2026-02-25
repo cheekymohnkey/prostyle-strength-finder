@@ -1126,6 +1126,40 @@ export default function StyleDnaAdminPage() {
     },
   });
 
+  const deleteBaselineSetMutation = useMutation({
+    mutationFn: async () => {
+      const selectedBaselineRenderSetId = baselineRenderSetId.trim();
+      if (!selectedBaselineRenderSetId) {
+        throw new Error("Baseline render set id is required");
+      }
+      const response = await fetch(`/api/proxy/admin/style-dna/baseline-sets/${encodeURIComponent(selectedBaselineRenderSetId)}`, {
+        method: "DELETE",
+      });
+      return parseApiResponse<Record<string, unknown>>(response);
+    },
+    onSuccess: async () => {
+      const deletedBaselineRenderSetId = baselineRenderSetId.trim();
+      setBaselineRenderSetId("");
+      setBaselineGridImageId("");
+      setTestGridImageId("");
+      setBaselineFile(null);
+      setTestFile(null);
+      setUploadedBaselinePreviewUrl("");
+      setUploadedTestPreviewUrl("");
+      setCopyStatus(deletedBaselineRenderSetId
+        ? `Deleted baseline set ${deletedBaselineRenderSetId}.`
+        : "Baseline set deleted.");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "style-dna", "baseline-sets"],
+      });
+      if (deletedBaselineRenderSetId) {
+        await queryClient.invalidateQueries({
+          queryKey: ["admin", "style-dna", "baseline-set", deletedBaselineRenderSetId],
+        });
+      }
+    },
+  });
+
   const uploadTestImageMutation = useMutation({
     mutationFn: async (input: { promptKey: string; cellId: string }) => {
       if (!testFile) {
@@ -1987,6 +2021,26 @@ export default function StyleDnaAdminPage() {
           >
             {createBaselineMutation.isPending ? "Saving..." : "Save As New Baseline Set"}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              const selectedBaselineRenderSetId = baselineRenderSetId.trim();
+              if (!selectedBaselineRenderSetId) {
+                return;
+              }
+              const confirmed = window.confirm(
+                `Delete baseline set ${selectedBaselineRenderSetId} and all related prompt jobs, runs, results, and images?`
+              );
+              if (!confirmed) {
+                return;
+              }
+              deleteBaselineSetMutation.mutate();
+            }}
+            disabled={deleteBaselineSetMutation.isPending || baselineRenderSetId.trim() === ""}
+            className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-60"
+          >
+            {deleteBaselineSetMutation.isPending ? "Deleting..." : "Delete Baseline Set"}
+          </button>
           <label className="flex min-w-[280px] flex-col gap-1 text-sm">
             <span className="text-[var(--muted)]">Baseline Render Set Id</span>
             <input value={baselineRenderSetId} onChange={(event) => setBaselineRenderSetId(event.target.value)} className="rounded-lg border border-[var(--line)] px-3 py-2 text-sm" />
@@ -2039,6 +2093,9 @@ export default function StyleDnaAdminPage() {
         ) : null}
         {createBaselineMutation.isError ? (
           <p className="mt-2 text-sm text-red-600">Save failed: {mutationErrorMessage(createBaselineMutation.error)}</p>
+        ) : null}
+        {deleteBaselineSetMutation.isError ? (
+          <p className="mt-2 text-sm text-red-600">Delete failed: {mutationErrorMessage(deleteBaselineSetMutation.error)}</p>
         ) : null}
         {baselineRenderSetId.trim() ? (
           <p className="mt-2 text-sm text-[var(--muted)]">
