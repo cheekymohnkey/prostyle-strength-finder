@@ -28,6 +28,7 @@
     "backup:restore-smoke": "node scripts/backup/restore-smoke.js",
     "queue:recovery-smoke": "node scripts/queue/recovery-smoke.js",
     "ops:checks": "node scripts/ops/operational-checks.js",
+    "ops:bootstrap-admin": "node scripts/ops/bootstrap-admin-user.js",
     "frontend:critical-flow-smoke": "node scripts/frontend/critical-flow-smoke.js",
     "launch:readiness-smoke": "node scripts/launch/readiness-smoke.js",
     "storage:smoke": "node scripts/storage/smoke.js",
