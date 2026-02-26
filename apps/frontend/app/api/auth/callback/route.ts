@@ -29,9 +29,12 @@ export async function GET(request: NextRequest) {
     return buildRedirectWithError(config.appBaseUrl, "missing_code_or_state");
   }
 
+  // Debug: log first/last chars of code to detect truncation
+  const codePreview = `${code.slice(0, 8)}...${code.slice(-8)}`;
+
   const pkce = await readPkceCookies();
   if (!pkce.state || !pkce.verifier || pkce.state !== returnedState) {
-    const debugInfo = `state_cookie=${pkce.state ? "present" : "missing"} verifier_cookie=${pkce.verifier ? "present" : "missing"} state_match=${pkce.state === returnedState}`;
+    const debugInfo = `state_cookie=${pkce.state ? "present" : "missing"} verifier_cookie=${pkce.verifier ? "present" : "missing"} state_match=${pkce.state === returnedState} code=${codePreview}(len=${code.length})`;
     return buildRedirectWithError(config.appBaseUrl, `invalid_state:${debugInfo}`);
   }
 
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
-    const debugInfo = `verifier_len=${verifierLen} challenge_match=${challengeMatch} sent=${(pkce.sentChallenge ?? "null").slice(0, 12)}... computed=${recomputedChallenge.slice(0, 12)}... code_len=${code.length}`;
+    const debugInfo = `code=${codePreview}(len=${code.length}) verifier_len=${verifierLen} challenge_match=${challengeMatch} sent=${(pkce.sentChallenge ?? "null").slice(0, 12)}... computed=${recomputedChallenge.slice(0, 12)}...`;
     return buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason} [pkce:${debugInfo}]`);
   }
 }
