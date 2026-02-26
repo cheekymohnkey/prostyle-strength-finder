@@ -5,6 +5,7 @@ import { createPkceChallenge } from "@/lib/auth/pkce";
 import { clearPkceCookies, setSessionCookie, readPkceCookies } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function buildRedirectWithError(baseUrl: string, code: string): NextResponse {
   const redirect = new URL(baseUrl);

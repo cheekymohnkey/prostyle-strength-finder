@@ -34,9 +34,9 @@ async function postTokenRequest(config: FrontendAuthConfig, formInput: Record<st
   const json = await response.json().catch(() => null);
   if (!response.ok || !json || typeof json.access_token !== "string") {
     const errorCode = json && typeof json.error === "string" ? json.error : "unknown_error";
-    const reason = json && typeof json.error_description === "string"
-      ? json.error_description
-      : `status=${response.status} error=${errorCode}`;
+    const errorDesc = json && typeof json.error_description === "string" ? json.error_description : null;
+    const rawJson = json ? JSON.stringify(json) : `(no json, status=${response.status})`;
+    const reason = errorDesc ?? `status=${response.status} error=${errorCode} raw=${rawJson}`;
     throw new Error(reason);
   }
 

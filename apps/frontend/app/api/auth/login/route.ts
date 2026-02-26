@@ -4,6 +4,7 @@ import { createPkceChallenge, createPkceVerifier, createRandomState } from "@/li
 import { setPkceCookies } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(_request: NextRequest) {
   const config = loadFrontendAuthConfig();
