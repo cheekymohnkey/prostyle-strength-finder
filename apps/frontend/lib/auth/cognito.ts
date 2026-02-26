@@ -33,9 +33,10 @@ async function postTokenRequest(config: FrontendAuthConfig, formInput: Record<st
 
   const json = await response.json().catch(() => null);
   if (!response.ok || !json || typeof json.access_token !== "string") {
+    const errorCode = json && typeof json.error === "string" ? json.error : "unknown_error";
     const reason = json && typeof json.error_description === "string"
       ? json.error_description
-      : "Token endpoint rejected request";
+      : `status=${response.status} error=${errorCode}`;
     throw new Error(reason);
   }
 
