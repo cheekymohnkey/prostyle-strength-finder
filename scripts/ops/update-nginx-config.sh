@@ -6,30 +6,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Load production environment variables
-if [ ! -f "$PROJECT_ROOT/.env.prod.infra" ]; then
-    echo "Error: .env.prod.infra not found"
-    exit 1
-fi
-
-set -a
-source "$PROJECT_ROOT/.env.prod.infra"
-set +a
-
-# Validate required variables
-if [ -z "${LIGHTSAIL_INSTANCE_IP:-}" ]; then
-    echo "Error: LIGHTSAIL_INSTANCE_IP not set in .env.prod.infra"
-    exit 1
-fi
-
-if [ -z "${LIGHTSAIL_SSH_KEY_PATH:-}" ]; then
-    echo "Error: LIGHTSAIL_SSH_KEY_PATH not set in .env.prod.infra"
-    exit 1
-fi
-
+# Define connection details (same as other ops scripts)
 REMOTE_USER="ubuntu"
-REMOTE_IP="$LIGHTSAIL_INSTANCE_IP"
-KEY_FILE="$LIGHTSAIL_SSH_KEY_PATH"
+REMOTE_IP="98.87.97.135"
+KEY_FILE="$HOME/.ssh/prostyle-prod.pem"
 
 if [ ! -f "$KEY_FILE" ]; then
     echo "Error: SSH key not found at $KEY_FILE"
