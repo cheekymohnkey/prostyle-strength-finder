@@ -57,7 +57,7 @@ jobs:
         # We bake the public URLs into the build time configuration
         run: npm run build --workspace=@prostyle/frontend
         env:
-          NEXT_PUBLIC_API_BASE_URL: "https://${{ env.API_DOMAIN }}"
+          NEXT_PUBLIC_API_BASE_URL: "https://${{ env.API_DOMAIN }}/v1"
           NEXT_PUBLIC_APP_BASE_URL: "https://${{ env.APP_DOMAIN }}"
 
       - name: Prepare Deployment Artifact
@@ -226,9 +226,9 @@ jobs:
             fi
             
             if grep -q "NEXT_PUBLIC_API_BASE_URL=" $APP_DIR/.env.prod; then
-              sed -i "s|NEXT_PUBLIC_API_BASE_URL=.*|NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}|g" $APP_DIR/.env.prod
+              sed -i "s|NEXT_PUBLIC_API_BASE_URL=.*|NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}/v1|g" $APP_DIR/.env.prod
             else
-              echo "NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}" >> $APP_DIR/.env.prod
+              echo "NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}/v1" >> $APP_DIR/.env.prod
             fi
             
             chmod 600 $APP_DIR/.env.prod
