@@ -159,6 +159,14 @@ jobs:
             
             echo "Deploying code to $APP_DIR..."
             
+            # Ensure App Directory Exists (in case provision wasn't run)
+            if [ ! -d "$APP_DIR" ]; then
+              echo "Creating missing app directory: $APP_DIR"
+              sudo mkdir -p "$APP_DIR"
+              # Ensure the ubuntu user owns it so rsync can write
+              sudo chown -R $USER:$USER /opt/prostyle
+            fi
+            
             # Extract to temp directory
             mkdir -p /tmp/prostyle_release
             tar -xzf /tmp/deployment.tar.gz -C /tmp/prostyle_release
