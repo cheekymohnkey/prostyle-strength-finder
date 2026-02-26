@@ -38,5 +38,8 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
     # Never retry — auth callback codes are single-use; a retry would consume the code
     proxy_next_upstream off;
+    # Increase buffer size to handle large Set-Cookie headers (session JWT from Cognito)
+    proxy_buffer_size 16k;
+    proxy_busy_buffers_size 16k;
   }
 }

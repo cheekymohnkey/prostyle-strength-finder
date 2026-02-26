@@ -7,6 +7,7 @@ Type=simple
 User=__RUN_USER__
 WorkingDirectory=__APP_DIR__
 EnvironmentFile=__ENV_FILE__
+Environment=NODE_ENV=production
 ExecStart=/usr/bin/node __APP_DIR__/apps/api/src/index.js
 Restart=always
 RestartSec=5
