@@ -11,8 +11,8 @@ Environment=PORT=3001
 ExecStart=__APP_DIR__/node_modules/.bin/next start apps/frontend -p 3001
 Restart=always
 RestartSec=5
-StandardOutput=append:/var/log/prostyle/frontend.log
-StandardError=append:/var/log/prostyle/frontend.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

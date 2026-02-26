@@ -10,8 +10,8 @@ EnvironmentFile=__ENV_FILE__
 ExecStart=/usr/bin/node __APP_DIR__/apps/api/src/index.js
 Restart=always
 RestartSec=5
-StandardOutput=append:/var/log/prostyle/api.log
-StandardError=append:/var/log/prostyle/api.log
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
