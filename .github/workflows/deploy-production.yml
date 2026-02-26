@@ -226,11 +226,13 @@ jobs:
             cd ${{ env.APP_DIR }}
             
             # Run Migrations
-            # We override DATABASE_URL to ensure it uses the writable app directory
-            # instead of any systemic path that might be in secrets
-            export DATABASE_URL="file:${{ env.APP_DIR }}/data/prostyle.prod.db"
-            
-            set -a; source .env.prod; set +a
+            # Safely load .env.prod, skipping blank lines, comments, and lines without '='
+            # This avoids "command not found" errors from bare values or multi-line secrets
+            while IFS= read -r line || [[ -n "$line" ]]; do
+              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+              [[ "$line" != *"="* ]] && continue
+              export "$line"
+            done < .env.prod
             
             # Ensure the data directory exists
             mkdir -p ${{ env.APP_DIR }}/data
