@@ -29,6 +29,11 @@ echo "  - 1 baseline prompt suite (10 prompts)"
 echo "  - 3 baseline render sets (stylize: 0, 100, 1000)"
 echo "  - Model: Midjourney standard v7"
 echo ""
+read -p "Enter seed value (default: 777): " SEED_VALUE
+SEED_VALUE=${SEED_VALUE:-777}
+echo ""
+echo "Using seed: $SEED_VALUE"
+echo ""
 read -p "Continue? (y/N) " -n 1 -r
 echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -40,7 +45,8 @@ echo ""
 echo "Connecting to production server..."
 
 # Run the seed script on the remote server
-ssh -i "$KEY_FILE" "$REMOTE_USER@$REMOTE_IP" 'bash -s' << 'EOF'
+ssh -i "$KEY_FILE" "$REMOTE_USER@$REMOTE_IP" "bash -s $SEED_VALUE" << 'EOF'
+SEED_VALUE="$1"
 cd /opt/prostyle/app
 
 # Source environment
@@ -48,11 +54,11 @@ set -a
 source .env.prod
 set +a
 
-echo "Running baseline seed script..."
+echo "Running baseline seed script with seed=$SEED_VALUE..."
 echo ""
 
-# Run the seed script with the production environment
-node scripts/style-dna/seed-canonical-baselines.js
+# Run the seed script with the production environment and custom seed
+BASELINE_SEED="$SEED_VALUE" node scripts/style-dna/seed-canonical-baselines.js
 
 SEED_EXIT_CODE=$?
 
