@@ -209,6 +209,13 @@ jobs:
               echo "DATABASE_URL=file:$APP_DIR/data/prostyle.db" >> $APP_DIR/.env.prod
             fi
             
+            # FORCE PORT for API
+            if grep -q "^PORT=" $APP_DIR/.env.prod; then
+              sed -i "s|^PORT=.*|PORT=3000|g" $APP_DIR/.env.prod
+            else
+              echo "PORT=3000" >> $APP_DIR/.env.prod
+            fi
+            
             chmod 600 $APP_DIR/.env.prod
           EOF
 
@@ -304,85 +311,28 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
             set -e
+            cd ${{ env.APP_DIR }}
             
-            # Check if services exist, if not, try to install them
-            if [ ! -f /etc/systemd/system/prostyle-api.service ]; then
-                echo "Services missing, installing templates..."
-                cd ${{ env.APP_DIR }}
-                chmod +x scripts/prod/install-systemd.sh
-                APP_DIR=${{ env.APP_DIR }} \
-                ENV_FILE=${{ env.APP_DIR }}/.env.prod \
-                RUN_USER=${{ secrets.PROD_USERNAME }} \
-                ./scripts/prod/install-systemd.sh
-                
-                # FIX: Override Frontend Service to use direct binary path for reliability
-                # We force Frontend to 3001 to avoid conflict with API (likely default 3000)
-                NEXT_BIN="${{ env.APP_DIR }}/node_modules/.bin/next"
-                sudo sed -i "s|ExecStart=.*|ExecStart=$NEXT_BIN start apps/frontend -p 3001|g" /etc/systemd/system/prostyle-frontend.service
-                
-                # Ensuring API uses PORT=3000
-                sudo sed -i "s|EnvironmentFile=.*|EnvironmentFile=${{ env.APP_DIR }}/.env.prod\nEnvironment=PORT=3000|g" /etc/systemd/system/prostyle-api.service
-                
-                sudo systemctl daemon-reload
-                sudo systemctl enable prostyle-api prostyle-worker prostyle-frontend
-            fi
-            
-            # ALWAYS enforce correct ports in systemd services (patching potentially old configs)
-            # Frontend -> 3001
-            NEXT_BIN="${{ env.APP_DIR }}/node_modules/.bin/next"
-            if grep -q "ExecStart=" /etc/systemd/system/prostyle-frontend.service; then
-                sudo sed -i "s|ExecStart=.*|ExecStart=$NEXT_BIN start apps/frontend -p 3001|g" /etc/systemd/system/prostyle-frontend.service
-            fi
-            
-            # API -> 3000 (Ensure PORT=3000 environment variable is set)
-            if ! grep -q "Environment=PORT=3000" /etc/systemd/system/prostyle-api.service; then
-                 # Append Environment=PORT=3000 after EnvironmentFile line if not present
-                 sudo sed -i "/EnvironmentFile=.*/a Environment=PORT=3000" /etc/systemd/system/prostyle-api.service
-            fi
+            # ALWAYS re-install systemd units from the latest deployed templates.
+            # This ensures ExecStart and ports are always correct, even on updates.
+            echo "Installing systemd service units from templates..."
+            chmod +x scripts/prod/install-systemd.sh
+            APP_DIR=${{ env.APP_DIR }} \
+            ENV_FILE=${{ env.APP_DIR }}/.env.prod \
+            RUN_USER=${{ secrets.PROD_USERNAME }} \
+            ./scripts/prod/install-systemd.sh
             
             sudo systemctl daemon-reload
+            sudo systemctl enable prostyle-api prostyle-worker prostyle-frontend
 
-            # Check if Nginx is configured with SSL, if not run setup
-            # We check if the expected SSL cert exists. If not, we trigger the Nginx setup script.
-            if [ ! -f "/etc/letsencrypt/live/${{ env.API_DOMAIN }}/fullchain.pem" ]; then
-               echo "SSL Certificates missing, running Nginx & SSL setup..."
-               
-               # Ensure Certbot is installed
-               if ! command -v certbot &> /dev/null; then
-                 sudo apt-get update && sudo apt-get install -y nginx certbot python3-certbot-nginx acl
-               fi
-               
-               cd ${{ env.APP_DIR }}
-               
-               # 1. Stop Nginx to allow Certbot Standalone mode
-               sudo systemctl stop nginx || true
-               
-               # 2. Obtain SSL Certificates
-               # We use --standalone because Nginx might be broken or not running
-               sudo certbot certonly --standalone \
-                 -d ${{ env.API_DOMAIN }} -d ${{ env.APP_DOMAIN }} \
-                 --non-interactive --agree-tos -m ${{ secrets.PROD_EMAIL }}
-               
-               # 3. Install Nginx Config
-               chmod +x scripts/prod/install-nginx.sh
-               API_HOST=${{ env.API_DOMAIN }} \
-               APP_HOST=${{ env.APP_DOMAIN }} \
-               API_PORT=3000 \
-               FRONTEND_PORT=3001 \
-               ./scripts/prod/install-nginx.sh
-               
-               # 4. Start Nginx
-               sudo systemctl restart nginx
-            else
-               # Make sure Nginx config is up to date with correct ports even if SSL exists
-               echo "Updating Nginx Config with correct ports..."
-               chmod +x scripts/prod/install-nginx.sh
-               API_HOST=${{ env.API_DOMAIN }} \
-               APP_HOST=${{ env.APP_DOMAIN }} \
-               API_PORT=3000 \
-               FRONTEND_PORT=3001 \
-               ./scripts/prod/install-nginx.sh
-            fi
+            # ALWAYS update Nginx config with correct ports
+            echo "Updating Nginx Config with correct ports..."
+            chmod +x scripts/prod/install-nginx.sh
+            API_HOST=${{ env.API_DOMAIN }} \
+            APP_HOST=${{ env.APP_DOMAIN }} \
+            API_PORT=3000 \
+            FRONTEND_PORT=3001 \
+            ./scripts/prod/install-nginx.sh
 
             echo "Restarting Application Services..."
             sudo systemctl restart prostyle-api prostyle-worker prostyle-frontend
