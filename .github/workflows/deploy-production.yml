@@ -337,5 +337,44 @@ jobs:
             echo "Restarting Application Services..."
             sudo systemctl restart prostyle-api prostyle-worker prostyle-frontend
             
+            # Wait a moment for services to start up
+            sleep 5
+            
             echo "Deployment Complete!"
           EOF
+
+      - name: Diagnostics
+        if: always()
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'DIAG'
+            echo "======= SYSTEMD SERVICE STATUS ======="
+            sudo systemctl status prostyle-api prostyle-worker prostyle-frontend --no-pager -l || true
+            
+            echo ""
+            echo "======= NGINX STATUS ======="
+            sudo systemctl status nginx --no-pager -l || true
+            
+            echo ""
+            echo "======= LISTENING PORTS ======="
+            sudo ss -tlnp | grep -E '3000|3001|80|443' || true
+            
+            echo ""
+            echo "======= PROSTYLE-API UNIT FILE ======="
+            cat /etc/systemd/system/prostyle-api.service || true
+            
+            echo ""
+            echo "======= PROSTYLE-FRONTEND UNIT FILE ======="
+            cat /etc/systemd/system/prostyle-frontend.service || true
+            
+            echo ""
+            echo "======= API JOURNAL (last 50 lines) ======="
+            sudo journalctl -u prostyle-api --no-pager -n 50 || true
+            
+            echo ""
+            echo "======= FRONTEND JOURNAL (last 50 lines) ======="
+            sudo journalctl -u prostyle-frontend --no-pager -n 50 || true
+            
+            echo ""
+            echo "======= NGINX ERROR LOG (last 20 lines) ======="
+            sudo tail -20 /var/log/nginx/error.log || true
+          DIAG
