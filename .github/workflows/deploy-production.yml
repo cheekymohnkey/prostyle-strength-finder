@@ -390,7 +390,12 @@ jobs:
             echo ""
             echo "======= FRONTEND JOURNAL (last 50 lines) ======="
             sudo journalctl -u prostyle-frontend --no-pager -n 50 || true
-            
+
+            echo ""
+            echo "======= SERVER CLOCK (check for NTP skew) ======="
+            date -u
+            timedatectl status || true
+
             echo ""
             echo "======= NGINX ERROR LOG (last 20 lines) ======="
             sudo tail -20 /var/log/nginx/error.log || true

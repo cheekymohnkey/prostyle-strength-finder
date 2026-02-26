@@ -67,9 +67,15 @@ export async function exchangeAuthCodeForSession(
     .map(k => `${k}=${tokenParams[k]}`)
     .join(" ");
   const hasSecret = !!tokenParams.client_secret;
+
+  // Server-side diagnostic logging — visible in journalctl -u prostyle-frontend
+  console.error(`[AUTH DEBUG] token exchange attempt at=${new Date().toISOString()} ${tokenParamsDebug} has_secret=${hasSecret} code_len=${tokenParams.code?.length ?? 0} verifier_len=${tokenParams.code_verifier?.length ?? 0}`);
+
   const token = await postTokenRequest(config, tokenParams).catch((err: Error) => {
+    console.error(`[AUTH DEBUG] token exchange FAILED: ${err.message}`);
     throw new Error(`${err.message} [redirect_uri=${redirectUri}] [client_id=${config.cognitoClientId}] [token_endpoint=${config.cognitoHostedUiBaseUrl}/oauth2/token] [params:${tokenParamsDebug}] [has_client_secret=${hasSecret}]`);
   });
+  console.error(`[AUTH DEBUG] token exchange SUCCESS`);
 
   return {
     accessToken: token.access_token,

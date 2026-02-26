@@ -1,0 +1,45 @@
+name: Check Production Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      lines:
+        description: 'Number of journal lines to show per service'
+        required: false
+        default: '100'
+
+jobs:
+  logs:
+    name: Tail Production Logs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Fetch Logs
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << EOF
+            echo "======= SERVER CLOCK ======="
+            date -u
+            timedatectl status | grep -E 'Local time|Universal|NTP|synchronized' || true
+
+            echo ""
+            echo "======= FRONTEND JOURNAL (last ${{ github.event.inputs.lines }} lines) ======="
+            sudo journalctl -u prostyle-frontend --no-pager -n ${{ github.event.inputs.lines }} || true
+
+            echo ""
+            echo "======= API JOURNAL (last ${{ github.event.inputs.lines }} lines) ======="
+            sudo journalctl -u prostyle-api --no-pager -n ${{ github.event.inputs.lines }} || true
+
+            echo ""
+            echo "======= NGINX ACCESS LOG (last 50 lines) ======="
+            sudo tail -50 /var/log/nginx/access.log 2>/dev/null || echo "(no access log)"
+
+            echo ""
+            echo "======= NGINX ERROR LOG (last 20 lines) ======="
+            sudo tail -20 /var/log/nginx/error.log 2>/dev/null || echo "(no error log)"
+          EOF
