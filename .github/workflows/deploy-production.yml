@@ -316,12 +316,31 @@ jobs:
                 ./scripts/prod/install-systemd.sh
                 
                 # FIX: Override Frontend Service to use direct binary path for reliability
+                # We force Frontend to 3001 to avoid conflict with API (likely default 3000)
                 NEXT_BIN="${{ env.APP_DIR }}/node_modules/.bin/next"
                 sudo sed -i "s|ExecStart=.*|ExecStart=$NEXT_BIN start apps/frontend -p 3001|g" /etc/systemd/system/prostyle-frontend.service
+                
+                # Ensuring API uses PORT=3000
+                sudo sed -i "s|EnvironmentFile=.*|EnvironmentFile=${{ env.APP_DIR }}/.env.prod\nEnvironment=PORT=3000|g" /etc/systemd/system/prostyle-api.service
                 
                 sudo systemctl daemon-reload
                 sudo systemctl enable prostyle-api prostyle-worker prostyle-frontend
             fi
+            
+            # ALWAYS enforce correct ports in systemd services (patching potentially old configs)
+            # Frontend -> 3001
+            NEXT_BIN="${{ env.APP_DIR }}/node_modules/.bin/next"
+            if grep -q "ExecStart=" /etc/systemd/system/prostyle-frontend.service; then
+                sudo sed -i "s|ExecStart=.*|ExecStart=$NEXT_BIN start apps/frontend -p 3001|g" /etc/systemd/system/prostyle-frontend.service
+            fi
+            
+            # API -> 3000 (Ensure PORT=3000 environment variable is set)
+            if ! grep -q "Environment=PORT=3000" /etc/systemd/system/prostyle-api.service; then
+                 # Append Environment=PORT=3000 after EnvironmentFile line if not present
+                 sudo sed -i "/EnvironmentFile=.*/a Environment=PORT=3000" /etc/systemd/system/prostyle-api.service
+            fi
+            
+            sudo systemctl daemon-reload
 
             # Check if Nginx is configured with SSL, if not run setup
             # We check if the expected SSL cert exists. If not, we trigger the Nginx setup script.
@@ -348,10 +367,21 @@ jobs:
                chmod +x scripts/prod/install-nginx.sh
                API_HOST=${{ env.API_DOMAIN }} \
                APP_HOST=${{ env.APP_DOMAIN }} \
+               API_PORT=3000 \
+               FRONTEND_PORT=3001 \
                ./scripts/prod/install-nginx.sh
                
                # 4. Start Nginx
                sudo systemctl restart nginx
+            else
+               # Make sure Nginx config is up to date with correct ports even if SSL exists
+               echo "Updating Nginx Config with correct ports..."
+               chmod +x scripts/prod/install-nginx.sh
+               API_HOST=${{ env.API_DOMAIN }} \
+               APP_HOST=${{ env.APP_DOMAIN }} \
+               API_PORT=3000 \
+               FRONTEND_PORT=3001 \
+               ./scripts/prod/install-nginx.sh
             fi
 
             echo "Restarting Application Services..."
