@@ -22,7 +22,7 @@ export async function GET(_request: NextRequest) {
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("client_id", config.cognitoClientId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
-  authorizeUrl.searchParams.set("scope", "openid profile email");
+  authorizeUrl.searchParams.set("scope", "openid email");
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("code_challenge_method", "S256");
   authorizeUrl.searchParams.set("code_challenge", challenge);
