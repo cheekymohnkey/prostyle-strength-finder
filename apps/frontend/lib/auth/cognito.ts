@@ -62,8 +62,13 @@ export async function exchangeAuthCodeForSession(
   if (config.cognitoClientSecret) {
     tokenParams.client_secret = config.cognitoClientSecret;
   }
+  const tokenParamsDebug = Object.keys(tokenParams)
+    .filter(k => k !== "code" && k !== "code_verifier" && k !== "client_secret")
+    .map(k => `${k}=${tokenParams[k]}`)
+    .join(" ");
+  const hasSecret = !!tokenParams.client_secret;
   const token = await postTokenRequest(config, tokenParams).catch((err: Error) => {
-    throw new Error(`${err.message} [redirect_uri=${redirectUri}] [client_id=${config.cognitoClientId}] [token_endpoint=${config.cognitoHostedUiBaseUrl}/oauth2/token]`);
+    throw new Error(`${err.message} [redirect_uri=${redirectUri}] [client_id=${config.cognitoClientId}] [token_endpoint=${config.cognitoHostedUiBaseUrl}/oauth2/token] [params:${tokenParamsDebug}] [has_client_secret=${hasSecret}]`);
   });
 
   return {
