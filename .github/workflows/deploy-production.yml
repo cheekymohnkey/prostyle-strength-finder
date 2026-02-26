@@ -66,6 +66,7 @@ jobs:
           # Create an archive of everything needed for runtime
           # We exclude dev/test files to keep the payload smaller
           tar -czf dist/deployment.tar.gz \
+            --exclude='dist' \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='apps/*/node_modules' \
