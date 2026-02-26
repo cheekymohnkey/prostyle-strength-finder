@@ -432,6 +432,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
 
 async function runWorker() {
   const config = loadConfig();
+  const strictHealthcheck = parseBooleanEnv("WORKER_STRICT_HEALTHCHECK", false);
   setCurrentDefaultModels({
     standard: config.models.defaultStandardVersion,
     niji: config.models.defaultNijiVersion,
@@ -439,14 +440,41 @@ async function runWorker() {
   const dbReadiness = assertDatabaseReady(config.database.databaseUrl);
   const dbPath = ensureReady(config.database.databaseUrl);
   const queue = createQueueAdapter(config);
-  const queueHealth = await Promise.resolve(queue.healthcheck());
+  const queueHealth = await Promise.resolve()
+    .then(() => queue.healthcheck())
+    .catch((error) => {
+      if (strictHealthcheck) {
+        throw error;
+      }
+      logJson("warn", "worker.queue.healthcheck_failed", {
+        error: error.message,
+      });
+      return {
+        mode: "unknown",
+        queueUrl: config.queue.queueUrl,
+        deadLetterQueueUrl: config.queue.dlqUrl,
+      };
+    });
   const storageAdapter = createStorageAdapter({
     appEnv: config.runtime.appEnv,
     bucket: config.storage.bucket,
     region: config.storage.region,
     endpoint: config.storage.endpoint,
   });
-  const storageHealth = await storageAdapter.healthcheck();
+  const storageHealth = await Promise.resolve()
+    .then(() => storageAdapter.healthcheck())
+    .catch((error) => {
+      if (strictHealthcheck) {
+        throw error;
+      }
+      logJson("warn", "worker.storage.healthcheck_failed", {
+        error: error.message,
+      });
+      return {
+        mode: "unknown",
+        bucket: config.storage.bucket,
+      };
+    });
   const traitInferenceAdapter = createTraitInferenceAdapter(config);
   const styleDnaInferenceAdapter = createStyleDnaInferenceAdapter(config);
   const runOnce = parseBooleanEnv("WORKER_RUN_ONCE", true);
@@ -468,6 +496,7 @@ async function runWorker() {
     queue_url: config.queue.queueUrl,
     dead_letter_url: config.queue.dlqUrl,
     run_once: runOnce,
+    strict_healthcheck: strictHealthcheck,
     database_path: dbReadiness.dbPath,
     storage_mode: storageHealth.mode,
     storage_bucket: storageHealth.bucket,

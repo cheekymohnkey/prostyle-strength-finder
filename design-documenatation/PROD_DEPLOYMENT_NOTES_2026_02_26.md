@@ -21,6 +21,9 @@ First production deployment to AWS Lightsail. Encountered several configuration 
 - Made storage healthcheck non-fatal (logs warning, server continues)
 - Updated systemd service templates with `Environment=STORAGE_ADAPTER_MODE=local`
 - Storage now uses local filesystem under `data/storage/` directory
+- Current worker startup behavior is now configurable with `WORKER_STRICT_HEALTHCHECK`:
+  - `false` (default): queue/storage healthcheck failures log warnings and worker continues startup
+  - `true`: worker fails fast on queue/storage healthcheck errors
 
 **Commit:** `bdf816c`
 

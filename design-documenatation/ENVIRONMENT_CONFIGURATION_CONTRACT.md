@@ -62,6 +62,7 @@ For the current phase, these are the only supported environments beyond local: `
 | `LOG_LEVEL` | Yes | API, Worker | `debug|info|warn|error` | Structured logging level. |
 | `SERVICE_NAME` | Yes | API, Worker | string | Service identifier in logs. |
 | `LOG_INCLUDE_CORRELATION_IDS` | No | API, Worker | `true|false` | Defaults to `true` when omitted. |
+| `WORKER_STRICT_HEALTHCHECK` | No | Worker | `true|false` | Worker startup healthcheck mode. Default `false` logs queue/storage healthcheck failures as warnings and continues startup; set `true` to fail fast on healthcheck errors. |
 | `NEXT_PUBLIC_API_BASE_URL` | Yes | Frontend | URL | API base URL exposed to browser runtime. |
 | `NEXT_PUBLIC_APP_BASE_URL` | Yes | Frontend | URL | Browser-visible frontend base URL used to build OAuth redirect/logout URIs. |
 
@@ -71,6 +72,7 @@ For the current phase, these are the only supported environments beyond local: `
 2. Worker validates all required worker keys at startup and exits on missing/invalid values.
 3. Frontend validates `NEXT_PUBLIC_API_BASE_URL` and `APP_ENV`.
 4. Integer keys must be parseable as base-10 integers.
+5. Worker queue/storage startup healthchecks are warning-only by default; set `WORKER_STRICT_HEALTHCHECK=true` for fail-fast behavior.
 
 ## Local Pre-Prod Defaults
 

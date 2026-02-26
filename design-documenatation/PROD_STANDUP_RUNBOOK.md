@@ -146,6 +146,7 @@ Required checks before start:
 7. `S3_BUCKET`, `SQS_QUEUE_URL`, `SQS_DLQ_URL`, `AWS_REGION` values present (even though using local adapters)
 8. `COGNITO_*` values are production values
 9. `NEXT_PUBLIC_API_BASE_URL` matches production API URL including `/v1` suffix (e.g., `https://api.cheekymohnkey.com/v1`)
+10. `WORKER_STRICT_HEALTHCHECK=false` (recommended on Lightsail so queue/storage healthcheck failures warn without blocking worker startup)
 
 ## Phase 5 - Database Migration and Backup
 
