@@ -323,6 +323,37 @@ jobs:
                 sudo systemctl enable prostyle-api prostyle-worker prostyle-frontend
             fi
 
+            # Check if Nginx is configured with SSL, if not run setup
+            # We check if the expected SSL cert exists. If not, we trigger the Nginx setup script.
+            if [ ! -f "/etc/letsencrypt/live/${{ env.API_DOMAIN }}/fullchain.pem" ]; then
+               echo "SSL Certificates missing, running Nginx & SSL setup..."
+               
+               # Ensure Certbot is installed
+               if ! command -v certbot &> /dev/null; then
+                 sudo apt-get update && sudo apt-get install -y nginx certbot python3-certbot-nginx acl
+               fi
+               
+               cd ${{ env.APP_DIR }}
+               
+               # 1. Stop Nginx to allow Certbot Standalone mode
+               sudo systemctl stop nginx || true
+               
+               # 2. Obtain SSL Certificates
+               # We use --standalone because Nginx might be broken or not running
+               sudo certbot certonly --standalone \
+                 -d ${{ env.API_DOMAIN }} -d ${{ env.APP_DOMAIN }} \
+                 --non-interactive --agree-tos -m ${{ secrets.PROD_EMAIL }}
+               
+               # 3. Install Nginx Config
+               chmod +x scripts/prod/install-nginx.sh
+               API_HOST=${{ env.API_DOMAIN }} \
+               APP_HOST=${{ env.APP_DOMAIN }} \
+               ./scripts/prod/install-nginx.sh
+               
+               # 4. Start Nginx
+               sudo systemctl restart nginx
+            fi
+
             echo "Restarting Application Services..."
             sudo systemctl restart prostyle-api prostyle-worker prostyle-frontend
             
