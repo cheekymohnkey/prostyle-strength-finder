@@ -113,7 +113,7 @@ export function clearSessionCookie(response: NextResponse, config: FrontendAuthC
 
 export function setPkceCookies(
   response: NextResponse,
-  input: { state: string; verifier: string },
+  input: { state: string; verifier: string; challenge: string },
   config: FrontendAuthConfig
 ): void {
   response.cookies.set(PKCE_STATE_COOKIE, input.state, {
@@ -123,7 +123,8 @@ export function setPkceCookies(
     path: "/",
     maxAge: PKCE_COOKIE_MAX_AGE_SEC,
   });
-  response.cookies.set(PKCE_VERIFIER_COOKIE, input.verifier, {
+  // Store "challenge|verifier" so the callback can verify the challenge matches
+  response.cookies.set(PKCE_VERIFIER_COOKIE, `${input.challenge}|${input.verifier}`, {
     httpOnly: true,
     secure: cookieSecure(config),
     sameSite: "lax",
@@ -132,11 +133,26 @@ export function setPkceCookies(
   });
 }
 
-export async function readPkceCookies(): Promise<{ state: string | null; verifier: string | null }> {
+export async function readPkceCookies(): Promise<{ state: string | null; verifier: string | null; sentChallenge: string | null }> {
   const cookieStore = await cookies();
+  const verifierRaw = cookieStore.get(PKCE_VERIFIER_COOKIE)?.value ?? null;
+  // Cookie format: "challenge|verifier" (challenge stored so we can compare with what was sent to Cognito)
+  let verifier: string | null = null;
+  let sentChallenge: string | null = null;
+  if (verifierRaw) {
+    const sep = verifierRaw.indexOf("|");
+    if (sep !== -1) {
+      sentChallenge = verifierRaw.slice(0, sep);
+      verifier = verifierRaw.slice(sep + 1);
+    } else {
+      // Legacy format without challenge prefix
+      verifier = verifierRaw;
+    }
+  }
   return {
     state: cookieStore.get(PKCE_STATE_COOKIE)?.value ?? null,
-    verifier: cookieStore.get(PKCE_VERIFIER_COOKIE)?.value ?? null,
+    verifier,
+    sentChallenge,
   };
 }
 

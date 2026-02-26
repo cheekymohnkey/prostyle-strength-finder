@@ -28,6 +28,6 @@ export async function GET(_request: NextRequest) {
   authorizeUrl.searchParams.set("code_challenge", challenge);
 
   const response = NextResponse.redirect(authorizeUrl);
-  setPkceCookies(response, { state, verifier }, config);
+  setPkceCookies(response, { state, verifier, challenge }, config);
   return response;
 }

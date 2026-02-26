@@ -35,9 +35,10 @@ export async function GET(request: NextRequest) {
     return buildRedirectWithError(config.appBaseUrl, `invalid_state:${debugInfo}`);
   }
 
-  // Debug: recompute the challenge so we can compare against what was sent to Cognito
+  // Debug: compare the challenge sent to Cognito vs what we'd compute from the stored verifier
   const verifierLen = pkce.verifier.length;
   const recomputedChallenge = createPkceChallenge(pkce.verifier);
+  const challengeMatch = pkce.sentChallenge === recomputedChallenge;
 
   try {
     const session = await exchangeAuthCodeForSession(config, {
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
-    const debugInfo = `verifier_len=${verifierLen} challenge=${recomputedChallenge.slice(0, 12)}... code_len=${code.length}`;
+    const debugInfo = `verifier_len=${verifierLen} challenge_match=${challengeMatch} sent=${(pkce.sentChallenge ?? "null").slice(0, 12)}... computed=${recomputedChallenge.slice(0, 12)}... code_len=${code.length}`;
     return buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason} [pkce:${debugInfo}]`);
   }
 }
