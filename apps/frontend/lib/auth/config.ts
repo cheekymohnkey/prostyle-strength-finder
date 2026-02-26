@@ -4,6 +4,7 @@ export type FrontendAuthConfig = {
   apiBaseUrl: string;
   appBaseUrl: string;
   cognitoClientId: string | null;
+  cognitoClientSecret: string | null;
   cognitoHostedUiBaseUrl: string | null;
   cognitoIssuer: string | null;
   cognitoAudience: string | null;
@@ -74,12 +75,17 @@ export function loadFrontendAuthConfig(): FrontendAuthConfig {
   );
   const cognitoAudience = requireEnv("COGNITO_AUDIENCE", isLocal ? "local-client-id" : undefined);
 
+  const cognitoClientSecret = authMode === "cognito"
+    ? (process.env.COGNITO_CLIENT_SECRET?.trim() || null)
+    : null;
+
   return {
     appEnv,
     authMode,
     apiBaseUrl: requireEnv("NEXT_PUBLIC_API_BASE_URL", "http://127.0.0.1:3001/v1"),
     appBaseUrl,
     cognitoClientId,
+    cognitoClientSecret,
     cognitoHostedUiBaseUrl,
     cognitoIssuer,
     cognitoAudience,

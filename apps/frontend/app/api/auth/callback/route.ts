@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
     setSessionCookie(response, session, config);
     clearPkceCookies(response, config);
     return response;
-  } catch (_error) {
-    return buildRedirectWithError(config.appBaseUrl, "token_exchange_failed");
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "unknown";
+    return buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason}`);
   }
 }

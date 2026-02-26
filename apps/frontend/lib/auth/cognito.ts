@@ -50,13 +50,18 @@ export async function exchangeAuthCodeForSession(
     throw new Error("Cognito auth mode is disabled");
   }
   const redirectUri = absoluteUrl(config.appBaseUrl, config.redirectPath);
-  const token = await postTokenRequest(config, {
+  const tokenParams: Record<string, string> = {
     grant_type: "authorization_code",
     client_id: config.cognitoClientId,
     code: input.code,
     redirect_uri: redirectUri,
     code_verifier: input.codeVerifier,
-  });
+  };
+  // If the App Client has a secret, it must be included in the token request
+  if (config.cognitoClientSecret) {
+    tokenParams.client_secret = config.cognitoClientSecret;
+  }
+  const token = await postTokenRequest(config, tokenParams);
 
   return {
     accessToken: token.access_token,
@@ -78,11 +83,15 @@ export async function refreshSession(
     throw new Error("Missing refresh token");
   }
 
-  const token = await postTokenRequest(config, {
+  const refreshParams: Record<string, string> = {
     grant_type: "refresh_token",
     client_id: config.cognitoClientId,
     refresh_token: existing.refreshToken,
-  });
+  };
+  if (config.cognitoClientSecret) {
+    refreshParams.client_secret = config.cognitoClientSecret;
+  }
+  const token = await postTokenRequest(config, refreshParams);
 
   return {
     accessToken: token.access_token,
