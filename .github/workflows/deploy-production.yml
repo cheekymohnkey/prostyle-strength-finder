@@ -303,6 +303,26 @@ jobs:
       - name: Restart Application
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            set -e
+            
+            # Check if services exist, if not, try to install them
+            if [ ! -f /etc/systemd/system/prostyle-api.service ]; then
+                echo "Services missing, installing templates..."
+                cd ${{ env.APP_DIR }}
+                chmod +x scripts/prod/install-systemd.sh
+                APP_DIR=${{ env.APP_DIR }} \
+                ENV_FILE=${{ env.APP_DIR }}/.env.prod \
+                RUN_USER=${{ secrets.PROD_USERNAME }} \
+                ./scripts/prod/install-systemd.sh
+                
+                # FIX: Override Frontend Service to use direct binary path for reliability
+                NEXT_BIN="${{ env.APP_DIR }}/node_modules/.bin/next"
+                sudo sed -i "s|ExecStart=.*|ExecStart=$NEXT_BIN start apps/frontend -p 3001|g" /etc/systemd/system/prostyle-frontend.service
+                
+                sudo systemctl daemon-reload
+                sudo systemctl enable prostyle-api prostyle-worker prostyle-frontend
+            fi
+
             echo "Restarting Application Services..."
             sudo systemctl restart prostyle-api prostyle-worker prostyle-frontend
             
