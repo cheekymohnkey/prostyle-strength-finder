@@ -38,7 +38,20 @@ function cookieSecure(config: FrontendAuthConfig): boolean {
 }
 
 export function encodeSessionCookie(session: FrontendAuthSession, secret: string): string {
-  const payloadBase64 = base64UrlEncode(JSON.stringify(session));
+  // Only store what's needed to keep the cookie under the browser's 4096-byte limit.
+  // Cognito tokens are large (access ~900B, id ~1200B, refresh ~1600B); storing all
+  // three easily exceeds 4096 bytes and the browser silently drops the Set-Cookie header.
+  // idToken is not used server-side (sub/email are read from accessToken).
+  // Omit null-valued fields to further reduce payload size.
+  const slim: Record<string, unknown> = {
+    accessToken: session.accessToken,
+    tokenType: session.tokenType,
+    expiresAt: session.expiresAt,
+  };
+  if (session.refreshToken !== null) {
+    slim.refreshToken = session.refreshToken;
+  }
+  const payloadBase64 = base64UrlEncode(JSON.stringify(slim));
   const signature = createSignature(payloadBase64, secret);
   return `${payloadBase64}.${signature}`;
 }
