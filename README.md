@@ -47,6 +47,10 @@ Policy:
 - S3: put/head/get/delete
 - SQS: send/receive/delete
 
+Current production runtime note:
+- Target architecture remains AWS-backed adapters (S3/SQS) for IAM-enabled environments.
+- Active Lightsail production runtime currently uses `QUEUE_ADAPTER_MODE=sqlite` and `STORAGE_ADAPTER_MODE=local` because Lightsail has no IAM instance profile.
+
 ## Local Quickstart
 
 1. Ensure Node.js 20 is installed and on `PATH`.

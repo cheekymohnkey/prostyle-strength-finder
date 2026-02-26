@@ -95,7 +95,7 @@ In scope:
 5. Add minimal targeted frontend tests and smoke updates for launch gates.
 
 Out of scope:
-1. Backend framework migration (Fastify/TypeScript) in this plan.
+1. Backend runtime/framework migration in this plan.
 2. Data model/schema redesign.
 3. New product features beyond existing MVP flows.
 

@@ -132,9 +132,9 @@ npm run contracts
 
 Create production env file (example path):
 1. `/opt/prostyle/app/.env.prod`
-2. Start from `.env.prod.example` and fill secrets/real endpoints.
-3. Validate against `design-documenatation/PROD_ENV_CHECKLIST.md` before starting services.
-4. Optional sanitized starter template: `.env.prod.template.final`.
+2. For current Lightsail production, start from `.env.prod.template.final` and fill secrets/real endpoints.
+3. For future IAM-enabled production, `.env.prod.example` remains the S3/SQS-target baseline.
+4. Validate against `design-documenatation/PROD_ENV_CHECKLIST.md` before starting services.
 
 Required checks before start:
 1. `APP_ENV=prod`

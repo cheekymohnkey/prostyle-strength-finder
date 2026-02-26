@@ -27,7 +27,9 @@ Alternatives considered:
 
 Proposed:
 - SQLite as MVP system of record.
-- Amazon S3 for image and artifact binary storage.
+- Storage adapter abstraction with:
+  - target non-local mode: Amazon S3 for image and artifact binary storage
+  - current Lightsail production mode: local disk storage (`STORAGE_ADAPTER_MODE=local`) due to no IAM instance profile
 - JSON field for `trait_vector` (with `trait_schema_version`).
 - Explicit data-access abstraction (repository/port layer) to enable later migration to server-based Postgres.
 
@@ -56,7 +58,9 @@ Migration intent:
 ## Decision 3: Queue and Job Processing
 
 Proposed:
-- AWS SQS-backed queue + worker (retry, backoff, dead-letter support).
+- Queue adapter abstraction with:
+  - target non-local mode: AWS SQS-backed queue + worker (retry, backoff, dead-letter support)
+  - current Lightsail production mode: SQLite queue adapter (`QUEUE_ADAPTER_MODE=sqlite`) due to no IAM instance profile
 
 Why:
 - Clean async processing and failure recovery.
@@ -175,7 +179,9 @@ Proposed:
   - API application process
   - async worker process
   - SQLite database file on persistent local disk
-- AWS SQS for queueing.
+- Adapter mode split:
+  - target non-local mode: S3 storage + SQS queueing
+  - current Lightsail production mode: local storage + SQLite queueing
 
 Why:
 - Minimal operational surface while meeting reliability needs.
@@ -348,18 +354,17 @@ Why:
 ## Decision 16: Backend Runtime and Worker Library
 
 Proposed:
-- Backend runtime: Node.js + TypeScript.
-- API framework: Fastify.
+- Backend runtime: Node.js (JavaScript in current implementation).
+- API framework: Node HTTP server (versioned REST routes).
 - Worker runtime: dedicated Node.js worker process.
-- SQS integration:
-  - AWS SDK v3 for queue operations.
-  - `sqs-consumer` library for long-poll worker consumption flow.
+- Queue integration in current implementation:
+  - adapter interface with SQLite and SQS modes
+  - SQS mode implemented via AWS CLI command execution
 
 Why:
-- Aligns backend language with frontend TypeScript for shared models/types.
-- Fastify provides low-overhead API performance and straightforward structure.
+- Keeps backend/runtime simple and operationally transparent for MVP.
 - Dedicated worker process cleanly separates request handling from async analysis execution.
-- `sqs-consumer` reduces boilerplate and improves reliability for queue consumption patterns.
+- Adapter-based queue abstraction preserves ability to evolve SQS integration strategy later.
 
 Alternatives considered:
 - Python backend/worker: viable, but would split language/tooling across stack.
@@ -391,11 +396,13 @@ Why:
 ## Decision 18: Backup and Restore Policy (SQLite + S3)
 
 Proposed:
-- S3 is the backup destination for both database backups and image/artifact durability.
+- Backup destination supports both modes:
+  - target non-local mode: S3 destination for backups and artifact durability
+  - current Lightsail mode: local backup destination when IAM credentials are unavailable
 - S3 bucket versioning enabled.
 - SQLite backup schedule:
   - periodic database backups using SQLite-safe backup methods (`.backup` or `VACUUM INTO`)
-  - upload timestamped backups to S3 paths (for example: `db-backups/YYYY/MM/DD/`)
+  - upload timestamped backups to S3 paths (for example: `db-backups/YYYY/MM/DD/`) when S3 mode is active
 - Restore drills required on a regular schedule (at least monthly in MVP stage).
 
 Retention and protection:

@@ -529,7 +529,7 @@ In-scope resources for IaC:
 - role/policy attachment stubs if role ownership is in this repo
 
 Out of scope for this task:
-1. Lightsail compute provisioning.
+1. Lightsail compute provisioning via this IaC task.
 2. Cognito provisioning.
 3. DNS/certificate management.
 4. Full production observability/alarming setup.

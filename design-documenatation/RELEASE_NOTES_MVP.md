@@ -58,7 +58,7 @@ Reference:
 ## Compatibility / Scope Notes
 
 1. MVP excludes MidJourney render job submission/execution.
-2. Current implementation baseline uses SQLite + AWS S3/SQS foundations; Lightsail deployment remains a planned target and is not yet provisioned in this repo.
+2. Current implementation baseline retains SQLite + AWS S3/SQS foundations as target architecture; active Lightsail production runtime is provisioned and currently operates with `QUEUE_ADAPTER_MODE=sqlite` and `STORAGE_ADAPTER_MODE=local`.
 3. Active environment strategy is `local` + `prod`; `uat` is retained as an optional future environment.
 
 ## Post-MVP Patch Updates

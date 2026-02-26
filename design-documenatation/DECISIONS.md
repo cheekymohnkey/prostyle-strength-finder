@@ -95,7 +95,7 @@ Rationale: Epic implementation established executable migration workflows and ap
 Rationale: API style and payload validation rules are now implemented and exercised across recommendation, feedback, and admin flows.
 
 23. MVP hosting topology target is single-instance app/worker + SQLite with AWS S3/SQS, deploying to `prod` first while keeping `uat` as a future option.
-Rationale: Deployment strategy is decided for current phase; S3/SQS foundations are provisioned, Lightsail compute provisioning remains pending, and UAT can be added later without architecture changes.
+Rationale: S3/SQS foundations are provisioned and remain the target architecture; current production runtime on Lightsail uses `QUEUE_ADAPTER_MODE=sqlite` and `STORAGE_ADAPTER_MODE=local` due to no IAM instance profile. UAT can be added later without architecture changes.
 
 24. Style-DNA analysis will use paired MidJourney 2x2 grid comparison (baseline vs test) as a first-class workflow.
 Rationale: Side-by-side delta analysis is required to isolate profile/sref influence from prompt and model baseline behavior.

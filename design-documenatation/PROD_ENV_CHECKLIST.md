@@ -9,9 +9,9 @@ Provide a production-safe `.env.prod` checklist and pre-start validation steps.
 
 ## Base Template
 
-1. Start from `.env.prod.example`.
-2. Save as `/opt/prostyle/app/.env.prod` on the production host.
-3. Optional sanitized starter: `.env.prod.template.final`.
+1. For current Lightsail production, start from `.env.prod.template.final`.
+2. For future IAM-enabled environments, `.env.prod.example` remains the S3/SQS-target baseline.
+3. Save as `/opt/prostyle/app/.env.prod` on the production host.
 
 ## Required Production Values
 
