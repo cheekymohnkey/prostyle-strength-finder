@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
   const oauthError = request.nextUrl.searchParams.get("error");
 
   if (oauthError) {
-    return buildRedirectWithError(config.appBaseUrl, "oauth_denied");
+    const oauthErrorDesc = request.nextUrl.searchParams.get("error_description") || oauthError;
+    return buildRedirectWithError(config.appBaseUrl, `oauth_denied:${oauthErrorDesc}`);
   }
   if (!code || !returnedState) {
     return buildRedirectWithError(config.appBaseUrl, "missing_code_or_state");
