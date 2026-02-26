@@ -12,7 +12,9 @@ function createStorageAdapter(config) {
     throw new Error("Storage adapter requires bucket and region");
   }
 
-  if (config.appEnv === "local") {
+  const adapterMode = process.env.STORAGE_ADAPTER_MODE || null;
+
+  if (adapterMode === "local" || config.appEnv === "local") {
     return new LocalDiskStorageAdapter(config);
   }
 

@@ -4853,7 +4853,11 @@ function main() {
     logJson("warn", "api.queue.healthcheck_failed", { error: err.message });
     return { mode: "unknown", queueUrl: null, deadLetterQueueUrl: null };
   });
-  Promise.all([storageAdapter.healthcheck(), queueHealthPromise]).then(([storageHealth, queueHealth]) => {
+  const storageHealthPromise = Promise.resolve().then(() => storageAdapter.healthcheck()).catch((err) => {
+    logJson("warn", "api.storage.healthcheck_failed", { error: err.message });
+    return { mode: "unknown", bucket: null };
+  });
+  Promise.all([storageHealthPromise, queueHealthPromise]).then(([storageHealth, queueHealth]) => {
     server.listen(config.runtime.port, () => {
       logJson("info", "api.server.started", {
         port: config.runtime.port,
