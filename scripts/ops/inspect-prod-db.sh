@@ -150,6 +150,24 @@ LEFT JOIN baseline_prompt_suite_items bpsi ON bps.suite_id = bpsi.suite_id
 GROUP BY bps.suite_id
 ORDER BY bps.created_at DESC;
 SQL
+
+echo ""
+echo "======= SUITE PROMPTS (suite_style_dna_default_v1) ======="
+sqlite3 "$DB_PATH" << 'SQL'
+.mode column
+.headers on
+.width 10 12 50
+SELECT 
+    bpsi.prompt_key,
+    bpsm.domain,
+    substr(bpsi.prompt_text, 1, 50) AS prompt_text
+FROM baseline_prompt_suite_items bpsi
+LEFT JOIN baseline_prompt_suite_item_metadata bpsm 
+    ON bpsi.suite_id = bpsm.suite_id 
+    AND bpsi.prompt_key = bpsm.prompt_key
+WHERE bpsi.suite_id = 'suite_style_dna_default_v1'
+ORDER BY bpsi.display_order;
+SQL
 EOF
         ;;
     
@@ -195,7 +213,9 @@ SQL
 EOF
         ;;
     
-    "summary"|"overview")
+    "sumPrompt Suite Items', COUNT(*) FROM baseline_prompt_suite_items
+UNION ALL
+SELECT 'mary"|"overview")
         echo "Fetching production database summary..."
         ssh -i "$KEY_FILE" "$REMOTE_USER@$REMOTE_IP" 'bash -s' << 'EOF'
 cd /opt/prostyle/app

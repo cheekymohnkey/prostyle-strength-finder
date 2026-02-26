@@ -78,6 +78,24 @@ FROM baseline_render_sets
 WHERE suite_id = 'suite_style_dna_default_v1'
 ORDER BY entity DESC;
 SQL
+    
+    echo ""
+    echo "======= PROMPT SUITE ITEMS (10 prompts) ======="
+    sqlite3 "$DB_PATH" << 'SQL'
+.mode column
+.headers on
+.width 10 12 50
+SELECT 
+    prompt_key,
+    bpsm.domain,
+    substr(bpsi.prompt_text, 1, 50) AS prompt_text
+FROM baseline_prompt_suite_items bpsi
+LEFT JOIN baseline_prompt_suite_item_metadata bpsm 
+    ON bpsi.suite_id = bpsm.suite_id 
+    AND bpsi.prompt_key = bpsm.prompt_key
+WHERE bpsi.suite_id = 'suite_style_dna_default_v1'
+ORDER BY bpsi.display_order;
+SQL
 else
     echo ""
     echo "✗ Baseline seed failed with exit code: $SEED_EXIT_CODE"
