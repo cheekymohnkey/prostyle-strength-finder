@@ -49,16 +49,6 @@ export async function GET(request: NextRequest) {
   const recomputedChallenge = createPkceChallenge(pkce.verifier);
   const challengeMatch = pkce.sentChallenge === recomputedChallenge;
 
-  // TEMP DEBUG: halt before token exchange so the code stays unconsumed for manual curl testing.
-  // The full verifier and code are in the authError URL — copy them for the curl test below.
-  // REMOVE this early return once the curl test is done.
-  const debugHalt = (process.env.DEBUG_HALT_BEFORE_TOKEN_EXCHANGE ?? "1") === "1";
-  if (debugHalt) {
-    return buildRedirectWithError(config.appBaseUrl,
-      `DEBUG_HALT code=${code} verifier=${pkce.verifier} challenge_match=${challengeMatch}`
-    );
-  }
-
   try {
     const session = await exchangeAuthCodeForSession(config, {
       code,
