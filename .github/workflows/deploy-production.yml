@@ -54,10 +54,11 @@ jobs:
         run: npm run contracts
 
       - name: Build Frontend
-        # We bake the API URL into the build time configuration
+        # We bake the public URLs into the build time configuration
         run: npm run build --workspace=@prostyle/frontend
         env:
           NEXT_PUBLIC_API_BASE_URL: "https://${{ env.API_DOMAIN }}"
+          NEXT_PUBLIC_APP_BASE_URL: "https://${{ env.APP_DOMAIN }}"
 
       - name: Prepare Deployment Artifact
         run: |
@@ -214,6 +215,20 @@ jobs:
               sed -i "s|^PORT=.*|PORT=3000|g" $APP_DIR/.env.prod
             else
               echo "PORT=3000" >> $APP_DIR/.env.prod
+            fi
+            
+            # FORCE public URLs — required at runtime by Next.js server-side auth routes
+            # These must match the Cognito callback/logout URLs exactly
+            if grep -q "NEXT_PUBLIC_APP_BASE_URL=" $APP_DIR/.env.prod; then
+              sed -i "s|NEXT_PUBLIC_APP_BASE_URL=.*|NEXT_PUBLIC_APP_BASE_URL=https://${{ env.APP_DOMAIN }}|g" $APP_DIR/.env.prod
+            else
+              echo "NEXT_PUBLIC_APP_BASE_URL=https://${{ env.APP_DOMAIN }}" >> $APP_DIR/.env.prod
+            fi
+            
+            if grep -q "NEXT_PUBLIC_API_BASE_URL=" $APP_DIR/.env.prod; then
+              sed -i "s|NEXT_PUBLIC_API_BASE_URL=.*|NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}|g" $APP_DIR/.env.prod
+            else
+              echo "NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}" >> $APP_DIR/.env.prod
             fi
             
             chmod 600 $APP_DIR/.env.prod
