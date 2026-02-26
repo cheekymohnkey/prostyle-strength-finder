@@ -62,7 +62,9 @@ export async function exchangeAuthCodeForSession(
   if (config.cognitoClientSecret) {
     tokenParams.client_secret = config.cognitoClientSecret;
   }
-  const token = await postTokenRequest(config, tokenParams);
+  const token = await postTokenRequest(config, tokenParams).catch((err: Error) => {
+    throw new Error(`${err.message} [redirect_uri=${redirectUri}] [client_id=${config.cognitoClientId}] [token_endpoint=${config.cognitoHostedUiBaseUrl}/oauth2/token]`);
+  });
 
   return {
     accessToken: token.access_token,
