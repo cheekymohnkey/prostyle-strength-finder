@@ -159,12 +159,13 @@ function main() {
   }
 
   const seedValue = process.env.BASELINE_SEED ? Number(process.env.BASELINE_SEED) : 777;
+  const qualityValue = process.env.BASELINE_QUALITY ? Number(process.env.BASELINE_QUALITY) : 1;
   const baselineSets = [];
   for (const stylizeTier of STYLIZE_TIERS) {
     const parameterEnvelope = {
       aspectRatio: "1:1",
       seed: seedValue,
-      quality: 1,
+      quality: qualityValue,
       styleRaw: true,
       stylizeTier,
       styleWeight: 0,

@@ -32,7 +32,10 @@ echo ""
 read -p "Enter seed value (default: 777): " SEED_VALUE
 SEED_VALUE=${SEED_VALUE:-777}
 echo ""
-echo "Using seed: $SEED_VALUE"
+read -p "Enter quality value (default: 1): " QUALITY_VALUE
+QUALITY_VALUE=${QUALITY_VALUE:-1}
+echo ""
+echo "Using seed: $SEED_VALUE, quality: $QUALITY_VALUE"
 echo ""
 read -p "Continue? (y/N) " -n 1 -r
 echo ""
@@ -45,8 +48,9 @@ echo ""
 echo "Connecting to production server..."
 
 # Run the seed script on the remote server
-ssh -i "$KEY_FILE" "$REMOTE_USER@$REMOTE_IP" "bash -s $SEED_VALUE" << 'EOF'
+ssh -i "$KEY_FILE" "$REMOTE_USER@$REMOTE_IP" "bash -s $SEED_VALUE $QUALITY_VALUE" << 'EOF'
 SEED_VALUE="$1"
+QUALITY_VALUE="$2"
 cd /opt/prostyle/app
 
 # Source environment
@@ -54,11 +58,11 @@ set -a
 source .env.prod
 set +a
 
-echo "Running baseline seed script with seed=$SEED_VALUE..."
+echo "Running baseline seed script with seed=$SEED_VALUE, quality=$QUALITY_VALUE..."
 echo ""
 
-# Run the seed script with the production environment and custom seed
-BASELINE_SEED="$SEED_VALUE" node scripts/style-dna/seed-canonical-baselines.js
+# Run the seed script with the production environment and custom parameters
+BASELINE_SEED="$SEED_VALUE" BASELINE_QUALITY="$QUALITY_VALUE" node scripts/style-dna/seed-canonical-baselines.js
 
 SEED_EXIT_CODE=$?
 
