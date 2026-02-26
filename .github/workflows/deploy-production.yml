@@ -200,6 +200,15 @@ jobs:
             
             # Write Env File from Secret
             echo "${{ secrets.PROD_ENV_FILE }}" > $APP_DIR/.env.prod
+            
+            # FORCE OVERRIDE: Update DATABASE_URL to always point to the writable app directory
+            # This fixes permission issues if the secret points to /var/lib/prostyle
+            if grep -q "DATABASE_URL=" $APP_DIR/.env.prod; then
+              sed -i "s|DATABASE_URL=.*|DATABASE_URL=file:$APP_DIR/data/prostyle.db|g" $APP_DIR/.env.prod
+            else
+              echo "DATABASE_URL=file:$APP_DIR/data/prostyle.db" >> $APP_DIR/.env.prod
+            fi
+            
             chmod 600 $APP_DIR/.env.prod
           EOF
 
@@ -210,7 +219,15 @@ jobs:
             cd ${{ env.APP_DIR }}
             
             # Run Migrations
+            # We override DATABASE_URL to ensure it uses the writable app directory
+            # instead of any systemic path that might be in secrets
+            export DATABASE_URL="file:${{ env.APP_DIR }}/data/prostyle.prod.db"
+            
             set -a; source .env.prod; set +a
+            
+            # Ensure the data directory exists
+            mkdir -p ${{ env.APP_DIR }}/data
+            
             echo "Running Database Migrations..."
             npm run db:migrate
             
