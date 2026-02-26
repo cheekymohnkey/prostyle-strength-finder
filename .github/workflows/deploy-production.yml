@@ -134,8 +134,8 @@ jobs:
               sudo apt-get install -y nodejs build-essential
             fi
             
-            # 4. Install Nginx & Certbot
-            sudo apt-get install -y nginx certbot python3-certbot-nginx acl
+            # 4. Install Nginx & Certbot & SQLite3
+            sudo apt-get install -y nginx certbot python3-certbot-nginx acl sqlite3
             
             # 5. Create App Directory
             sudo mkdir -p ${{ env.APP_DIR }}
@@ -228,6 +228,12 @@ jobs:
             # Ensure the data directory exists
             mkdir -p ${{ env.APP_DIR }}/data
             
+            # Ensure SQLite3 is installed (needed for migration scripts)
+            if ! command -v sqlite3 &> /dev/null; then
+              echo "Installing sqlite3..."
+              sudo apt-get update && sudo apt-get install -y sqlite3
+            fi
+
             echo "Running Database Migrations..."
             npm run db:migrate
             
