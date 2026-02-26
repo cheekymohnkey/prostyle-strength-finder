@@ -26,6 +26,11 @@ sudo ln -sf "/etc/nginx/sites-available/$TARGET_NAME" "/etc/nginx/sites-enabled/
 rm -f "$tmp_file"
 
 sudo nginx -t
-sudo systemctl reload nginx
+if systemctl is-active --quiet nginx; then
+  sudo systemctl reload nginx
+else
+  echo "Nginx is not running. Starting it now..."
+  sudo systemctl start nginx
+fi
 
 echo "Installed nginx site: $TARGET_NAME"
