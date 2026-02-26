@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadFrontendAuthConfig } from "@/lib/auth/config";
 import { exchangeAuthCodeForSession } from "@/lib/auth/cognito";
+import { createPkceChallenge } from "@/lib/auth/pkce";
 import { clearPkceCookies, setSessionCookie, readPkceCookies } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -30,8 +31,13 @@ export async function GET(request: NextRequest) {
 
   const pkce = await readPkceCookies();
   if (!pkce.state || !pkce.verifier || pkce.state !== returnedState) {
-    return buildRedirectWithError(config.appBaseUrl, "invalid_state");
+    const debugInfo = `state_cookie=${pkce.state ? "present" : "missing"} verifier_cookie=${pkce.verifier ? "present" : "missing"} state_match=${pkce.state === returnedState}`;
+    return buildRedirectWithError(config.appBaseUrl, `invalid_state:${debugInfo}`);
   }
+
+  // Debug: recompute the challenge so we can compare against what was sent to Cognito
+  const verifierLen = pkce.verifier.length;
+  const recomputedChallenge = createPkceChallenge(pkce.verifier);
 
   try {
     const session = await exchangeAuthCodeForSession(config, {
@@ -44,6 +50,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
-    return buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason}`);
+    const debugInfo = `verifier_len=${verifierLen} challenge=${recomputedChallenge.slice(0, 12)}... code_len=${code.length}`;
+    return buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason} [pkce:${debugInfo}]`);
   }
 }
