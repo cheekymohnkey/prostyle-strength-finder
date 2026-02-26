@@ -39,6 +39,12 @@ export async function GET(request: NextRequest) {
     return buildRedirectWithError(config.appBaseUrl, `invalid_state:${debugInfo}`);
   }
 
+  // Clear PKCE cookies immediately — before the token exchange — so that any duplicate
+  // callback request (e.g. Nginx retry) hits invalid_state rather than burning the code twice.
+  const clearResponse = new NextResponse(null, { status: 200 });
+  clearPkceCookies(clearResponse, config);
+  // We'll transfer these cleared cookies to the final response below.
+
   // Debug: compare the challenge sent to Cognito vs what we'd compute from the stored verifier
   const verifierLen = pkce.verifier.length;
   const recomputedChallenge = createPkceChallenge(pkce.verifier);
@@ -51,11 +57,15 @@ export async function GET(request: NextRequest) {
     });
     const response = NextResponse.redirect(new URL(config.appBaseUrl));
     setSessionCookie(response, session, config);
-    clearPkceCookies(response, config);
+    // Copy the already-cleared PKCE cookie deletions onto the success response
+    clearResponse.cookies.getAll().forEach(c => response.cookies.set(c));
     return response;
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
     const debugInfo = `code=${codePreview}(len=${code.length}) verifier_len=${verifierLen} challenge_match=${challengeMatch} sent=${(pkce.sentChallenge ?? "null").slice(0, 12)}... computed=${recomputedChallenge.slice(0, 12)}...`;
-    return buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason} [pkce:${debugInfo}]`);
+    const errResponse = buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason} [pkce:${debugInfo}]`);
+    // Still propagate the cookie deletions even on failure
+    clearResponse.cookies.getAll().forEach(c => errResponse.cookies.set(c));
+    return errResponse;
   }
 }
