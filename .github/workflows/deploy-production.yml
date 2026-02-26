@@ -1,0 +1,278 @@
+name: Production Deployment
+
+# ------------------------------------------------------------------------------
+# SETUP INSTRUCTIONS
+# ------------------------------------------------------------------------------
+# 1. Create a Lightsail Instance (Ubuntu 22.04 or 24.04).
+# 2. Assign a Static IP to the instance.
+# 3. Point your DNS (api.cheekymohnkey.com, app.cheekymohnkey.com) to this Static IP.
+# 4. Add the following Secrets to your GitHub Repository (Settings -> Secrets -> Actions):
+#    - PROD_HOST: The Static IP Address (e.g., 98.87.97.135)
+#    - PROD_USERNAME: ubuntu
+#    - PROD_SSH_KEY: The content of your .pem private key file.
+#    - PROD_ENV_FILE: The full content of your .env.prod file.
+#    - PROD_EMAIL: Your email address for SSL certificate registration (LetsEncrypt).
+# ------------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      provision:
+        description: 'Provision Server? (Runs updates, installs Node/Nginx/Swap, sets up SSL)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  # Configuration
+  NODE_VERSION: '20'
+  APP_DIR: '/opt/prostyle/app'
+  API_DOMAIN: 'api.cheekymohnkey.com'
+  APP_DOMAIN: 'app.cheekymohnkey.com'
+
+jobs:
+  build:
+    name: Build & Package
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Shared Contracts
+        run: npm run contracts
+
+      - name: Build Frontend
+        # We bake the API URL into the build time configuration
+        run: npm run build --workspace=@prostyle/frontend
+        env:
+          NEXT_PUBLIC_API_BASE_URL: "https://${{ env.API_DOMAIN }}"
+
+      - name: Prepare Deployment Artifact
+        run: |
+          mkdir -p dist
+          
+          # Create an archive of everything needed for runtime
+          # We exclude dev/test files to keep the payload smaller
+          tar -czf dist/deployment.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='apps/*/node_modules' \
+            --exclude='data/*.db' \
+            --exclude='data/storage' \
+            --exclude='.env*' \
+            --exclude='design-documenatation' \
+            .
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-package
+          path: dist/deployment.tar.gz
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-package
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.PROD_HOST }} >> ~/.ssh/known_hosts
+
+      # ----------------------------------------------------------------
+      # PROVISIONING (Only runs if manually selected)
+      # ----------------------------------------------------------------
+      - name: Provision Server (System Setup)
+        if: ${{ inputs.provision == true }}
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            set -e
+            echo "Starting Provisioning..."
+            
+            # 1. System Updates
+            sudo apt-get update
+            # Avoid interactive prompts during upgrade
+            sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -yq
+            
+            # 2. Add Swap (Crucial for 1-2GB RAM Instances)
+            # Checks if swap exists, if not adds 2GB
+            if [ $(free | awk "/^Swap:/ {print \$2}") -eq 0 ]; then
+              echo "Adding 2GB Swap file for stability..."
+              sudo fallocate -l 2G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+              echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            fi
+            
+            # 3. Install Node.js 20
+            if ! command -v node &> /dev/null; then
+              echo "Installing Node.js..."
+              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+              sudo apt-get install -y nodejs build-essential
+            fi
+            
+            # 4. Install Nginx & Certbot
+            sudo apt-get install -y nginx certbot python3-certbot-nginx acl
+            
+            # 5. Create App Directory
+            sudo mkdir -p ${{ env.APP_DIR }}
+            sudo chown -R ${{ secrets.PROD_USERNAME }}:${{ secrets.PROD_USERNAME }} /opt/prostyle
+            
+            echo "Provisioning Complete."
+          EOF
+
+      # ----------------------------------------------------------------
+      # DEPLOYMENT
+      # ----------------------------------------------------------------
+      - name: Transfer & Extract Code
+        run: |
+          # Copy tarball to temp location
+          scp -i ~/.ssh/id_rsa deployment.tar.gz ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }}:/tmp/deployment.tar.gz
+          
+          # Extract and Install
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            set -e
+            APP_DIR="${{ env.APP_DIR }}"
+            
+            echo "Deploying code to $APP_DIR..."
+            
+            # Extract to temp directory
+            mkdir -p /tmp/prostyle_release
+            tar -xzf /tmp/deployment.tar.gz -C /tmp/prostyle_release
+            
+            # Sync files (preserve .env and data)
+            # We use rsync to update the app directory efficiently
+            rsync -a --delete \
+              --exclude '.env.prod' \
+              --exclude 'data/*.db' \
+              --exclude 'data/storage' \
+              --exclude 'node_modules' \
+              /tmp/prostyle_release/ $APP_DIR/
+              
+            # Cleanup
+            rm -rf /tmp/prostyle_release /tmp/deployment.tar.gz
+            
+            # Install Production Dependencies
+            cd $APP_DIR
+            echo "Installing dependencies..."
+            npm ci --production --ignore-scripts
+            
+            # Rebuild Contracts (Runtime check)
+            npm run contracts
+          EOF
+
+      - name: Environment Configuration
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            set -e
+            APP_DIR="${{ env.APP_DIR }}"
+            
+            # Write Env File from Secret
+            echo "${{ secrets.PROD_ENV_FILE }}" > $APP_DIR/.env.prod
+            chmod 600 $APP_DIR/.env.prod
+          EOF
+
+      - name: Database Migrations
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            set -e
+            cd ${{ env.APP_DIR }}
+            
+            # Run Migrations
+            set -a; source .env.prod; set +a
+            echo "Running Database Migrations..."
+            npm run db:migrate
+            
+            echo "Applying Taxonomy Seed..."
+            npm run style-dna:taxonomy-seed-apply -- --file scripts/style-dna/seeds/style-dna-taxonomy-seed-v2.json --require-coverage --min-canonical 4 --min-aliases 16
+          EOF
+
+      # ----------------------------------------------------------------
+      # SERVICES SETUP (Only runs if provision selected)
+      # ----------------------------------------------------------------
+      - name: Setup Systemd Services
+        if: ${{ inputs.provision == true }}
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            set -e
+            cd ${{ env.APP_DIR }}
+            
+            echo "Configuring Systemd Services..."
+            
+            # Install Service Templates
+            chmod +x scripts/prod/install-systemd.sh
+            APP_DIR=${{ env.APP_DIR }} \
+            ENV_FILE=${{ env.APP_DIR }}/.env.prod \
+            RUN_USER=${{ secrets.PROD_USERNAME }} \
+            ./scripts/prod/install-systemd.sh
+            
+            # FIX: Override Frontend Service to use direct binary path for reliability
+            # This prevents "next: command not found" errors
+            NEXT_BIN="${{ env.APP_DIR }}/node_modules/.bin/next"
+            # We assume port 3001 for frontend to avoid conflict with API (3000)
+            sudo sed -i "s|ExecStart=.*|ExecStart=$NEXT_BIN start apps/frontend -p 3001|g" /etc/systemd/system/prostyle-frontend.service
+            
+            sudo systemctl daemon-reload
+            sudo systemctl enable prostyle-api prostyle-worker prostyle-frontend
+          EOF
+
+      - name: Setup Nginx & SSL
+        if: ${{ inputs.provision == true }}
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            set -e
+            cd ${{ env.APP_DIR }}
+            
+            echo "Configuring Nginx & SSL..."
+            
+            # 1. Stop Nginx to allow Certbot Standalone mode
+            sudo systemctl stop nginx || true
+            
+            # 2. Obtain SSL Certificates (if missing)
+            if [ ! -d "/etc/letsencrypt/live/${{ env.API_DOMAIN }}" ]; then
+               echo "Requesting SSL Certificates..."
+               sudo certbot certonly --standalone \
+                 -d ${{ env.API_DOMAIN }} -d ${{ env.APP_DOMAIN }} \
+                 --non-interactive --agree-tos -m ${{ secrets.PROD_EMAIL }}
+            fi
+            
+            # 3. Install Nginx Config
+            chmod +x scripts/prod/install-nginx.sh
+            API_HOST=${{ env.API_DOMAIN }} \
+            APP_HOST=${{ env.APP_DOMAIN }} \
+            ./scripts/prod/install-nginx.sh
+            
+            # 4. Start Nginx
+            sudo systemctl restart nginx
+          EOF
+
+      - name: Restart Application
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.PROD_USERNAME }}@${{ secrets.PROD_HOST }} 'bash -s' << 'EOF'
+            echo "Restarting Application Services..."
+            sudo systemctl restart prostyle-api prostyle-worker prostyle-frontend
+            
+            echo "Deployment Complete!"
+          EOF
