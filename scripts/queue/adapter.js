@@ -170,6 +170,10 @@ class SqsCliQueueAdapter {
       { encoding: "utf8" }
     );
 
+    if (result.error) {
+      // spawnSync sets result.error when the binary can't be found (ENOENT) or similar OS errors
+      throw new Error(`aws CLI spawn error: ${result.error.message} (code=${result.error.code})`);
+    }
     if (result.status !== 0) {
       throw new Error((result.stderr || result.stdout || "aws sqs command failed").trim());
     }

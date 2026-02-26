@@ -4846,7 +4846,14 @@ function main() {
     });
   });
 
-  Promise.all([storageAdapter.healthcheck(), Promise.resolve(queueAdapter.healthcheck())]).then(([storageHealth, queueHealth]) => {
+  // Use Promise.resolve().then() rather than Promise.resolve(expr) so that any
+  // synchronous throw from healthcheck() is converted to a rejection (caught below)
+  // rather than escaping the chain as an unhandled exception.
+  const queueHealthPromise = Promise.resolve().then(() => queueAdapter.healthcheck()).catch((err) => {
+    logJson("warn", "api.queue.healthcheck_failed", { error: err.message });
+    return { mode: "unknown", queueUrl: null, deadLetterQueueUrl: null };
+  });
+  Promise.all([storageAdapter.healthcheck(), queueHealthPromise]).then(([storageHealth, queueHealth]) => {
     server.listen(config.runtime.port, () => {
       logJson("info", "api.server.started", {
         port: config.runtime.port,
