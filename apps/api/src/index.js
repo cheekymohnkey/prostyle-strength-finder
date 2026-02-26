@@ -3048,9 +3048,14 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         : `--sref ${payload.styleAdjustmentMidjourneyId}`;
       const modelVersion = String(baselineSet.mj_model_version || "").trim();
       const versionArg = modelVersion !== "" ? ` --v ${modelVersion}` : "";
+      const envelope = parseBaselineParameterEnvelope(baselineSet.parameter_envelope_json);
+      const aspectRatioArg = envelope.aspectRatio ? ` --ar ${envelope.aspectRatio}` : "";
+      const seedArg = envelope.seed ? ` --seed ${envelope.seed}` : "";
+      const rawArg = envelope.styleRaw !== false ? " --raw" : "";
+      const qualityArg = envelope.quality ? ` --q ${envelope.quality}` : "";
       for (const tier of payload.stylizeTiers) {
         for (const promptItem of promptItems) {
-          const promptTextGenerated = `${promptItem.prompt_text} ${adjustmentArg} ${styleInfluence.influence_code} --stylize ${tier}${versionArg}`;
+          const promptTextGenerated = `${promptItem.prompt_text}${aspectRatioArg}${seedArg}${rawArg} ${adjustmentArg} ${styleInfluence.influence_code} --stylize ${tier}${versionArg}${qualityArg}`;
           insertStyleDnaPromptJobItem(dbPath, {
             itemId: `sdpji_${crypto.randomUUID()}`,
             promptJobId,
