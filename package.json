@@ -36,6 +36,7 @@
     "ops:db:runs": "bash scripts/ops/inspect-prod-db.sh runs",
     "ops:db:summary": "bash scripts/ops/inspect-prod-db.sh summary",
     "ops:seed-baselines": "bash scripts/ops/seed-prod-baselines.sh",
+    "ops:update-nginx": "bash scripts/ops/update-nginx-config.sh",
     "frontend:critical-flow-smoke": "node scripts/frontend/critical-flow-smoke.js",
     "launch:readiness-smoke": "node scripts/launch/readiness-smoke.js",
     "storage:smoke": "node scripts/storage/smoke.js",

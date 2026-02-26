@@ -11,6 +11,9 @@ server {
   ssl_certificate /etc/letsencrypt/live/__API_HOST__/fullchain.pem;
   ssl_certificate_key /etc/letsencrypt/live/__API_HOST__/privkey.pem;
 
+  # Allow large uploads for baseline grid images (4x images + base64 encoding overhead)
+  client_max_body_size 50M;
+
   location / {
     proxy_pass http://127.0.0.1:__API_PORT__;
     proxy_http_version 1.1;
@@ -28,6 +31,9 @@ server {
   # Use the same certificate as the API host, since we generate a SAN certificate for both domains
   ssl_certificate /etc/letsencrypt/live/__API_HOST__/fullchain.pem;
   ssl_certificate_key /etc/letsencrypt/live/__API_HOST__/privkey.pem;
+
+  # Allow large uploads for baseline grid images via frontend proxy
+  client_max_body_size 50M;
 
   location / {
     proxy_pass http://127.0.0.1:__FRONTEND_PORT__;
