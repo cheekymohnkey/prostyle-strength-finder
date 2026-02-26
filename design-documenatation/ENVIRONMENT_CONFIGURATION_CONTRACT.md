@@ -30,11 +30,12 @@ For the current phase, these are the only supported environments beyond local: `
 | `SQS_DLQ_URL` | Yes | API, Worker | URL | Dead-letter queue URL. |
 | `SQS_MAX_ATTEMPTS` | Yes | API, Worker | integer | Retry cap before dead-letter. |
 | `SQS_RETRY_BASE_MS` | Yes | API, Worker | integer | Base delay for backoff strategy. |
-| `QUEUE_ADAPTER_MODE` | No | API, Worker | `sqlite|sqs` | Defaults to `sqlite` in `local`, `sqs` otherwise. |
+| `QUEUE_ADAPTER_MODE` | No | API, Worker | `sqlite|sqs` | Defaults to `sqlite` in `local`. **Must be `sqlite` in Lightsail production** (no IAM instance profile). Set explicitly to `sqlite` or `sqs` per environment. |
 | `S3_BUCKET` | Yes | API, Worker | string | Bucket for image/artifact object storage. |
 | `AWS_REGION` | Yes | API, Worker | AWS region | Example: `us-east-1`. |
 | `S3_ENDPOINT_OVERRIDE` | No | API, Worker | URL | Local simulation endpoint (for LocalStack/dev). |
-| `STORAGE_LOCAL_DIR` | No | API, Worker | path | Local-disk storage root when `APP_ENV=local`; should be absolute to avoid cwd drift between processes. |
+| `STORAGE_ADAPTER_MODE` | No | API, Worker | `local|s3` | Storage adapter selection. Defaults to `local` when `APP_ENV=local`. **Must be `local` in Lightsail production** (no IAM instance profile). |
+| `STORAGE_LOCAL_DIR` | No | API, Worker | path | Local-disk storage root when using local adapter; should be absolute to avoid cwd drift between processes. Defaults to `data/storage/` relative to app root. |
 | `COGNITO_USER_POOL_ID` | Yes | API, Worker | string | Cognito user pool identifier. |
 | `COGNITO_CLIENT_ID` | Yes | API, Worker | string | Cognito app client identifier. |
 | `COGNITO_ISSUER` | Yes | API, Worker | URL | JWT issuer expected by API. |

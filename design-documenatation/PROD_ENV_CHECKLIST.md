@@ -24,16 +24,18 @@ Database:
 1. `DATABASE_URL=file:/var/lib/prostyle/prostyle.prod.db`
 
 Queue:
-1. `QUEUE_ADAPTER_MODE=sqs`
-2. `SQS_QUEUE_URL` must match Terraform prod output.
-3. `SQS_DLQ_URL` must match Terraform prod output.
+1. `QUEUE_ADAPTER_MODE=sqlite` (required for Lightsail; no IAM instance profile available)
+2. `SQS_QUEUE_URL` must match Terraform prod output (required even with sqlite adapter for config validation).
+3. `SQS_DLQ_URL` must match Terraform prod output (required even with sqlite adapter for config validation).
 4. `SQS_MAX_ATTEMPTS` is integer (default `5`).
 5. `SQS_RETRY_BASE_MS` is integer (default `2000`).
 
 Storage:
-1. `S3_BUCKET` must match Terraform prod output.
-2. `AWS_REGION` must match Terraform prod output (`us-east-1` currently).
-3. `S3_ENDPOINT_OVERRIDE` must be empty in production.
+1. `STORAGE_ADAPTER_MODE=local` (required for Lightsail; no IAM instance profile available)
+2. `S3_BUCKET` must match Terraform prod output (required even with local adapter for config validation).
+3. `AWS_REGION` must match Terraform prod output (`us-east-1` currently).
+4. `S3_ENDPOINT_OVERRIDE` must be empty in production.
+5. Local storage will use filesystem under `data/storage/` directory.
 
 Auth:
 1. `COGNITO_USER_POOL_ID` must be production pool id.

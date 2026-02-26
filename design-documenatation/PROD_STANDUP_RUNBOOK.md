@@ -139,12 +139,13 @@ Create production env file (example path):
 Required checks before start:
 1. `APP_ENV=prod`
 2. `NODE_ENV=production`
-3. `QUEUE_ADAPTER_MODE=sqs`
-4. `AUTH_JWT_VERIFICATION_MODE=jwks`
-5. `DATABASE_URL=file:/var/lib/prostyle/prostyle.prod.db`
-6. `S3_BUCKET`, `SQS_QUEUE_URL`, `SQS_DLQ_URL`, `AWS_REGION` match Terraform outputs
-7. `COGNITO_*` values are production values
-8. `NEXT_PUBLIC_API_BASE_URL` matches production API URL
+3. `QUEUE_ADAPTER_MODE=sqlite` (Lightsail has no IAM instance profile; cannot use SQS without credentials)
+4. `STORAGE_ADAPTER_MODE=local` (Lightsail has no IAM instance profile; cannot use S3 without credentials)
+5. `AUTH_JWT_VERIFICATION_MODE=jwks`
+6. `DATABASE_URL=file:/var/lib/prostyle/prostyle.prod.db` (or path under `/opt/prostyle/app/data/` depending on deployment)
+7. `S3_BUCKET`, `SQS_QUEUE_URL`, `SQS_DLQ_URL`, `AWS_REGION` values present (even though using local adapters)
+8. `COGNITO_*` values are production values
+9. `NEXT_PUBLIC_API_BASE_URL` matches production API URL including `/v1` suffix (e.g., `https://api.cheekymohnkey.com/v1`)
 
 ## Phase 5 - Database Migration and Backup
 
@@ -225,6 +226,36 @@ And endpoint checks:
 3. On-call/rollback owner is assigned.
 4. Release tag/commit hash is recorded.
 5. Launch sign-off captured.
+
+## Phase 10 - Post-Launch Operations Tooling
+
+Production operational scripts are available under `npm run ops:*`:
+
+**Monitoring & Debugging:**
+- `npm run ops:logs [lines]`: Quick log inspection (API, frontend, worker, nginx)
+- `npm run ops:checks`: Operational health checks (queue lag, DLQ, error rates)
+
+**Database Inspection:**
+- `npm run ops:db:summary`: Entity counts across all tables
+- `npm run ops:db:baselines`: List baseline render sets
+- `npm run ops:db:suites`: Show baseline prompt suites with prompts  
+- `npm run ops:db:runs`: Show Style-DNA runs and statuses
+
+**Data Management:**
+- `npm run ops:seed-baselines`: Seed V1 baseline tests with configurable seed/quality
+- `npm run ops:bootstrap-admin`: Provision admin user with Cognito sub
+
+**Infrastructure:**
+- `npm run ops:update-nginx`: Deploy nginx configuration changes
+
+**Prerequisites:**
+- SSH key at `~/.ssh/prostyle-prod.pem` (chmod 400)
+- Connection to `ubuntu@98.87.97.135`
+
+**Safety:**
+- Inspection scripts are read-only and safe anytime
+- Mutation scripts prompt for confirmation
+- All scripts designed for rapid troubleshooting (~2-5 seconds vs GitHub Actions ~30s)
 
 ## Rollback (Minimum)
 
