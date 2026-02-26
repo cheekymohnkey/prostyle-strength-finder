@@ -46,9 +46,18 @@ export async function GET(request: NextRequest) {
   // We'll transfer these cleared cookies to the final response below.
 
   // Debug: compare the challenge sent to Cognito vs what we'd compute from the stored verifier
-  const verifierLen = pkce.verifier.length;
   const recomputedChallenge = createPkceChallenge(pkce.verifier);
   const challengeMatch = pkce.sentChallenge === recomputedChallenge;
+
+  // TEMP DEBUG: halt before token exchange so the code stays unconsumed for manual curl testing.
+  // The full verifier and code are in the authError URL — copy them for the curl test below.
+  // REMOVE this early return once the curl test is done.
+  const debugHalt = (process.env.DEBUG_HALT_BEFORE_TOKEN_EXCHANGE ?? "1") === "1";
+  if (debugHalt) {
+    return buildRedirectWithError(config.appBaseUrl,
+      `DEBUG_HALT code=${code} verifier=${pkce.verifier} challenge_match=${challengeMatch}`
+    );
+  }
 
   try {
     const session = await exchangeAuthCodeForSession(config, {
@@ -57,14 +66,14 @@ export async function GET(request: NextRequest) {
     });
     const response = NextResponse.redirect(new URL(config.appBaseUrl));
     setSessionCookie(response, session, config);
-    // Copy the already-cleared PKCE cookie deletions onto the success response
     clearResponse.cookies.getAll().forEach(c => response.cookies.set(c));
     return response;
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
-    const debugInfo = `code=${codePreview}(len=${code.length}) verifier_len=${verifierLen} challenge_match=${challengeMatch} sent=${(pkce.sentChallenge ?? "null").slice(0, 12)}... computed=${recomputedChallenge.slice(0, 12)}...`;
+    const recomputed = recomputedChallenge.slice(0, 12);
+    const sent = (pkce.sentChallenge ?? "null").slice(0, 12);
+    const debugInfo = `code=${codePreview}(len=${code.length}) verifier_len=${pkce.verifier.length} challenge_match=${challengeMatch} sent=${sent}... computed=${recomputed}...`;
     const errResponse = buildRedirectWithError(config.appBaseUrl, `token_exchange_failed:${reason} [pkce:${debugInfo}]`);
-    // Still propagate the cookie deletions even on failure
     clearResponse.cookies.getAll().forEach(c => errResponse.cookies.set(c));
     return errResponse;
   }
