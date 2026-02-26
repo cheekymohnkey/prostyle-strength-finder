@@ -92,7 +92,7 @@ SQL
 .headers on
 .width 10 12 50
 SELECT 
-    prompt_key,
+    bpsi.prompt_key,
     bpsm.domain,
     substr(bpsi.prompt_text, 1, 50) AS prompt_text
 FROM baseline_prompt_suite_items bpsi
