@@ -51,6 +51,10 @@ Current production runtime note:
 - Target architecture remains AWS-backed adapters (S3/SQS) for IAM-enabled environments.
 - Active Lightsail production runtime currently uses `QUEUE_ADAPTER_MODE=sqlite` and `STORAGE_ADAPTER_MODE=local` because Lightsail has no IAM instance profile.
 
+Production deployment trigger note:
+- Pushes to `origin/master` automatically trigger `.github/workflows/deploy-production.yml`.
+- `workflow_dispatch` with `provision=true` is intended for explicit provisioning runs.
+
 ## Local Quickstart
 
 1. Ensure Node.js 20 is installed and on `PATH`.

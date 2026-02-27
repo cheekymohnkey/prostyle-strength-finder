@@ -13,6 +13,12 @@ Stand up production using the current strategy: `local` + `prod` (UAT deferred).
 2. Provision prod compute and deploy API/worker/frontend.
 3. Run production-safe verification checks.
 
+## Deployment Trigger Behavior
+
+1. Pushes to `origin/master` automatically trigger the GitHub Actions production deployment workflow (`.github/workflows/deploy-production.yml`).
+2. Use `workflow_dispatch` with `provision=true` only when you intentionally want provisioning steps (system packages, cert bootstrap, service enablement) to run.
+3. For routine application deploys, a normal push to `master` is sufficient.
+
 ## Critical Safety Rules
 
 1. Never run `npm run db:reset` in production.
