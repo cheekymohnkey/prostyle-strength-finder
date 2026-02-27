@@ -7,10 +7,6 @@ Type=simple
 User=__RUN_USER__
 WorkingDirectory=__APP_DIR__
 EnvironmentFile=__ENV_FILE__
-Environment=NODE_ENV=production
-# Lightsail has no IAM instance profile; use SQLite queue adapter and local disk storage to avoid aws CLI credential failures
-Environment=QUEUE_ADAPTER_MODE=sqlite
-Environment=STORAGE_ADAPTER_MODE=local
 # Ensure aws CLI and other tools installed in /usr/local/bin are reachable from systemd's restricted PATH
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/node __APP_DIR__/apps/api/src/index.js

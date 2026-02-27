@@ -7,6 +7,10 @@ Date: 2026-02-20
 
 Provide a production-safe `.env.prod` checklist and pre-start validation steps.
 
+Source-of-truth rule:
+1. GitHub secret `PROD_ENV_FILE` is written to `/opt/prostyle/app/.env.prod` during deploy.
+2. Deploy workflow validates required keys but does not rewrite application config values.
+
 ## Base Template
 
 1. For current Lightsail production, start from `.env.prod.template.final`.
@@ -18,10 +22,10 @@ Provide a production-safe `.env.prod` checklist and pre-start validation steps.
 Core runtime:
 1. `NODE_ENV=production`
 2. `APP_ENV=prod`
-3. `PORT=3001`
+3. `PORT=3000`
 
 Database:
-1. `DATABASE_URL=file:/var/lib/prostyle/prostyle.prod.db`
+1. `DATABASE_URL=file:/opt/prostyle/app/data/prostyle.db`
 
 Queue:
 1. `QUEUE_ADAPTER_MODE=sqlite` (required for Lightsail; no IAM instance profile available)

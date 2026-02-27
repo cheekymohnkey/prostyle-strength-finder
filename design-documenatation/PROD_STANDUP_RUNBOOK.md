@@ -135,6 +135,7 @@ Create production env file (example path):
 2. For current Lightsail production, start from `.env.prod.template.final` and fill secrets/real endpoints.
 3. For future IAM-enabled production, `.env.prod.example` remains the S3/SQS-target baseline.
 4. Validate against `design-documenatation/PROD_ENV_CHECKLIST.md` before starting services.
+5. Deploy workflow writes `PROD_ENV_FILE` to `.env.prod` and validates required keys; it should not override app configuration values.
 
 Required checks before start:
 1. `APP_ENV=prod`
@@ -142,7 +143,7 @@ Required checks before start:
 3. `QUEUE_ADAPTER_MODE=sqlite` (Lightsail has no IAM instance profile; cannot use SQS without credentials)
 4. `STORAGE_ADAPTER_MODE=local` (Lightsail has no IAM instance profile; cannot use S3 without credentials)
 5. `AUTH_JWT_VERIFICATION_MODE=jwks`
-6. `DATABASE_URL=file:/var/lib/prostyle/prostyle.prod.db` (or path under `/opt/prostyle/app/data/` depending on deployment)
+6. `DATABASE_URL=file:/opt/prostyle/app/data/prostyle.db`
 7. `S3_BUCKET`, `SQS_QUEUE_URL`, `SQS_DLQ_URL`, `AWS_REGION` values present (even though using local adapters)
 8. `COGNITO_*` values are production values
 9. `NEXT_PUBLIC_API_BASE_URL` matches production API URL including `/v1` suffix (e.g., `https://api.cheekymohnkey.com/v1`)

@@ -199,36 +199,51 @@ jobs:
             set -e
             APP_DIR="${{ env.APP_DIR }}"
             
-            # Write Env File from Secret
+            # Write Env File from Secret (source of truth)
             echo "${{ secrets.PROD_ENV_FILE }}" > $APP_DIR/.env.prod
-            
-            # FORCE OVERRIDE: Update DATABASE_URL to always point to the writable app directory
-            # This fixes permission issues if the secret points to /var/lib/prostyle
-            if grep -q "DATABASE_URL=" $APP_DIR/.env.prod; then
-              sed -i "s|DATABASE_URL=.*|DATABASE_URL=file:$APP_DIR/data/prostyle.db|g" $APP_DIR/.env.prod
-            else
-              echo "DATABASE_URL=file:$APP_DIR/data/prostyle.db" >> $APP_DIR/.env.prod
-            fi
-            
-            # FORCE PORT for API
-            if grep -q "^PORT=" $APP_DIR/.env.prod; then
-              sed -i "s|^PORT=.*|PORT=3000|g" $APP_DIR/.env.prod
-            else
-              echo "PORT=3000" >> $APP_DIR/.env.prod
-            fi
-            
-            # FORCE public URLs — required at runtime by Next.js server-side auth routes
-            # These must match the Cognito callback/logout URLs exactly
-            if grep -q "NEXT_PUBLIC_APP_BASE_URL=" $APP_DIR/.env.prod; then
-              sed -i "s|NEXT_PUBLIC_APP_BASE_URL=.*|NEXT_PUBLIC_APP_BASE_URL=https://${{ env.APP_DOMAIN }}|g" $APP_DIR/.env.prod
-            else
-              echo "NEXT_PUBLIC_APP_BASE_URL=https://${{ env.APP_DOMAIN }}" >> $APP_DIR/.env.prod
-            fi
-            
-            if grep -q "NEXT_PUBLIC_API_BASE_URL=" $APP_DIR/.env.prod; then
-              sed -i "s|NEXT_PUBLIC_API_BASE_URL=.*|NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}/v1|g" $APP_DIR/.env.prod
-            else
-              echo "NEXT_PUBLIC_API_BASE_URL=https://${{ env.API_DOMAIN }}/v1" >> $APP_DIR/.env.prod
+
+            # Validate required keys are present and adapter modes are valid.
+            required_keys=(
+              NODE_ENV APP_ENV PORT DATABASE_URL
+              SQS_QUEUE_URL SQS_DLQ_URL SQS_MAX_ATTEMPTS SQS_RETRY_BASE_MS QUEUE_ADAPTER_MODE
+              S3_BUCKET AWS_REGION STORAGE_ADAPTER_MODE
+              COGNITO_CLIENT_ID COGNITO_USER_POOL_ID COGNITO_ISSUER COGNITO_AUDIENCE
+              FRONTEND_SESSION_SECRET
+              AUTH_JWT_VERIFICATION_MODE DEFAULT_STANDARD_MODEL_VERSION DEFAULT_NIJI_MODEL_VERSION
+              LOG_LEVEL SERVICE_NAME
+              NEXT_PUBLIC_API_BASE_URL NEXT_PUBLIC_APP_BASE_URL
+            )
+
+            missing=0
+            for key in "${required_keys[@]}"; do
+              if ! grep -q "^${key}=" "$APP_DIR/.env.prod"; then
+                echo "Missing required key in .env.prod: ${key}" >&2
+                missing=1
+              fi
+            done
+
+            queue_mode="$(grep -E '^QUEUE_ADAPTER_MODE=' "$APP_DIR/.env.prod" | head -n1 | cut -d'=' -f2- | tr -d '[:space:]')"
+            case "$queue_mode" in
+              sqlite|sqs) ;;
+              *)
+                echo "Invalid QUEUE_ADAPTER_MODE in .env.prod: '$queue_mode' (expected sqlite|sqs)" >&2
+                echo "Tip: check for typo 'sqllite' -> 'sqlite'." >&2
+                missing=1
+                ;;
+            esac
+
+            storage_mode="$(grep -E '^STORAGE_ADAPTER_MODE=' "$APP_DIR/.env.prod" | head -n1 | cut -d'=' -f2- | tr -d '[:space:]')"
+            case "$storage_mode" in
+              local|s3) ;;
+              *)
+                echo "Invalid STORAGE_ADAPTER_MODE in .env.prod: '$storage_mode' (expected local|s3)" >&2
+                missing=1
+                ;;
+            esac
+
+            if [ "$missing" -ne 0 ]; then
+              echo "Environment validation failed; refusing to continue deployment." >&2
+              exit 1
             fi
             
             chmod 600 $APP_DIR/.env.prod

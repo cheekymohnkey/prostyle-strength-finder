@@ -19,7 +19,7 @@ First production deployment to AWS Lightsail. Encountered several configuration 
 **Resolution:**
 - Added `STORAGE_ADAPTER_MODE=local` to use `LocalDiskStorageAdapter` 
 - Made storage healthcheck non-fatal (logs warning, server continues)
-- Updated systemd service templates with `Environment=STORAGE_ADAPTER_MODE=local`
+- (Historical) Updated systemd service templates with `Environment=STORAGE_ADAPTER_MODE=local`
 - Storage now uses local filesystem under `data/storage/` directory
 - Current worker startup behavior is now configurable with `WORKER_STRICT_HEALTHCHECK`:
   - `false` (default): queue/storage healthcheck failures log warnings and worker continues startup
@@ -35,7 +35,7 @@ First production deployment to AWS Lightsail. Encountered several configuration 
 
 **Resolution:**
 - Updated `.env.prod` on server to `QUEUE_ADAPTER_MODE=sqlite`
-- Systemd service template already had override: `Environment=QUEUE_ADAPTER_MODE=sqlite`
+- (Historical) Systemd service template already had override: `Environment=QUEUE_ADAPTER_MODE=sqlite`
 - Queue now uses SQLite tables for message queuing
 - Updated documentation to clarify Lightsail requires SQLite adapter
 
@@ -147,12 +147,11 @@ NEXT_PUBLIC_API_BASE_URL=https://api.cheekymohnkey.com/v1
 
 ### Systemd Service Template Updates
 
-Both `prostyle-api.service.template` and `prostyle-worker.service.template` now have:
+Current approach:
 
 ```ini
-# Lightsail has no IAM instance profile; use SQLite queue adapter and local disk storage to avoid aws CLI credential failures
-Environment=QUEUE_ADAPTER_MODE=sqlite
-Environment=STORAGE_ADAPTER_MODE=local
+# Adapter/runtime values are sourced from .env.prod (written from PROD_ENV_FILE during deploy)
+# systemd unit files should avoid overriding app configuration values.
 ```
 
 ### Nginx Configuration Additions
