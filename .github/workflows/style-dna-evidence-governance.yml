@@ -36,6 +36,31 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare fresh governance evidence
+        run: |
+          STAMP=$(date -u +"%Y%m%dT%H%M%SZ")
+          DB_PATH="tmp/style-dna-governance.sqlite3"
+
+          # Apply all migrations into a fresh sqlite database
+          DATABASE_URL="file:${DB_PATH}" node scripts/db/migrate.js apply
+
+          # Generate rollout artifacts for taxonomy v2 with coverage + apply enabled
+          DATABASE_URL="file:${DB_PATH}" node scripts/style-dna/taxonomy-seed-rollout-artifacts.js \
+            --file scripts/style-dna/seeds/style-dna-taxonomy-seed-v2.json \
+            --artifact-dir tmp/style-dna-taxonomy-rollouts \
+            --run-id "gov_${STAMP}" \
+            --apply \
+            --require-coverage
+
+          # Publish artifacts into the retention directory the governance check scans
+          node scripts/style-dna/taxonomy-seed-rollout-artifacts-publish.js \
+            --destination-dir "tmp/style-dna-evidence/shared-ci/${APP_ENV}/${STAMP}" \
+            --run-id "gov_${STAMP}" \
+            --destination-policy local
+
       - name: Ensure governance artifact directory exists
         run: mkdir -p "$(dirname "$GOVERNANCE_STATUS_PATH")"
 
