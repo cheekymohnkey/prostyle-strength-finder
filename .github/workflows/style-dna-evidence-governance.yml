@@ -61,6 +61,14 @@ jobs:
             --run-id "gov_${STAMP}" \
             --destination-policy local
 
+          # Copy upload receipt to retention root so governance checker sees manifest+receipt at same level
+          RECEIPT_PATH="tmp/style-dna-evidence/shared-ci/${APP_ENV}/${STAMP}/gov_${STAMP}/gov_${STAMP}__upload_receipt.json"
+          if [ -f "$RECEIPT_PATH" ]; then
+            cp "$RECEIPT_PATH" "tmp/style-dna-evidence/shared-ci/${APP_ENV}/${STAMP}/"
+          else
+            echo "Receipt missing at $RECEIPT_PATH" && exit 1
+          fi
+
       - name: Ensure governance artifact directory exists
         run: mkdir -p "$(dirname "$GOVERNANCE_STATUS_PATH")"
 
