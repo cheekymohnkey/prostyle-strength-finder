@@ -106,6 +106,22 @@ S3_ENDPOINT_OVERRIDE=<provider_endpoint> \
 npm run style-dna:taxonomy-seed-rollout-artifacts-upload-ci -- --storage-policy-mode shared
 ```
 
+## Evidence Governance Runbook (SDNA-34)
+
+Use `.github/workflows/style-dna-evidence-governance.yml` to validate that a fresh manifest + upload receipt exist in retention (`tmp/style-dna-evidence/shared-ci/<app_env>/<timestamp>`). The workflow now generates evidence in-job and copies the upload receipt into the retention root.
+
+### Commands
+- Hard-gate dispatch: `gh workflow run style-dna-evidence-governance.yml --ref master --field app_env=prod --field enforcement_mode=hard-gate`
+- Warning-only dispatch: `gh workflow run style-dna-evidence-governance.yml --ref master --field app_env=prod --field enforcement_mode=warning-only`
+
+### Latest evidence (2026-02-27)
+- Hard-gate run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22482717342 (fresh).
+- Warning-only run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22482780895 (fresh).
+- Retention paths: `tmp/style-dna-evidence/shared-ci/prod/20260227T103430Z` (hard-gate) and `tmp/style-dna-evidence/shared-ci/prod/20260227T103627Z` (warning-only).
+
+### Expected status artifact
+- Artifact name: `style-dna-governance-status-<app_env>` containing `latest_governance_status.json` with `status: fresh`, `manifestExists: true`, `receiptExists: true`.
+
 ## Deterministic Shared-Mode Evidence Workflow
 
 1. Use deterministic retention directory + file names:
