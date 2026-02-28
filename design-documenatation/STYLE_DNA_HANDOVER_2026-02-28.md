@@ -181,6 +181,33 @@ Canonical task detail location:
 ### Recommended next task kickoff
 1. Continue SDNA-37 by wiring provenance receipt fields into admin UI upload payloads and adding explicit user-facing guidance for required evidence fields in strict mode.
 
+## Addendum - 2026-03-01 (SDNA-37 UI Provenance Payload Wiring Complete)
+
+### Status
+1. Completed (UI payload slice).
+
+### Completed in this slice
+1. Wired `provenanceReceipt` into Style-DNA image upload payloads in active Studio flow (`StudioPage`) for baseline and test uploads.
+2. Wired the same provenance payload into legacy Style-DNA page upload flows for compatibility.
+3. Preserved existing upload behavior while making strict provenance policy compatible with admin UI uploads.
+
+### Files changed
+1. `apps/frontend/app/admin/style-dna/StudioPage.tsx`
+2. `apps/frontend/app/admin/style-dna/LegacyPage.tsx`
+3. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+4. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+
+### Verification command order
+1. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
+2. `npm run contracts`
+
+### Risks / follow-up notes
+1. Operator-entered provenance assertions are still process-trust metadata; they improve auditability but are not cryptographic origin guarantees.
+2. Strict-policy rollout still depends on operator guidance discipline for high-quality `operatorAssertion` values.
+
+### Recommended next task kickoff
+1. Finish SDNA-37 with concise operator runbook guidance/examples for provenance receipt values and strict-mode rollout checklist.
+
 ## Addendum - 2026-03-01 (SDNA-35 LLM-Only Trait Inference Cutover Kickoff)
 
 ### Status

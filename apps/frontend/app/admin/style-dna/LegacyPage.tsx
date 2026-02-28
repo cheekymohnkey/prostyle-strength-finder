@@ -519,6 +519,14 @@ function styleDnaImageContentPath(styleDnaImageId: string): string {
   return `/api/proxy/admin/style-dna/images/${encodeURIComponent(styleDnaImageId)}/content`;
 }
 
+function buildStyleDnaProvenanceReceipt(input: { imageKind: "baseline" | "test"; fileName: string }) {
+  return {
+    source: "studio_manual_upload",
+    capturedAtUtc: new Date().toISOString(),
+    operatorAssertion: `${input.imageKind}_grid_uploaded_via_legacy_studio:${input.fileName}`,
+  };
+}
+
 function section3ProgressKey(promptKey: string, cellId: string): string {
   return `${promptKey}::${cellId}`;
 }
@@ -1049,6 +1057,10 @@ export default function StyleDnaAdminPage() {
           fileName: baselineFile.name,
           mimeType: baselineFile.type || "image/png",
           fileBase64: await readFileAsBase64(baselineFile),
+          provenanceReceipt: buildStyleDnaProvenanceReceipt({
+            imageKind: "baseline",
+            fileName: baselineFile.name,
+          }),
         }),
       });
       return parseApiResponse<StyleDnaImageUploadResponse>(response);
@@ -1178,6 +1190,10 @@ export default function StyleDnaAdminPage() {
           fileName: testFile.name,
           mimeType: testFile.type || "image/png",
           fileBase64: await readFileAsBase64(testFile),
+          provenanceReceipt: buildStyleDnaProvenanceReceipt({
+            imageKind: "test",
+            fileName: testFile.name,
+          }),
         }),
       });
       const data = await parseApiResponse<StyleDnaImageUploadResponse>(response);

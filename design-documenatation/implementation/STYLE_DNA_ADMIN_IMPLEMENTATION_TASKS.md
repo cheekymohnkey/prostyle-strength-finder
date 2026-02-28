@@ -28,7 +28,8 @@ Quick start:
 SDNA-37 progress snapshot:
 1. `contentSha256` image digest persistence is implemented and smoke-verified.
 2. Provenance receipt baseline fields are now implemented for Style-DNA image uploads with backward-compatible defaults.
-3. Remaining SDNA-37 work is documentation/runbook evidence-template consistency and any policy tightening decisions.
+3. Admin Studio upload payloads now send `provenanceReceipt` for both baseline and test grid uploads (active Studio + legacy fallback page).
+4. Remaining SDNA-37 work is operator-facing strict-mode guidance and any final policy tightening decisions.
 
 SDNA-37 handover evidence template (required fields):
 1. `runUrl` or execution reference.

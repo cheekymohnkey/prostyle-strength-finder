@@ -26,6 +26,14 @@ function styleDnaImageContentPath(imageId: string): string {
   return `/api/proxy/admin/style-dna/images/${encodeURIComponent(imageId)}/content`;
 }
 
+function buildStyleDnaProvenanceReceipt(input: { imageKind: "baseline" | "test"; fileName: string }) {
+    return {
+        source: "studio_manual_upload",
+        capturedAtUtc: new Date().toISOString(),
+        operatorAssertion: `${input.imageKind}_grid_uploaded_via_studio:${input.fileName}`,
+    };
+}
+
 export default function StudioPage() {
   const queryClient = useQueryClient();
   const { 
@@ -173,7 +181,11 @@ export default function StudioPage() {
         fileBase64: base64,
         fileName: baselineFile.name,
         mimeType: baselineFile.type,
-        imageKind: "baseline"
+                imageKind: "baseline",
+                provenanceReceipt: buildStyleDnaProvenanceReceipt({
+                    imageKind: "baseline",
+                    fileName: baselineFile.name,
+                }),
       };
       
       const resp = await fetch("/api/proxy/admin/style-dna/images", { 
@@ -526,7 +538,11 @@ export default function StudioPage() {
             fileBase64: base64,
             fileName: testFile.name,
             mimeType: testFile.type,
-            imageKind: "test"
+                        imageKind: "test",
+                        provenanceReceipt: buildStyleDnaProvenanceReceipt({
+                            imageKind: "test",
+                            fileName: testFile.name,
+                        }),
         };
 
         const resp = await fetch("/api/proxy/admin/style-dna/images", { 
