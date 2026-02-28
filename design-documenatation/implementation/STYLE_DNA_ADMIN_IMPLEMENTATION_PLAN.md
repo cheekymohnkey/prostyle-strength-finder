@@ -23,6 +23,12 @@ Define a dedicated, execution-ready implementation plan for the admin-only Style
 
 Enable administrators to run rigorous, repeatable baseline-vs-test aesthetic delta analysis with minimal manual overhead and strong auditability.
 
+## Decommissioned / Archived Functionality (Planned under SDNA-35)
+
+1. Deterministic application-side trait inference/fallback behavior is being retired in favor of strict-schema LLM-only trait inference.
+2. Historical references to deterministic fallback behavior remain for audit context only and should not be treated as forward implementation scope.
+3. Active planning work must use LLM-only inference language; deterministic app-side inference work items belong only in archive/decommission notes.
+
 ## Current Execution Snapshot (2026-02-24)
 
 Implemented in code:

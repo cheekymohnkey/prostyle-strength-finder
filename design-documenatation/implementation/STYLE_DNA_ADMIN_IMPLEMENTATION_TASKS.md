@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-20` Artifact Index + Prune Tooling.
+1. `SDNA-35` LLM-Only Trait Inference Cutover.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-20`.
-2. Implement only SDNA-20 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-35`.
+2. Implement only SDNA-35 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -340,6 +340,7 @@ Acceptance criteria:
 20. `SDNA-20` artifact index + prune tooling.
 21. `SDNA-21` artifact export + manifest tooling.
 22. `SDNA-22` artifact upload/publish receipt workflow.
+23. `SDNA-35` LLM-only trait inference cutover.
 
 ## Completed Task (SDNA-34 / DISC-002 Environment Rollout Verification)
 
@@ -877,7 +878,49 @@ Risks / notes:
 2. Naming contract is versioned (`sdna_rollout_artifacts_v1`) and should be bumped if stage schema changes.
 
 Next kickoff:
-1. `SDNA-20` Artifact Index + Prune Tooling.
+1. `SDNA-35` LLM-Only Trait Inference Cutover.
+
+## Next Task (SDNA-35 / LLM-Only Trait Inference Cutover)
+
+Status: Planned 2026-03-01.
+
+Objective:
+1. Remove application-side trait inference and make strict-schema LLM output the single inference source for Style-DNA runs.
+
+Scope:
+1. Remove/disable app-side fallback/heuristic trait inference paths in Style-DNA result generation.
+2. Preserve canonicalization/taxonomy mapping and audit persistence behavior after validated LLM output.
+3. Enforce explicit deterministic failure behavior for invalid/missing LLM trait payloads.
+4. Keep launch/readiness behavior unchanged.
+5. Review remaining planned-work docs and remove deterministic app-side trait inference tasks from active plans.
+6. Move historical deterministic app-side inference references to archive/decommissioned sections where needed.
+
+Out of scope:
+1. Worker queue architecture redesign.
+2. Frontend redesign/new UI.
+3. Non-Style-DNA features.
+
+Definition of done:
+1. No app-side trait inference path is used for Style-DNA run result generation.
+2. Valid strict-schema LLM output still yields succeeded runs with persisted canonicalized traits.
+3. Invalid/malformed LLM schema output fails deterministically with explicit error contracts.
+4. Existing launch/readiness checks remain green.
+5. Active planned-work sections no longer include deterministic app-side trait inference tasks.
+6. Appropriate design docs contain explicit archive/decommissioned notes for superseded deterministic app-side inference behavior.
+
+Verification command order:
+1. `npm run contracts`
+2. `set -a && source .env.local && set +a && npm run style-dna:run-smoke`
+3. `set -a && source .env.local && set +a && npm run style-dna:schema-failure-smoke`
+4. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
+5. `set -a && source .env.local && set +a && npm run launch:readiness-smoke`
+
+Risks / notes:
+1. LLM/schema drift can increase hard-fail frequency without app-side fallback.
+2. Model/version changes can alter output characteristics and should be monitored via existing smoke/readiness evidence.
+
+Next kickoff:
+1. `SDNA-35` LLM-Only Trait Inference Cutover.
 
 ## Verification Runbook (Target End-State)
 

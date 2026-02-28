@@ -108,6 +108,7 @@ Rationale: Downstream parsing, taxonomy mapping, and auditability require determ
 
 27. Trait extraction strategy is hybrid: open-trait discovery at ingestion + canonical taxonomy mapping for production scoring.
 Rationale: Strict taxonomy-only extraction misses nuance; open extraction without mapping causes synonym fragmentation.
+Status note (2026-03-01): superseded for forward implementation planning by SDNA-35 LLM-only trait inference cutover. Keep this item as historical context only.
 
 28. Style-DNA baseline generation and comparison operations are admin-only workflows.
 Rationale: Controlled execution and dataset quality are operational governance concerns, not general consumer flow.

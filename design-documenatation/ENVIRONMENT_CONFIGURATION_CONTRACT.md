@@ -52,7 +52,7 @@ For the current phase, these are the only supported environments beyond local: `
 | `AUTH_JWKS_CACHE_TTL_SEC` | No | API | integer | JWKS cache TTL in seconds (default `600`). |
 | `DEFAULT_STANDARD_MODEL_VERSION` | Yes | API, Worker | integer string | Current default MidJourney standard model version used when prompt has no `--v`/`--niji`. |
 | `DEFAULT_NIJI_MODEL_VERSION` | Yes | API, Worker | integer string | Current default niji model version used for default tables and operations that need niji fallback metadata. |
-| `TRAIT_INFERENCE_MODE` | No | API, Worker | `deterministic|llm` | Trait inference execution mode. Defaults to `deterministic` for local safety. |
+| `TRAIT_INFERENCE_MODE` | No | API, Worker | `llm` (legacy: `deterministic`) | Trait inference execution mode. Forward path is `llm` only (SDNA-35). `deterministic` is deprecated and retained only for historical rollback context until decommission cleanup is complete. |
 | `OPENAI_API_KEY` | Conditional | API, Worker | string | Required when `TRAIT_INFERENCE_MODE=llm`. |
 | `OPENAI_MODEL` | No | API, Worker | string | OpenAI model id for trait inference (default `gpt-4.1-mini`). |
 | `OPENAI_BASE_URL` | No | API, Worker | URL | Base URL for OpenAI-compatible endpoint (default `https://api.openai.com/v1`). |
