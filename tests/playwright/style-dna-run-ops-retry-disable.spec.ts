@@ -29,4 +29,24 @@ test.describe("Style DNA Studio run operations - retry disable UX", () => {
     await expect(retryDisabledWrapper).toBeVisible();
     await expect(retryDisabledWrapper.getByRole("button", { name: "Load for retry" })).toBeDisabled();
   });
+
+  test("loads retry context when references are present and allows clearing stored grid", async ({ page }) => {
+    await openRunOpsForInfluence(page, "si_playwright_seed");
+
+    const statusFilter = page.getByTestId("run-status-filter");
+    await statusFilter.selectOption("failed");
+    await expect(statusFilter).toHaveValue("failed");
+
+    const loadableRetryRow = page.locator('[data-testid="run-row"]', {
+      hasText: "Seeded failed run for diagnostics assertions.",
+    });
+    await expect(loadableRetryRow).toBeVisible();
+    await loadableRetryRow.getByRole("button", { name: "Load for retry" }).click();
+
+    await expect(page.getByText("Using stored test grid")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Submit Retry" })).toBeEnabled();
+
+    await page.getByRole("button", { name: "Clear" }).click();
+    await expect(page.getByText("Using stored test grid")).toHaveCount(0);
+  });
 });
