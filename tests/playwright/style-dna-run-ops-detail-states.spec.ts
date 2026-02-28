@@ -11,6 +11,26 @@ async function openRunOpsForInfluence(page: Parameters<typeof test>[0]["page"], 
 }
 
 test.describe("Style DNA Studio run operations - detail states", () => {
+  test("preserves selected run when refreshing run list", async ({ page }) => {
+    await openRunOpsForInfluence(page, "si_playwright_seed");
+
+    const statusFilter = page.getByTestId("run-status-filter");
+    await statusFilter.selectOption("failed");
+    await expect(statusFilter).toHaveValue("failed");
+
+    const selectedRow = page.locator('[data-testid="run-row"]', {
+      hasText: "Seeded failed run without test grid reference.",
+    });
+    await selectedRow.click();
+    await expect(selectedRow).toHaveAttribute("data-selected", "true");
+
+    const refreshRuns = page.getByRole("button", { name: "Refresh runs" });
+    await refreshRuns.click();
+
+    await expect(selectedRow).toHaveAttribute("data-selected", "true");
+    await expect(page.getByTestId("selected-run-details")).toContainText("sdr_failmissing_001");
+  });
+
   test("shows failed-run diagnostics in selected details and modal", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
@@ -81,5 +101,28 @@ test.describe("Style DNA Studio run operations - detail states", () => {
     await expect(page.getByText("No runs found for this influence.")).toBeVisible();
     await expect(page.getByTestId("run-row")).toHaveCount(0);
     await expect(page.getByTestId("selected-run-details")).toHaveCount(0);
+  });
+
+  test("closes run-detail modal when clicking overlay", async ({ page }) => {
+    await openRunOpsForInfluence(page, "si_playwright_seed");
+
+    const statusFilter = page.getByTestId("run-status-filter");
+    await statusFilter.selectOption("failed");
+    await expect(statusFilter).toHaveValue("failed");
+
+    const diagnosticsFailedRow = page.locator('[data-testid="run-row"]', {
+      hasText: "Seeded failed run for diagnostics assertions.",
+    });
+    await diagnosticsFailedRow.click();
+
+    const viewDetails = page.getByTestId("view-run-details");
+    await expect(viewDetails).toBeVisible();
+    await viewDetails.click();
+
+    const modal = page.getByTestId("run-detail-modal");
+    await expect(modal).toBeVisible();
+
+    await page.getByTestId("run-detail-modal-overlay").click({ position: { x: 10, y: 10 } });
+    await expect(modal).toHaveCount(0);
   });
 });
