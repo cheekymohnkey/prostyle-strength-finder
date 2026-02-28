@@ -595,3 +595,7 @@ Verification:
 
 Recommended next task:
 1. Refactor run-ops Playwright tests with shared helper utilities to reduce duplicated setup while preserving current behavior assertions.
+
+Follow-up completed:
+1. `7624d04` — extracted shared run-ops Playwright helper utilities (`tests/playwright/support/run-ops-helpers.ts`) and rewired run-ops specs with no assertion behavior changes.
+2. Verification remained green: `set -a && source .env.local && set +a && npm run e2e:playwright` (pass; 9 specs).

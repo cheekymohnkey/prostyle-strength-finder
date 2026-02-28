@@ -249,3 +249,7 @@ Out of scope:
 Definition of done:
 1. No behavior changes in assertions.
 2. `npm run e2e:playwright` remains green.
+
+### Follow-up note (maintainability)
+1. Shared run-ops Playwright helpers extracted in `7624d04` (`refactor(playwright): extract shared run-ops helper utilities`).
+2. Browser behavior assertions unchanged; suite remained green after refactor.
