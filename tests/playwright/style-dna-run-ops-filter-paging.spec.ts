@@ -48,4 +48,35 @@ test.describe("Style DNA Studio run operations - filter and paging", () => {
     await expect(statusFilter).toHaveValue("all");
     await expect(pageIndicator).toHaveText(/^1\/\d+$/);
   });
+
+  test("supports queued and in-progress filters and resets paging on filter change", async ({ page }) => {
+    await openRunOpsForInfluence(page, "si_playwright_seed");
+
+    const statusFilter = page.getByTestId("run-status-filter");
+    await expect(statusFilter).toBeVisible();
+
+    const runRows = page.getByTestId("run-row");
+    const pageIndicator = page.getByTestId("run-page-indicator");
+
+    await statusFilter.selectOption("all");
+    await expect(statusFilter).toHaveValue("all");
+    await expect(runRows).toHaveCount(10);
+
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(pageIndicator).toHaveText(/^2\/\d+$/);
+
+    await statusFilter.selectOption("queued");
+    await expect(statusFilter).toHaveValue("queued");
+    await expect.poll(async () => runRows.count()).toBe(1);
+    await expect(pageIndicator).toHaveText(/^1\/1$/);
+
+    await statusFilter.selectOption("in_progress");
+    await expect(statusFilter).toHaveValue("in_progress");
+    await expect.poll(async () => runRows.count()).toBe(1);
+    await expect(pageIndicator).toHaveText(/^1\/1$/);
+
+    await statusFilter.selectOption("all");
+    await expect(statusFilter).toHaveValue("all");
+    await expect(pageIndicator).toHaveText(/^1\/\d+$/);
+  });
 });
