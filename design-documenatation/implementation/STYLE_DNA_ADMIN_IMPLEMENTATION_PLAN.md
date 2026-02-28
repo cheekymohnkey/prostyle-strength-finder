@@ -172,7 +172,7 @@ Implemented in code:
 - includes artifact download commands and handover evidence block template
 
 Open gaps:
-1. `DISC-002` remains partially open: SDNA-34 execution runbook is ready; remaining work is capturing real CI run evidence (warning-only + hard-gate + schedule ownership verification).
+1. `DISC-002` is closed via `SDNA-36` evidence closeout: fresh CI dispatch runs were captured for `warning-only` and `hard-gate` (`22520274603`, `22520275229`), with governance status artifacts retained and latest evidence fields (`retentionDir`, `manifestPath`, `receiptPath`, freshness `fresh/within_threshold`) documented in active handover/tasks docs, plus explicit schedule ownership verification/response expectations.
 2. DISC-003 residual limitation: submitted test-envelope evidence is validated server-side, but rendered-image authenticity remains operator/process-dependent.
 3. Remaining admin UX work is minor visual/layout refinement only; contract, guardrail, and smoke-verified status coverage are complete for this scope.
 

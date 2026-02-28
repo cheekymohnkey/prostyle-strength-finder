@@ -6,7 +6,7 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. Post-SDNA-35 prioritization (TBD by roadmap owner).
+1. Post-SDNA-36 prioritization (TBD by roadmap owner).
 
 Use this as kickoff in a new chat:
 1. Objective: remove app-side trait inference and depend entirely on strict-schema LLM output.
@@ -16,6 +16,43 @@ Use this as kickoff in a new chat:
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
+
+## Addendum - 2026-03-01 (SDNA-36 DISC-002 CI Governance Evidence Closeout Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Captured fresh real CI governance evidence for both modes using `.github/workflows/style-dna-evidence-governance.yml`:
+- warning-only run `22520274603`
+- hard-gate run `22520275229`
+2. Captured concrete evidence metadata for both runs:
+- run URL,
+- artifact name/expiry (`style-dna-governance-status-prod`),
+- retention dir,
+- manifest + receipt paths,
+- freshness fields (`status=fresh`, `reason=within_threshold`, `staleEnvironmentCount=0`).
+3. Documented schedule ownership verification path with concrete run references and explicit response/escalation expectations.
+4. Closed active `DISC-002` partial-open wording in active plan/tasks docs.
+5. Applied minimal CI wiring correction so governance verify command accepts both `--key=value` and `--key value` argument forms used by workflow/runbook examples.
+
+### Files changed
+1. `scripts/governance/verify-freshness.js`
+2. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+3. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+4. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+5. `design-documenatation/LLM_WORKFLOW.md`
+
+### Verification command order
+1. `npm run contracts`
+2. `set -a && source .env.local && set +a && npm run launch:readiness-smoke`
+
+### Risks / follow-up notes
+1. Fresh CI runs `22520274603` and `22520275229` generated valid governance artifacts and fresh status payloads, but failed at post-check before parser fix (`--requireArtifacts true` parsing); parser handling is now corrected for subsequent runs.
+2. Scheduled run ownership remains process-dependent; keep Monday review + stale escalation discipline in release/on-call handoff.
+
+### Recommended next task kickoff
+1. Select next SDNA ticket by roadmap priority (`DISC-002` CI governance evidence closeout is complete).
 
 ## Addendum - 2026-03-01 (SDNA-35 LLM-Only Trait Inference Cutover Kickoff)
 

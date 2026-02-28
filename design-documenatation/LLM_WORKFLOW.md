@@ -7,7 +7,7 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 ## NEXT SESSION START HERE (as of 2026-03-01)
 
 Current next implementation task:
-1. Post-SDNA-35 prioritization (next SDNA ticket TBD by roadmap owner).
+1. Post-SDNA-36 prioritization (next SDNA ticket TBD by roadmap owner).
 
 Primary pointers:
 1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
@@ -61,6 +61,15 @@ Definition of done:
 1. SDNA-35 is completed.
 2. Style-DNA run inference is now strict-schema LLM-only with deterministic explicit failure contracts for invalid/missing payloads.
 3. Deterministic app-side Style-DNA inference references are archived/decommissioned context only and are not forward implementation work.
+
+## SDNA-36 Status Note (2026-03-01)
+
+1. SDNA-36 is completed and `DISC-002` CI governance evidence closeout is complete.
+2. Fresh real CI evidence is captured for both governance modes:
+- warning-only: `https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520274603`
+- hard-gate: `https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520275229`
+3. Evidence records now include run links, artifact retention/expiry metadata, retention dir, manifest/receipt paths, and freshness fields.
+4. Schedule ownership verification and stale-response expectations are now explicitly documented in active handover/tasks docs.
 
 ## Source-of-Truth Docs
 

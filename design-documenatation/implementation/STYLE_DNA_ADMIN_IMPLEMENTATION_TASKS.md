@@ -364,7 +364,7 @@ Definition of done:
 4. Regression checks remain green.
 5. Task handoff documents files changed, decisions made, risks, and recommended next slice.
 
-Status: Completed 2026-02-28 (hard-gate + warning-only CI runs fresh; manifests and receipts retained under prod paths listed below).
+Status: Completed 2026-03-01 (`DISC-002` closed via `SDNA-36` CI governance evidence closeout; fresh warning-only + hard-gate evidence and schedule ownership response path captured).
 
 Verification commands:
 1. `npm run contracts`
@@ -395,6 +395,23 @@ Verification commands:
 #### Additional evidence (2026-02-28T06:13Z hard-gate + warning-only)
 - Hard-gate run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22514996483 (fresh, manifest+receipt present). Retention: tmp/style-dna-evidence/shared-ci/prod/20260228T061307Z.
 - Warning-only run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22514997916 (fresh, manifest+receipt present). Retention: tmp/style-dna-evidence/shared-ci/prod/20260228T061315Z.
+
+#### SDNA-36 closeout evidence (2026-02-28T11:56Z UTC; captured 2026-03-01 local)
+- Warning-only run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520274603.
+	- Mode proof: `Governance Check (warning-only)` succeeded and `Governance Check (hard-gate)` was skipped.
+	- Artifact: `style-dna-governance-status-prod` (not expired; expires at `2026-05-29T11:56:41Z`).
+	- Status JSON: `generatedAtUtc=2026-02-28T11:56:59.486Z`, `status=fresh`, `reason=within_threshold`, `staleEnvironmentCount=0`.
+	- Retention/evidence: `tmp/style-dna-evidence/shared-ci/prod/20260228T115658Z` with manifest `gov_20260228T115658Z__export_manifest.json` and receipt `gov_20260228T115658Z__upload_receipt.json` (`manifestExists=true`, `receiptExists=true`).
+- Hard-gate run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520275229.
+	- Mode proof: `Governance Check (hard-gate)` succeeded and `Governance Check (warning-only)` was skipped.
+	- Artifact: `style-dna-governance-status-prod` (not expired; expires at `2026-05-29T11:56:43Z`).
+	- Status JSON: `generatedAtUtc=2026-02-28T11:56:59.854Z`, `status=fresh`, `reason=within_threshold`, `staleEnvironmentCount=0`.
+	- Retention/evidence: `tmp/style-dna-evidence/shared-ci/prod/20260228T115658Z` with manifest `gov_20260228T115658Z__export_manifest.json` and receipt `gov_20260228T115658Z__upload_receipt.json` (`manifestExists=true`, `receiptExists=true`).
+- Ownership response path (schedule verification contract):
+	- Monday scheduled ownership check remains `.github/workflows/style-dna-evidence-governance.yml` (`cron: 0 9 * * 1`, hard-gate default).
+	- Manual dispatch references above (`22520274603`, `22520275229`) are the concrete fallback evidence path if a scheduled run is delayed/missing.
+	- Expected owner response when schedule is stale/missing: release owner triggers immediate hard-gate dispatch for `prod`, infra owner verifies artifact upload + `latest_governance_status.json`, on-call maintainer confirms `manifestExists=true` and `receiptExists=true` and records the run URL + retention dir in handover.
+	- Escalation expectation: if stale persists after one rerun, open incident thread and attach failing/succeeding run URLs plus governance status artifact summary.
 
 #### Runbook: verify governance freshness
 - Locate latest retention dir under tmp/style-dna-evidence/shared-ci/<app_env>/; expect manifest+receipt files to exist.

@@ -16,10 +16,17 @@ function parseArgs(argv) {
   for (let i = 2; i < argv.length; i += 1) {
     const [key, value] = argv[i].split("=");
     const normalizedKey = key.replace(/^--/, "");
-    if (value === undefined) {
-      args[normalizedKey] = true;
-    } else {
+    if (value !== undefined) {
       args[normalizedKey] = value;
+      continue;
+    }
+
+    const nextToken = argv[i + 1];
+    if (nextToken && !nextToken.startsWith("--")) {
+      args[normalizedKey] = nextToken;
+      i += 1;
+    } else {
+      args[normalizedKey] = true;
     }
   }
   return args;
