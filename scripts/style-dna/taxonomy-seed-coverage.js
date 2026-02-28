@@ -95,6 +95,13 @@ function main() {
   const output = {
     ok: report.ok,
     seedPath,
+    preview: {
+      taxonomyVersion: report.taxonomyVersion,
+      reportSignature: report.reportSignature,
+      coveredAxisCount: report.totals?.coveredAxisCount ?? 0,
+      uncoveredAxisCount: report.totals?.uncoveredAxisCount ?? 0,
+      deficitsCount: Array.isArray(report.deficits) ? report.deficits.length : 0,
+    },
     report,
   };
   const rendered = `${JSON.stringify(output, null, 2)}\n`;

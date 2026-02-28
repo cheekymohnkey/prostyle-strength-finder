@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-16` Seed Per-Axis Coverage Validation Tooling.
+1. `SDNA-17` Coverage-Gated Seed Apply Enforcement + Readiness Integration.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-16`.
-2. Implement only SDNA-16 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-17`.
+2. Implement only SDNA-17 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -750,6 +750,41 @@ Risks / notes:
 Next kickoff:
 1. `SDNA-16` Seed Per-Axis Coverage Validation Tooling.
 2. Scope: per-axis coverage validation hardening only; no worker/frontend redesign.
+
+## Next Task (SDNA-16 / Seed Per-Axis Coverage Validation Tooling)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Hardened per-axis taxonomy seed coverage report with deterministic preview contracts:
+- stable `reportSignature` (sha256 over deterministic report JSON),
+- explicit axis rollup surface (`summaryByAxis`),
+- aggregate coverage totals (`coveredAxisCount`, `uncoveredAxisCount`, canonical/alias totals).
+2. Added coverage CLI preview metadata for lightweight validation checks:
+- taxonomy version,
+- report signature,
+- covered/uncovered axis counts,
+- deficits count.
+3. Expanded coverage smoke assertions to lock deterministic replay behavior and persisted preview-contract parity.
+
+Files changed:
+1. `scripts/style-dna/taxonomy-seed-coverage-core.js`
+2. `scripts/style-dna/taxonomy-seed-coverage.js`
+3. `scripts/style-dna/taxonomy-seed-coverage-smoke.js`
+
+Verification:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-coverage-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-apply-coverage-smoke` (pass).
+4. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+
+Risks / notes:
+1. Signature determinism depends on stable field/array ordering in coverage report serialization.
+2. Preview contract is intentionally deterministic and omits runtime timestamp fields.
+
+Next kickoff:
+1. `SDNA-17` Coverage-Gated Seed Apply Enforcement + Readiness Integration.
+2. Scope: coverage-gated apply + readiness wiring hardening only; no worker/frontend redesign.
 
 ## Verification Runbook (Target End-State)
 

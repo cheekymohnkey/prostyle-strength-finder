@@ -1,5 +1,27 @@
 const { normalizeTraitText } = require("../inference/style-dna-canonicalizer");
+const crypto = require("crypto");
 const { STYLE_DNA_TRAIT_AXES } = require("../../packages/shared-contracts/src");
+
+function compareByKey(a, b) {
+  return String(a || "").localeCompare(String(b || ""));
+}
+
+function toDeterministicJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => toDeterministicJson(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value).sort(compareByKey);
+    return `{${keys
+      .map((key) => `${JSON.stringify(key)}:${toDeterministicJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
 
 function buildSeedCoverageReport(payload, options = {}) {
   const taxonomyVersion = String(payload?.taxonomyVersion || "style_dna_v1").trim() || "style_dna_v1";
@@ -66,15 +88,41 @@ function buildSeedCoverageReport(payload, options = {}) {
     }
   });
 
-  return {
+  const summaryByAxis = STYLE_DNA_TRAIT_AXES.map((axis) => ({
+    axis,
+    canonicalCount: coverageByAxis[axis].canonicalCount,
+    aliasCount: coverageByAxis[axis].aliasCount,
+    canonicalDeficit: coverageByAxis[axis].canonicalDeficit,
+    aliasDeficit: coverageByAxis[axis].aliasDeficit,
+    meetsCoverage: coverageByAxis[axis].meetsCoverage,
+  }));
+
+  const totals = {
+    axisCount: STYLE_DNA_TRAIT_AXES.length,
+    coveredAxisCount: summaryByAxis.filter((row) => row.meetsCoverage).length,
+    uncoveredAxisCount: summaryByAxis.filter((row) => !row.meetsCoverage).length,
+    totalCanonicalCount: summaryByAxis.reduce((sum, row) => sum + row.canonicalCount, 0),
+    totalAliasCount: summaryByAxis.reduce((sum, row) => sum + row.aliasCount, 0),
+  };
+
+  const baseReport = {
     taxonomyVersion,
     thresholds: {
       minCanonicalPerAxis,
       minAliasesPerAxis,
     },
     coverageByAxis,
+    summaryByAxis,
+    totals,
     deficits,
     ok: deficits.length === 0,
+  };
+
+  const reportSignature = sha256Hex(toDeterministicJson(baseReport));
+
+  return {
+    ...baseReport,
+    reportSignature,
   };
 }
 
