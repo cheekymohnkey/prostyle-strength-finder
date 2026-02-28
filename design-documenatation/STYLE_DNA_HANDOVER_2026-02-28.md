@@ -6,13 +6,13 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. SDNA-37 / DISC-003 authenticity hardening (in progress).
+1. Post-SDNA-37 prioritization (next SDNA ticket TBD by roadmap owner).
 
 Use this as kickoff in a new chat:
-1. Objective: reduce DISC-003 process-trust risk by adding immutable upload-evidence digests/provenance fields for Style-DNA images.
-2. Scope: surgical Style-DNA image upload/persistence/verification hardening and docs updates only.
+1. Objective: select the next highest-priority SDNA ticket after SDNA-37 closeout.
+2. Scope: one ticket only, surgical implementation.
 3. Out of scope: worker queue architecture redesign, frontend redesign/new UI, non-Style-DNA work.
-4. DoD: image evidence records include deterministic digest + provenance receipt fields and verification evidence is captured in handoff.
+4. DoD: ticket-specific acceptance criteria verified and captured in handoff.
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
@@ -207,6 +207,36 @@ Canonical task detail location:
 
 ### Recommended next task kickoff
 1. Finish SDNA-37 with concise operator runbook guidance/examples for provenance receipt values and strict-mode rollout checklist.
+
+## Addendum - 2026-03-01 (SDNA-37 Operator Guidance + Strict-Mode Checklist Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Added strict-mode provenance operator guidance and rollout checklist to launch runbook/checklist docs.
+2. Added explicit SDNA-37 provenance evidence tuple requirements in active tasks doc and aligned next-session pointers.
+3. Marked SDNA-37 progress snapshot as operationally complete (residual DISC-003 remains process-trust/non-cryptographic origin proof only).
+
+### Files changed
+1. `design-documenatation/EPIC_E_LAUNCH_RUNBOOK.md`
+2. `design-documenatation/LAUNCH_CHECKLIST.md`
+3. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+4. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+5. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+6. `design-documenatation/LLM_WORKFLOW.md`
+
+### Verification command order
+1. `set -a && source .env.local && set +a && STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT=true npm run style-dna:baseline-smoke`
+2. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
+3. `npm run contracts`
+
+### Risks / follow-up notes
+1. Provenance metadata materially improves traceability/accountability but still does not cryptographically prove external render origin.
+2. Operator quality of `operatorAssertion` remains important for audit usefulness.
+
+### Recommended next task kickoff
+1. Select next SDNA ticket by roadmap priority (`SDNA-37` closeout complete; DISC-003 residual is now explicitly process-trust only).
 
 ## Addendum - 2026-03-01 (SDNA-35 LLM-Only Trait Inference Cutover Kickoff)
 

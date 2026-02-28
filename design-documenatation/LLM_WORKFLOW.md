@@ -7,7 +7,7 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 ## NEXT SESSION START HERE (as of 2026-03-01)
 
 Current next implementation task:
-1. SDNA-37 / DISC-003 authenticity hardening (image evidence digest + provenance receipt baseline).
+1. Post-SDNA-37 prioritization (next SDNA ticket TBD by roadmap owner).
 
 Primary pointers:
 1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`

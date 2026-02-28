@@ -74,6 +74,32 @@ Fail:
 - queue-unavailable submit contract assertions
 - idempotency + lifecycle observability assertions
 
+## SDNA-37 Provenance Receipt Operator Guidance
+
+When `STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT=true`, all Style-DNA image uploads (`POST /v1/admin/style-dna/images`) must include `provenanceReceipt`.
+
+Required provenance fields:
+1. `source` (string)
+2. `capturedAtUtc` (ISO-8601 UTC timestamp)
+3. `operatorAssertion` (nullable string; include field explicitly)
+
+Recommended source values:
+1. `studio_manual_upload` (admin studio uploads)
+2. `midjourney_manual_export` (direct operator export flow)
+3. `operator_upload_unverified` (local/dev fallback only; avoid in prod handoff evidence)
+
+Operator assertion examples:
+1. `baseline_grid_uploaded_via_studio:<filename>`
+2. `test_grid_uploaded_via_studio:<filename>`
+3. `grid captured from MJ job console export`
+
+Strict-mode rollout checklist:
+1. Verify `.env` includes `STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT=true` for target env.
+2. Verify admin UI uploads include `provenanceReceipt` in payload.
+3. Run `set -a && source .env.local && set +a && STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT=true npm run style-dna:baseline-smoke`.
+4. Confirm strict-policy rejection path still returns `400 INVALID_REQUEST` for missing receipt.
+5. Confirm handover evidence block includes digest + provenance tuple fields.
+
 ## Notes
 
 1. In restricted/sandboxed environments, localhost bind/listen permissions may block smoke runs.

@@ -18,7 +18,7 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. SDNA-37 / DISC-003 authenticity hardening (image evidence digest + provenance receipt baseline).
+1. Post-SDNA-37 prioritization (next SDNA ticket TBD by roadmap owner).
 
 Quick start:
 1. Use SDNA-36 post-fix green evidence refresh as the baseline state.
@@ -29,7 +29,8 @@ SDNA-37 progress snapshot:
 1. `contentSha256` image digest persistence is implemented and smoke-verified.
 2. Provenance receipt baseline fields are now implemented for Style-DNA image uploads with backward-compatible defaults.
 3. Admin Studio upload payloads now send `provenanceReceipt` for both baseline and test grid uploads (active Studio + legacy fallback page).
-4. Remaining SDNA-37 work is operator-facing strict-mode guidance and any final policy tightening decisions.
+4. Operator-facing strict-mode runbook/checklist guidance and evidence-template requirements are now documented.
+5. Residual DISC-003 limitation is explicitly process-trust only (external render origin remains non-cryptographic).
 
 SDNA-37 handover evidence template (required fields):
 1. `runUrl` or execution reference.

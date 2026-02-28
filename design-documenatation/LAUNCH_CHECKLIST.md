@@ -35,6 +35,11 @@ Style-DNA run-flow contract evidence (SDNA-11/SDNA-12 sync):
 3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
 4. `npm run contracts`
 
+Style-DNA provenance strict-mode evidence (SDNA-37):
+1. `set -a && source .env.local && set +a && STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT=true npm run style-dna:baseline-smoke`
+2. Confirm strict-policy missing-receipt path is covered in smoke assertions.
+3. Confirm run/handover evidence includes `contentSha256`, `provenanceSource`, `provenanceCapturedAtUtc`, `provenanceOperatorAssertion`, and policy fields.
+
 ## Pass Criteria
 
 All must be true:
@@ -47,6 +52,10 @@ All must be true:
 - invalid status filter contract (`400 INVALID_REQUEST` + `allowedValues`),
 - queue-unavailable submit contract (`503 QUEUE_UNAVAILABLE` + failed run persisted),
 - idempotency/lifecycle observability invariants.
+6. Style-DNA provenance strict-mode evidence passes:
+- strict policy baseline smoke exits zero,
+- evidence tuple fields are present in handoff block,
+- no missing-receipt uploads pass when strict policy is enabled.
 
 ## Fail Criteria
 
