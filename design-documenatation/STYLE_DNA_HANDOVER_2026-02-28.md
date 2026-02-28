@@ -6,13 +6,13 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. Post-SDNA-36 prioritization (TBD by roadmap owner).
+1. SDNA-37 / DISC-003 authenticity hardening (in progress).
 
 Use this as kickoff in a new chat:
-1. Objective: remove app-side trait inference and depend entirely on strict-schema LLM output.
-2. Scope: Style-DNA inference pipeline hardening only (LLM-only path, explicit failure contracts, unchanged launch/readiness behavior), plus planned-work/documentation decommission sweep for deterministic app-side inference references.
+1. Objective: reduce DISC-003 process-trust risk by adding immutable upload-evidence digests/provenance fields for Style-DNA images.
+2. Scope: surgical Style-DNA image upload/persistence/verification hardening and docs updates only.
 3. Out of scope: worker queue architecture redesign, frontend redesign/new UI, non-Style-DNA work.
-4. DoD: LLM-only inference contracts are explicit, deterministic, and captured in handoff evidence.
+4. DoD: image evidence records include deterministic digest fields and verification evidence is captured in handoff.
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
@@ -60,6 +60,39 @@ Canonical task detail location:
 
 ### Recommended next task kickoff
 1. Select next SDNA ticket by roadmap priority (`DISC-002` CI governance evidence closeout is complete).
+
+## Addendum - 2026-03-01 (SDNA-37 DISC-003 Authenticity Hardening Kickoff)
+
+### Status
+1. In progress.
+
+### Completed in this slice
+1. Added immutable Style-DNA image content digest capture (`SHA-256`) at upload time and persisted it in DB (`content_sha256`).
+2. API image response mapping now returns `contentSha256` for uploaded images.
+3. Baseline smoke now asserts digest presence/format and deterministic equality for identical uploaded image bytes.
+4. Updated active workflow/plan/tasks pointers to make SDNA-37 the current next task.
+
+### Files changed
+1. `scripts/db/migrations/20260301130000_style_dna_image_sha256.sql`
+2. `scripts/db/repository.js`
+3. `apps/api/src/index.js`
+4. `scripts/style-dna/baseline-smoke.js`
+5. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+7. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+8. `design-documenatation/LLM_WORKFLOW.md`
+
+### Verification command order
+1. `DATABASE_URL=file:./data/prostyle.local.db node scripts/db/migrate.js apply`
+2. `set -a && source .env.local && set +a && npm run style-dna:baseline-smoke`
+3. `npm run contracts`
+
+### Risks / follow-up notes
+1. Digest capture improves evidence integrity and replay/audit confidence, but does not cryptographically attest external MidJourney origin.
+2. Next slice should add explicit provenance-receipt fields for operator evidence pathing and update runbook evidence templates accordingly.
+
+### Recommended next task kickoff
+1. Continue SDNA-37 with provenance receipt contract + handover evidence template updates (surgical docs/API scope).
 
 ## Addendum - 2026-03-01 (SDNA-35 LLM-Only Trait Inference Cutover Kickoff)
 

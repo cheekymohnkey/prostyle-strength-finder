@@ -18,12 +18,12 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. Post-SDNA-35 prioritization (TBD by roadmap owner).
+1. SDNA-37 / DISC-003 authenticity hardening (image evidence digest + provenance receipt baseline).
 
 Quick start:
-1. Review latest completed addendum and choose next numbered SDNA ticket.
-2. Keep changes scoped to one ticket objective per session.
-3. End with handoff summary + verification outcomes.
+1. Use SDNA-36 post-fix green evidence refresh as the baseline state.
+2. Continue DISC-003 hardening in surgical slices (no workflow architecture redesign).
+3. End each slice with handoff summary + verification outcomes.
 
 Do not start with:
 1. Worker inference redesign.

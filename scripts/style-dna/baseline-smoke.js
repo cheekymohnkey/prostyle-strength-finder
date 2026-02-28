@@ -231,6 +231,11 @@ async function main() {
     const testImageId = testImage?.image?.styleDnaImageId;
     assertCondition(Boolean(baselineImageId), "Missing baseline image id");
     assertCondition(Boolean(testImageId), "Missing test image id");
+    const baselineImageSha = String(baselineImage?.image?.contentSha256 || "").trim();
+    const testImageSha = String(testImage?.image?.contentSha256 || "").trim();
+    assertCondition(/^[a-f0-9]{64}$/.test(baselineImageSha), "Expected baseline image contentSha256");
+    assertCondition(/^[a-f0-9]{64}$/.test(testImageSha), "Expected test image contentSha256");
+    assertCondition(baselineImageSha === testImageSha, "Expected identical digest for identical uploaded image bytes");
     createdImageIds.push(baselineImageId, testImageId);
 
     suiteId = `suite_style_dna_baseline_smoke_${Date.now()}`;

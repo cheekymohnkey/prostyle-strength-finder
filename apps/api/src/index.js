@@ -797,6 +797,7 @@ function mapStyleDnaImageRow(row) {
     mimeType: row.mime_type,
     fileName: row.file_name,
     sizeBytes: Number(row.size_bytes || 0),
+    contentSha256: row.content_sha256 || null,
     createdBy: row.created_by,
     createdAt: row.created_at,
   };
@@ -2631,6 +2632,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         return;
       }
       const styleDnaImageId = `sdimg_${crypto.randomUUID()}`;
+      const contentSha256 = crypto.createHash("sha256").update(buffer).digest("hex");
       const ext = extensionForMimeType(payload.mimeType);
       const key = `uploads/style-dna/${payload.imageKind}/${styleDnaImageId}.${ext}`;
       const put = await storageAdapter.putObject({
@@ -2640,6 +2642,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         metadata: {
           style_dna_image_id: styleDnaImageId,
           image_kind: payload.imageKind,
+          content_sha256: contentSha256,
           uploaded_by: authenticatedUserId,
           created_at: new Date().toISOString(),
         },
@@ -2652,6 +2655,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         mimeType: payload.mimeType,
         fileName: payload.fileName,
         sizeBytes: put.sizeBytes,
+        contentSha256,
         createdBy: authenticatedUserId,
       });
       sendJson(

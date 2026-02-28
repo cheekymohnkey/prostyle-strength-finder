@@ -7,7 +7,7 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 ## NEXT SESSION START HERE (as of 2026-03-01)
 
 Current next implementation task:
-1. Post-SDNA-36 prioritization (next SDNA ticket TBD by roadmap owner).
+1. SDNA-37 / DISC-003 authenticity hardening (image evidence digest + provenance receipt baseline).
 
 Primary pointers:
 1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
@@ -66,8 +66,8 @@ Definition of done:
 
 1. SDNA-36 is completed and `DISC-002` CI governance evidence closeout is complete.
 2. Fresh real CI evidence is captured for both governance modes:
-- warning-only: `https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520274603`
-- hard-gate: `https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520275229`
+- warning-only (post-fix green): `https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520357488`
+- hard-gate (post-fix green): `https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520358189`
 3. Evidence records now include run links, artifact retention/expiry metadata, retention dir, manifest/receipt paths, and freshness fields.
 4. Schedule ownership verification and stale-response expectations are now explicitly documented in active handover/tasks docs.
 
