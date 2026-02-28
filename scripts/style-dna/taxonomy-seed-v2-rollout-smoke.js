@@ -54,6 +54,10 @@ function main() {
       minAliasesPerAxis: 16,
     });
     assertCondition(v2Coverage.ok === true, `Expected v2 coverage to pass, got deficits=${v2Coverage.deficits.length}`);
+    assertCondition(
+      typeof v2Coverage.reportSignature === "string" && v2Coverage.reportSignature.length === 64,
+      "Expected v2 coverage reportSignature sha256"
+    );
 
     const first = applyStyleDnaTaxonomySeed(dbPath, "smoke:taxonomy-seed-v2-rollout", v2Payload);
     assertCondition(first.summary.canonicalTraits.created === 20, `Expected v2 first canonical created=20, got ${first.summary.canonicalTraits.created}`);
@@ -67,6 +71,11 @@ function main() {
     assertCondition(second.summary.traitAliases.deduplicated === 80, `Expected v2 second alias dedupe=80, got ${second.summary.traitAliases.deduplicated}`);
 
     const v2Diff = buildTaxonomySeedDiffReport(dbPath, v2Payload);
+    const v2DiffReplay = buildTaxonomySeedDiffReport(dbPath, v2Payload);
+    assertCondition(
+      v2Diff.reportSignature === v2DiffReplay.reportSignature,
+      "Expected v2 diff reportSignature to remain stable across repeated reads"
+    );
     assertCondition(v2Diff.summary.missingCanonicalInDb === 0, `Expected v2 diff missingCanonicalInDb=0, got ${v2Diff.summary.missingCanonicalInDb}`);
     assertCondition(v2Diff.summary.missingAliasInDb === 0, `Expected v2 diff missingAliasInDb=0, got ${v2Diff.summary.missingAliasInDb}`);
     assertCondition(v2Diff.summary.aliasConflicts === 0, `Expected v2 diff aliasConflicts=0, got ${v2Diff.summary.aliasConflicts}`);
@@ -100,10 +109,12 @@ function main() {
           },
           v2CoverageSummary: {
             deficits: v2Coverage.deficits.length,
+            reportSignature: v2Coverage.reportSignature,
           },
           firstSummary: first.summary,
           secondSummary: second.summary,
           v2DiffSummary: v2Diff.summary,
+          v2DiffReportSignature: v2Diff.reportSignature,
           coexistRows: {
             style_dna_v1: v1Rows,
             style_dna_v2: v2Rows,

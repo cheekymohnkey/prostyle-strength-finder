@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { assertDatabaseReady } = require("../db/runtime");
 const { validateStyleDnaTaxonomySeedPayload } = require("../../packages/shared-contracts/src");
 const { buildSeedCoverageReport } = require("./taxonomy-seed-coverage-core");
@@ -94,6 +95,23 @@ function resolvePath(rawPath) {
 function makeRunId(taxonomyVersion) {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "_").replace(/\..+$/, "Z");
   return `${String(taxonomyVersion || "taxonomy").replace(/[^a-zA-Z0-9_]+/g, "_")}__${stamp}`;
+}
+
+function toDeterministicJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => toDeterministicJson(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value).sort((left, right) => String(left).localeCompare(String(right)));
+    return `{${keys
+      .map((key) => `${JSON.stringify(key)}:${toDeterministicJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
 }
 
 function writeArtifact(artifactDir, runId, stage, value) {
@@ -236,7 +254,26 @@ function main() {
       minCanonicalPerAxis: args.minCanonicalPerAxis,
       minAliasesPerAxis: args.minAliasesPerAxis,
     },
+    preview: {
+      coverageReportSignature: coverage.reportSignature,
+      diffBeforeSignature: diffBefore.reportSignature,
+      diffAfterSignature: diffAfterArtifactPath
+        ? JSON.parse(fs.readFileSync(diffAfterArtifactPath, "utf8")).report.reportSignature
+        : null,
+      blocked,
+      applyRequested: args.apply,
+      requireCoverage: args.requireCoverage,
+    },
   };
+  summary.rolloutEvidenceSignature = sha256Hex(
+    toDeterministicJson({
+      runId: summary.runId,
+      taxonomyVersion: summary.taxonomyVersion,
+      thresholds: summary.thresholds,
+      steps: summary.steps,
+      preview: summary.preview,
+    })
+  );
   const summaryArtifactPath = writeArtifact(artifactDir, runId, "summary", summary);
   process.stdout.write(
     `${JSON.stringify(

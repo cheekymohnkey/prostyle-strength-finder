@@ -98,6 +98,19 @@ function main() {
     });
     assertCondition(success.status === 0, `Expected success rollout status=0, got ${success.status}`);
     assertCondition(success.json?.ok === true, "Expected success rollout json ok=true");
+    assertCondition(
+      typeof success.json?.rolloutEvidenceSignature === "string" && success.json.rolloutEvidenceSignature.length === 64,
+      "Expected success rolloutEvidenceSignature sha256"
+    );
+    assertCondition(
+      success.json?.preview?.coverageReportSignature
+      && success.json?.preview?.diffBeforeSignature,
+      "Expected success preview signatures"
+    );
+    assertCondition(
+      success.json?.preview?.blocked === false,
+      "Expected success preview blocked=false"
+    );
     const successNames = listArtifactNames(artifactDir);
     const expectedSuccess = [
       `${successRunId}__apply.json`,
@@ -123,6 +136,18 @@ function main() {
     });
     assertCondition(blocked.status !== 0, "Expected blocked rollout status != 0");
     assertCondition(blocked.json?.ok === false, "Expected blocked rollout json ok=false");
+    assertCondition(
+      typeof blocked.json?.rolloutEvidenceSignature === "string" && blocked.json.rolloutEvidenceSignature.length === 64,
+      "Expected blocked rolloutEvidenceSignature sha256"
+    );
+    assertCondition(
+      blocked.json?.preview?.blocked === true,
+      "Expected blocked preview blocked=true"
+    );
+    assertCondition(
+      blocked.json?.preview?.diffAfterSignature === null,
+      "Expected blocked preview diffAfterSignature=null"
+    );
     const blockedNames = listArtifactNames(artifactDir);
     const expectedBlocked = [
       `${blockedRunId}__apply.json`,
@@ -148,6 +173,10 @@ function main() {
     assertCondition(
       blockedSummary?.namingConvention === `${blockedRunId}__{coverage|diff_before|apply|diff_after|summary}.json`,
       "Expected naming convention in summary"
+    );
+    assertCondition(
+      blockedSummary?.rolloutEvidenceSignature === blocked.json?.rolloutEvidenceSignature,
+      "Expected blocked summary rolloutEvidenceSignature to match command output"
     );
 
     console.log(

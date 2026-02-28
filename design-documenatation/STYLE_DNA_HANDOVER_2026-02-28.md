@@ -6,16 +6,45 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. `SDNA-18` Expanded v2 Seed Bundle + Versioned Rollout Workflow.
+1. `SDNA-19` Consolidated Rollout Artifact Generation + Naming Standards.
 
 Use this as kickoff in a new chat:
-1. Objective: complete expanded v2 taxonomy seed bundle + versioned rollout workflow hardening.
-2. Scope: v2 bundle/rollout workflow tooling + deterministic rollout evidence only.
+1. Objective: complete consolidated rollout artifact generation + naming standards hardening.
+2. Scope: rollout artifact generator/naming contracts + deterministic evidence only.
 3. Out of scope: worker inference redesign, frontend redesign/new UI, non-Style-DNA work.
-4. DoD: v2 bundle/rollout checks are explicit, deterministic, and captured in handoff evidence.
+4. DoD: rollout artifact generation/naming checks are explicit, deterministic, and captured in handoff evidence.
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
+
+## Addendum - 2026-02-28 (SDNA-18 Expanded v2 Seed Bundle + Versioned Rollout Workflow Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Added deterministic rollout-evidence signature contract (`rolloutEvidenceSignature`) to rollout summary output.
+2. Added explicit summary preview signature pointers (`coverageReportSignature`, `diffBeforeSignature`, `diffAfterSignature`) and gate-state context (`blocked`, `applyRequested`, `requireCoverage`).
+3. Expanded rollout artifact and v2 rollout smoke assertions for deterministic signature presence and replay stability.
+4. Re-validated full launch readiness smoke with rollout hardening in place.
+
+### Files changed
+1. `scripts/style-dna/taxonomy-seed-rollout-artifacts.js`
+2. `scripts/style-dna/taxonomy-seed-rollout-artifacts-smoke.js`
+3. `scripts/style-dna/taxonomy-seed-v2-rollout-smoke.js`
+
+### Verification evidence
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-rollout-artifacts-smoke` (pass).
+4. `set -a && source .env.local && set +a && npm run launch:readiness-smoke` (pass).
+
+### Risks / follow-up notes
+1. Deterministic evidence signatures rely on stable report schema ordering and key naming.
+2. Readiness full scope remains time-intensive but completed green in this slice.
+
+### Recommended next task kickoff
+1. Proceed with `SDNA-19` Consolidated Rollout Artifact Generation + Naming Standards.
 
 ## Addendum - 2026-02-28 (SDNA-17 Coverage-Gated Seed Apply Enforcement + Readiness Integration Complete)
 

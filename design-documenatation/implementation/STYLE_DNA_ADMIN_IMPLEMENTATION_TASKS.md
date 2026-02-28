@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-18` Expanded v2 Seed Bundle + Versioned Rollout Workflow.
+1. `SDNA-19` Consolidated Rollout Artifact Generation + Naming Standards.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-18`.
-2. Implement only SDNA-18 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-19`.
+2. Implement only SDNA-19 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -816,6 +816,37 @@ Risks / notes:
 Next kickoff:
 1. `SDNA-18` Expanded v2 Seed Bundle + Versioned Rollout Workflow.
 2. Scope: v2 seed bundle/rollout workflow hardening only; no worker/frontend redesign.
+
+## Next Task (SDNA-18 / Expanded v2 Seed Bundle + Versioned Rollout Workflow)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Hardened rollout workflow evidence contracts with deterministic signature surfaces:
+- rollout summary now includes `rolloutEvidenceSignature` (stable sha256 over deterministic evidence payload),
+- rollout summary preview now includes coverage/diff signature references and blocked/apply contract state.
+2. Expanded rollout artifact smoke assertions to validate signature presence and parity between command output and persisted summary artifacts.
+3. Expanded v2 rollout smoke assertions to validate deterministic coverage/diff signatures under replay.
+4. Re-verified launch readiness full scope to ensure rollout hardening introduces no gate regressions.
+
+Files changed:
+1. `scripts/style-dna/taxonomy-seed-rollout-artifacts.js`
+2. `scripts/style-dna/taxonomy-seed-rollout-artifacts-smoke.js`
+3. `scripts/style-dna/taxonomy-seed-v2-rollout-smoke.js`
+
+Verification:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-rollout-artifacts-smoke` (pass).
+4. `set -a && source .env.local && set +a && npm run launch:readiness-smoke` (pass).
+
+Risks / notes:
+1. Evidence signatures depend on deterministic payload ordering and stable report shapes.
+2. Readiness full-scope runtime remains elevated due to broad smoke coverage, but stayed green end-to-end.
+
+Next kickoff:
+1. `SDNA-19` Consolidated Rollout Artifact Generation + Naming Standards.
+2. Scope: rollout artifact generator/naming contract hardening only; no worker/frontend redesign.
 
 ## Verification Runbook (Target End-State)
 
