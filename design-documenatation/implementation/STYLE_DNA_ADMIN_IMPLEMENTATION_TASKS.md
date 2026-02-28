@@ -507,3 +507,33 @@ Control: staged UI with completeness signals and copy-first UX.
 3. Admin can submit test grids and receive structured style-dna results.
 4. Strict-schema parsing is enforced end-to-end (no fallback free-text parsing).
 5. Smoke suite verifies happy path and critical failure paths.
+
+## Progress Addendum (2026-02-28) - Run Ops Playwright Edge Coverage
+
+Status:
+1. Completed.
+
+Objective completed:
+1. Expand browser-level run operations regression coverage from happy path to edge-state behavior.
+
+Completed in this slice:
+1. Expanded deterministic Playwright seed fixture with mixed statuses (succeeded, failed, queued, in_progress) and paging-capable run volume.
+2. Added deterministic failed diagnostics fixture data for modal assertions (error code/message path).
+3. Added deterministic retry-disabled fixture semantics for missing test-grid reference behavior.
+4. Extended Playwright run-ops spec to assert:
+- status filter transitions with async refetch stabilization,
+- paging interactions with resilient page/count checks,
+- retry-disabled affordance and disable reason visibility,
+- failed-run selected details and run-detail modal diagnostics.
+5. Hardened browser selectors to avoid collision with local Next.js dev tools controls.
+
+Files changed:
+1. tests/playwright/setup/seed-style-dna-run-ops.js
+2. tests/playwright/style-dna-run-ops.spec.ts
+
+Verification:
+1. set -a && source .env.local && set +a && npm run e2e:playwright (pass)
+2. Seed output confirms deterministic fixture references and runCount: 13 during setup.
+
+Recommended next task:
+1. Split run-ops browser checks into focused specs (filter/paging, retry-disable UX, diagnostics modal) and add one no-runs-state assertion path for deterministic empty-state coverage.

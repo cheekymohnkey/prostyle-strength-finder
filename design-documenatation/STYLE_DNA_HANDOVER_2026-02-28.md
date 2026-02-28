@@ -127,3 +127,46 @@ Definition of done:
 1. Browser tests cover selected-run happy path + one failure path.
 2. Tests are deterministic in local runs.
 3. Existing proxy smoke remains green.
+
+## Addendum - 2026-02-28 (Playwright Edge Coverage Closeout)
+
+### Summary
+Completed the previously recommended Playwright expansion for run-operations edge states by adding deterministic fixture coverage for disable-reason UX, paging/filter transitions, and failed-run diagnostics.
+
+### Completed in this slice
+1. Expanded deterministic Playwright seed fixture to include a mixed-status run matrix (succeeded/failed/queued/in-progress) with enough rows to exercise paging.
+2. Added a deterministic failed run with diagnostics fields (`lastErrorCode`/`lastErrorMessage`) for modal assertion coverage.
+3. Added a deterministic retry-disabled run shape (missing test-grid reference semantics) to assert disabled retry affordance + tooltip reason.
+4. Extended browser test assertions to cover:
+- status filter transitions and async refetch stabilization,
+- paging transitions (`Prev`/`Next`) with resilient page/count assertions,
+- failed-run selected state + empty structured-result message,
+- run-detail modal diagnostics rendering for failure metadata.
+5. Hardened selector usage to avoid collision with Next.js dev tools button labels in local dev runs.
+
+### Files changed
+1. `tests/playwright/setup/seed-style-dna-run-ops.js`
+2. `tests/playwright/style-dna-run-ops.spec.ts`
+
+### Verification
+1. `set -a && source .env.local && set +a && npm run e2e:playwright` (pass)
+2. Seed verification output confirms deterministic fixture IDs + run count (`runCount: 13`) during test setup.
+
+### Recommended Next Task Kickoff
+Objective:
+1. Broaden browser regression depth for run operations beyond single-spec coverage while preserving deterministic local execution.
+
+Scope:
+1. Split run-ops browser assertions into focused specs (paging/filter vs retry-disable vs modal diagnostics) for faster triage on failures.
+2. Add one explicit assertion path for successful-run canonical trait rendering in selected details/modal.
+3. Add one no-runs state assertion path using a seeded influence with zero runs.
+
+Out of scope:
+1. Backend endpoint/schema changes.
+2. UI redesign or component refactors.
+3. Non-Style-DNA Playwright suite expansion.
+
+Definition of done:
+1. Run-ops browser coverage is split into deterministic focused specs with stable selectors.
+2. Tests validate failed + succeeded + empty-state operator paths.
+3. `npm run e2e:playwright` remains green locally with fixture seeding.
