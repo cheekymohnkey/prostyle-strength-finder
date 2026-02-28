@@ -88,9 +88,9 @@
     "style-dna:smokes:with-restore": "scripts/db/run-with-db-restore.sh /bin/zsh -lc \"npm run style-dna:tier-validation-smoke && npm run style-dna:baseline-smoke && npm run style-dna:baseline-delete-cascade-smoke && npm run style-dna:prompt-generation-smoke && npm run style-dna:canonicalization-smoke && npm run style-dna:run-smoke && npm run style-dna:schema-failure-smoke\"",
     "governance:verify": "node scripts/governance/verify-freshness.js",
     "governance:verify:prod": "node scripts/governance/verify-freshness.js --env prod",
-    "e2e:playwright": "playwright test -c playwright.config.ts",
-    "e2e:playwright:reuse": "PLAYWRIGHT_USE_EXISTING_SERVER=1 playwright test -c playwright.config.ts",
-    "e2e:playwright:headed": "playwright test -c playwright.config.ts --headed",
+    "e2e:playwright": "/bin/zsh -lc \"set -a && source .env.local && set +a && node tests/playwright/setup/seed-style-dna-run-ops.js && playwright test -c playwright.config.ts\"",
+    "e2e:playwright:reuse": "/bin/zsh -lc \"set -a && source .env.local && set +a && node tests/playwright/setup/seed-style-dna-run-ops.js && PLAYWRIGHT_USE_EXISTING_SERVER=1 playwright test -c playwright.config.ts\"",
+    "e2e:playwright:headed": "/bin/zsh -lc \"set -a && source .env.local && set +a && node tests/playwright/setup/seed-style-dna-run-ops.js && playwright test -c playwright.config.ts --headed\"",
     "e2e:playwright:install": "playwright install chromium"
   },
   "devDependencies": {

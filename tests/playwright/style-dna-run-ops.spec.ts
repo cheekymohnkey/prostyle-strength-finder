@@ -7,6 +7,10 @@ test.describe("Style DNA Studio run operations", () => {
     await expect(page.getByRole("heading", { name: "Style DNA Studio" })).toBeVisible();
     await expect(page.getByText("Run Operations Log")).toBeVisible();
 
+    const influenceSelect = page.locator("label:has-text('Style Influence (Target SREF)') select");
+    await expect(influenceSelect).toBeVisible();
+    await influenceSelect.selectOption("si_playwright_seed");
+
     const statusFilter = page.getByTestId("run-status-filter");
     const limitSelect = page.getByTestId("run-limit-select");
     await expect(statusFilter).toBeVisible();
@@ -21,8 +25,7 @@ test.describe("Style DNA Studio run operations", () => {
     await expect(statusFilter).toHaveValue("all");
 
     const runRows = page.getByTestId("run-row");
-    const runRowCount = await runRows.count();
-    test.skip(runRowCount === 0, "No run rows available in current environment for modal interaction check.");
+    await expect(runRows).toHaveCount(1);
 
     const firstRow = runRows.first();
     await firstRow.click();
