@@ -212,3 +212,40 @@ Out of scope:
 Definition of done:
 1. New interaction assertions are deterministic under seeded local data.
 2. `npm run e2e:playwright` remains green.
+
+## Addendum - 2026-02-28 (Run Ops Interaction Gap Closeout)
+
+### Summary
+Closed the previously listed run-ops interaction gaps by shipping deterministic browser assertions for refresh-selection persistence and modal overlay dismissal, with all run-ops specs passing together.
+
+### Completed in this closeout
+1. Added browser assertion that `Refresh runs` preserves selected-run intent when the selected row remains present.
+2. Added browser assertion that run-detail modal closes when clicking outside on the overlay.
+3. Retained and re-validated stale-detail clearing behavior on influence switch to empty-run influence.
+
+### Commit references (master)
+1. `2bbaeea` — `test(playwright): assert run limit transitions reset paging`
+2. `33d77e9` — `test(playwright): add refresh persistence and modal overlay close checks`
+
+### Files changed
+1. `tests/playwright/style-dna-run-ops-filter-paging.spec.ts`
+2. `tests/playwright/style-dna-run-ops-detail-states.spec.ts`
+
+### Verification
+1. `set -a && source .env.local && set +a && npm run e2e:playwright` (pass, 9 specs)
+
+### Recommended Next Task Kickoff
+Objective:
+1. Keep run-ops suite maintainable as coverage grows.
+
+Scope:
+1. Add small shared Playwright helpers for repeated run-ops setup/actions (influence select, status select, row select) to reduce duplication.
+2. Keep existing assertions intact while improving test readability and maintenance cost.
+
+Out of scope:
+1. UI/API behavior changes.
+2. New feature work beyond test maintainability.
+
+Definition of done:
+1. No behavior changes in assertions.
+2. `npm run e2e:playwright` remains green.

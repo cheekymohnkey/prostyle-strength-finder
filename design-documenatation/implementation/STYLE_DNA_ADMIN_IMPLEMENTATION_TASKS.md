@@ -568,3 +568,30 @@ Verification:
 
 Recommended next task:
 1. Add browser assertions for refresh-run selection persistence, stale-detail clearing on influence switch, and modal overlay-dismiss close behavior.
+
+## Progress Addendum (2026-02-28) - Run Ops Interaction Gap Closeout
+
+Status:
+1. Completed.
+
+Objective completed:
+1. Close remaining run-ops interaction assertions (refresh selection persistence + modal overlay dismissal) under deterministic seeded browser tests.
+
+Completed in this closeout:
+1. Added browser assertion for refresh-run selection persistence when selected row remains in filtered result set.
+2. Added browser assertion for modal overlay dismissal (click outside closes run-detail modal).
+3. Re-verified stale-detail clearing path on influence switch alongside the expanded suite.
+
+Commits (master):
+1. 2bbaeea — test(playwright): assert run limit transitions reset paging
+2. 33d77e9 — test(playwright): add refresh persistence and modal overlay close checks
+
+Files changed:
+1. tests/playwright/style-dna-run-ops-filter-paging.spec.ts
+2. tests/playwright/style-dna-run-ops-detail-states.spec.ts
+
+Verification:
+1. set -a && source .env.local && set +a && npm run e2e:playwright (pass; 9 specs)
+
+Recommended next task:
+1. Refactor run-ops Playwright tests with shared helper utilities to reduce duplicated setup while preserving current behavior assertions.
