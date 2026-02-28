@@ -3,6 +3,20 @@
 ## Summary
 Added run visibility and retry affordances to the Style DNA Studio so operators can inspect run history (including failures) and re-submit using a stored test grid without re-uploading. This closes the loop on the initial Studio workflow by surfacing backend runs directly in the console.
 
+## NEXT SESSION START HERE
+
+Next task:
+1. `SDNA-04` Prompt Generation Service + Endpoints.
+
+Use this as kickoff in a new chat:
+1. Objective: finalize prompt generation admin service/API behavior (create/get prompt-jobs) with deterministic outputs.
+2. Scope: admin RBAC + immutable audit, deterministic prompt construction/order, eligibility checks, idempotency + explicit validation errors.
+3. Out of scope: worker execution changes, frontend redesign, non-Style-DNA surfaces.
+4. DoD: SDNA-04 acceptance criteria implemented and verification checks listed with outcomes.
+
+Canonical task detail location:
+1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Next Task (SDNA-04 / Prompt Generation Service + Endpoints)`).
+
 ## Key Accomplishments
 
 ### 1. Run Log + Status Surfacing

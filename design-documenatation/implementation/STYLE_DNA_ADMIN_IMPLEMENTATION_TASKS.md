@@ -15,6 +15,21 @@ Depends on:
 
 Translate the Style-DNA admin feature plan into executable tasks with clear sequencing, acceptance criteria, and verification commands.
 
+## START HERE (Next Session)
+
+Current next task:
+1. `SDNA-04` Prompt Generation Service + Endpoints.
+
+Quick start:
+1. Jump to section: `Next Task (SDNA-04 / Prompt Generation Service + Endpoints)`.
+2. Implement only SDNA-04 scope in a fresh chat.
+3. End with handoff summary + verification outcomes.
+
+Do not start with:
+1. SDNA-05 run submit/list/get + queue.
+2. UI redesign work.
+3. Non-Style-DNA tasks.
+
 ## Objective
 
 Ship an admin-only workflow that:

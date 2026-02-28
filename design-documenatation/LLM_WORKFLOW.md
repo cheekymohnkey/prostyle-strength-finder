@@ -4,6 +4,48 @@ Status: Agreed
 Date: 2026-02-18  
 Purpose: Keep LLM behavior stable and predictable as context windows fill over time.
 
+## NEXT SESSION START HERE (as of 2026-02-28)
+
+Current next implementation task:
+1. `SDNA-04` Prompt Generation Service + Endpoints.
+
+Primary pointers:
+1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+2. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+
+Copy/paste kickoff prompt for a fresh chat:
+
+```text
+Use these docs as source of truth:
+- design-documenatation/DECISIONS.md
+- design-documenatation/USER_NEEDS_ANALYSIS.md
+- design-documenatation/ARCHITECTURE_AND_ERD.md
+- design-documenatation/TECHNICAL_DECISIONS.md
+- design-documenatation/requirements/REQUIREMENTS_INDEX.md
+- design-documenatation/requirements/PRODUCT_REQUIREMENTS_HIGH_LEVEL.md
+- design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md
+- design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md
+
+Task objective:
+Implement SDNA-04 Prompt Generation Service + Endpoints.
+
+Scope:
+1) Finalize prompt-job create/get endpoints with admin RBAC + immutable audit.
+2) Ensure deterministic prompt generation output and ordering.
+3) Enforce eligibility checks (influence readiness + baseline coverage/context checks).
+4) Preserve/verify idempotency behavior and explicit validation errors.
+
+Out of scope:
+1) Worker execution path changes.
+2) Frontend redesign.
+3) Non-Style-DNA surfaces.
+
+Definition of done:
+1) SDNA-04 endpoint/service acceptance criteria are implemented.
+2) Relevant smokes/checks are listed and passing (or explicitly marked not run with reason).
+3) Task end includes handoff summary with files changed + risks + next task.
+```
+
 ## Core Rules
 
 1. Docs are memory, chat is execution.
