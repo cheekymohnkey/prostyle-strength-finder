@@ -89,6 +89,7 @@
     "governance:verify": "node scripts/governance/verify-freshness.js",
     "governance:verify:prod": "node scripts/governance/verify-freshness.js --env prod",
     "e2e:playwright": "playwright test -c playwright.config.ts",
+    "e2e:playwright:reuse": "PLAYWRIGHT_USE_EXISTING_SERVER=1 playwright test -c playwright.config.ts",
     "e2e:playwright:headed": "playwright test -c playwright.config.ts --headed",
     "e2e:playwright:install": "playwright install chromium"
   },
