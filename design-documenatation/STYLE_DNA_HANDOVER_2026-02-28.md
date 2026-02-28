@@ -6,16 +6,44 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. `SDNA-13` Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
+1. `SDNA-14` Versioned Taxonomy Seed Library + Import Tooling.
 
 Use this as kickoff in a new chat:
-1. Objective: complete taxonomy seeding replay-safety hardening and deterministic reseed behavior checks under `DISC-002`.
-2. Scope: taxonomy seed/reseed behavior + replay-safety tests and docs evidence only.
+1. Objective: complete versioned taxonomy seed library + import tooling hardening.
+2. Scope: seed-library packaging/import tooling + deterministic import verification evidence only.
 3. Out of scope: worker inference redesign, frontend redesign/new UI, non-Style-DNA work.
-4. DoD: replay-safety contract checks are explicit, deterministic, and captured in handoff evidence.
+4. DoD: seed-library import/versioning checks are explicit, deterministic, and captured in handoff evidence.
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
+
+## Addendum - 2026-02-28 (SDNA-13 Taxonomy Seeding + Replay-Safety Tests Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Extended taxonomy seed replay-safety smoke coverage to verify deterministic post-reactivation reapply behavior (no new writes, no reactivation drift).
+2. Added deterministic conflict replay assertions for repeated conflicting seed applies:
+- first conflicting apply surfaces conflict with preserved existing alias mapping,
+- repeated conflicting apply keeps conflict surface stable and avoids duplicate writes.
+3. Added persistence assertion that conflicting canonical creation remains single-row under replay.
+
+### Files changed
+1. `scripts/style-dna/taxonomy-seed-smoke.js`
+
+### Verification evidence
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-library-smoke` (pass).
+4. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-diff-smoke` (pass).
+
+### Risks / follow-up notes
+1. Conflict replay assertions are contract-focused and do not yet lock full conflict-array ordering.
+2. Replay-safety guarantees remain smoke-level and assume deterministic local DB reset/seed sequencing.
+
+### Recommended next task kickoff
+1. Proceed with `SDNA-14` Versioned Taxonomy Seed Library + Import Tooling.
 
 ## Addendum - 2026-02-28 (SDNA-12 Verification Runbook + Launch-Gate Sync Complete)
 

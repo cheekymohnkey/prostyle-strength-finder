@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-13` Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
+1. `SDNA-14` Versioned Taxonomy Seed Library + Import Tooling.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-13`.
-2. Implement only SDNA-13 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-14`.
+2. Implement only SDNA-14 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -653,6 +653,34 @@ Definition of done:
 1. Runbook and kickoff pointers reflect SDNA-11 hardening outcomes.
 2. Verification command ordering is explicit and reproducible.
 3. No behavioral regressions introduced outside docs.
+
+## Next Task (SDNA-13 / Taxonomy Seeding + Replay-Safety Tests)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Extended taxonomy seeding smoke replay-safety assertions to verify deterministic reapply behavior after canonical/alias reactivation.
+2. Added explicit deterministic conflict replay checks for repeated conflicting seed applies:
+- first conflict apply reports conflict and keeps existing alias mapping,
+- repeated conflict apply preserves stable conflict surface without duplicate alias/canonical writes.
+3. Added deterministic persistence assertions that conflict canonical creation happens once and remains single-row under replay.
+
+Files changed:
+1. `scripts/style-dna/taxonomy-seed-smoke.js`
+
+Verification:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-library-smoke` (pass).
+4. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-diff-smoke` (pass).
+
+Risks / notes:
+1. Conflict replay assertions currently target canonical/alias status and mapping invariants, but not full response ordering of the `conflicts` array.
+2. Replay-safety coverage remains smoke-level and should be paired with CI sequencing discipline to preserve deterministic environment state.
+
+Next kickoff:
+1. `SDNA-14` Versioned Taxonomy Seed Library + Import Tooling.
+2. Scope: seed-library packaging/import tooling hardening only; no worker/frontend redesign.
 
 ## Verification Runbook (Target End-State)
 

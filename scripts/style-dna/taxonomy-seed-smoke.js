@@ -282,6 +282,115 @@ async function main() {
       `Expected aliasMatches>=1 after reactivation, got ${reactivatedReplay.canonicalizationStats.aliasMatches}`
     );
 
+    const postReactivationSeedResponse = await fetch(`${baseUrl}/admin/style-dna/taxonomy-seed`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const postReactivationSeedJson = await postReactivationSeedResponse.json();
+    if (!postReactivationSeedResponse.ok) {
+      throw new Error(
+        `Post-reactivation taxonomy seed failed (${postReactivationSeedResponse.status}): ${JSON.stringify(postReactivationSeedJson)}`
+      );
+    }
+    assertCondition(
+      postReactivationSeedJson?.summary?.canonicalTraits?.created === 0,
+      "Expected canonical created=0 on post-reactivation replay"
+    );
+    assertCondition(
+      postReactivationSeedJson?.summary?.canonicalTraits?.reactivated === 0,
+      "Expected canonical reactivated=0 on post-reactivation replay"
+    );
+    assertCondition(
+      postReactivationSeedJson?.summary?.traitAliases?.created === 0,
+      "Expected alias created=0 on post-reactivation replay"
+    );
+    assertCondition(
+      postReactivationSeedJson?.summary?.traitAliases?.reactivated === 0,
+      "Expected alias reactivated=0 on post-reactivation replay"
+    );
+    assertCondition(
+      postReactivationSeedJson?.summary?.traitAliases?.conflicts === 0,
+      "Expected alias conflicts=0 on post-reactivation replay"
+    );
+
+    const conflictDisplayLabel = `smoke seed conflict label ${Date.now()}`;
+    const conflictPayload = {
+      taxonomyVersion: "style_dna_v1",
+      entries: [
+        {
+          axis: "lighting_and_contrast",
+          displayLabel: conflictDisplayLabel,
+          aliases: [aliasText],
+          notes: "taxonomy seed smoke deterministic conflict entry",
+        },
+      ],
+    };
+
+    const conflictSeedResponse = await fetch(`${baseUrl}/admin/style-dna/taxonomy-seed`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(conflictPayload),
+    });
+    const conflictSeedJson = await conflictSeedResponse.json();
+    if (!conflictSeedResponse.ok) {
+      throw new Error(`Conflict taxonomy seed failed (${conflictSeedResponse.status}): ${JSON.stringify(conflictSeedJson)}`);
+    }
+    assertCondition(conflictSeedJson?.summary?.canonicalTraits?.created === 1, "Expected conflict seed canonical created=1");
+    assertCondition(conflictSeedJson?.summary?.traitAliases?.created === 0, "Expected conflict seed alias created=0");
+    assertCondition(
+      conflictSeedJson?.summary?.traitAliases?.conflicts >= 1,
+      `Expected conflict seed alias conflicts>=1, got ${conflictSeedJson?.summary?.traitAliases?.conflicts}`
+    );
+    assertCondition(Array.isArray(conflictSeedJson?.conflicts) && conflictSeedJson.conflicts.length >= 1, "Expected conflict details");
+    const firstConflict = conflictSeedJson.conflicts[0] || {};
+    assertCondition(firstConflict.aliasId === aliasId, "Expected conflict aliasId to match seeded alias");
+    assertCondition(firstConflict.existingCanonicalTraitId === canonicalTraitId, "Expected conflict to preserve existing canonical trait mapping");
+
+    const conflictReplayResponse = await fetch(`${baseUrl}/admin/style-dna/taxonomy-seed`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(conflictPayload),
+    });
+    const conflictReplayJson = await conflictReplayResponse.json();
+    if (!conflictReplayResponse.ok) {
+      throw new Error(`Conflict replay taxonomy seed failed (${conflictReplayResponse.status}): ${JSON.stringify(conflictReplayJson)}`);
+    }
+    assertCondition(conflictReplayJson?.summary?.canonicalTraits?.created === 0, "Expected conflict replay canonical created=0");
+    assertCondition(conflictReplayJson?.summary?.canonicalTraits?.deduplicated >= 1, "Expected conflict replay canonical deduplicated>=1");
+    assertCondition(conflictReplayJson?.summary?.traitAliases?.created === 0, "Expected conflict replay alias created=0");
+    assertCondition(
+      conflictReplayJson?.summary?.traitAliases?.conflicts >= 1,
+      `Expected conflict replay alias conflicts>=1, got ${conflictReplayJson?.summary?.traitAliases?.conflicts}`
+    );
+
+    const canonicalAfterConflictListResponse = await fetch(
+      `${baseUrl}/admin/style-dna/canonical-traits?taxonomyVersion=style_dna_v1&axis=lighting_and_contrast&status=active&limit=200`,
+      {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      }
+    );
+    const canonicalAfterConflictListJson = await canonicalAfterConflictListResponse.json();
+    assertCondition(canonicalAfterConflictListResponse.ok, `Expected canonical-after-conflict list success, got ${canonicalAfterConflictListResponse.status}`);
+    const conflictCanonicalRows = (canonicalAfterConflictListJson?.canonicalTraits || []).filter(
+      (row) => row.displayLabel === conflictDisplayLabel
+    );
+    assertCondition(
+      conflictCanonicalRows.length === 1,
+      `Expected exactly one conflict canonical row after replay, got ${conflictCanonicalRows.length}`
+    );
+
     console.log(
       JSON.stringify(
         {
@@ -295,6 +404,9 @@ async function main() {
           firstSeedSummary: firstSeedJson.summary,
           secondSeedSummary: secondSeedJson.summary,
           reactivateSeedSummary: reactivateSeedJson.summary,
+          postReactivationSeedSummary: postReactivationSeedJson.summary,
+          conflictSeedSummary: conflictSeedJson.summary,
+          conflictReplaySummary: conflictReplayJson.summary,
           replay: {
             unresolvedWhenDeprecated: deprecatedReplay.canonicalizationStats.unresolved,
             unresolvedAfterReactivation: reactivatedReplay.canonicalizationStats.unresolved,
