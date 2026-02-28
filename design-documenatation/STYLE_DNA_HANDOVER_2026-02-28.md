@@ -6,16 +6,116 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. `SDNA-04` Prompt Generation Service + Endpoints.
+1. `SDNA-12` Verification Runbook + Launch-Gate Sync (Style-DNA run-flow hardening closeout).
 
 Use this as kickoff in a new chat:
-1. Objective: finalize prompt generation admin service/API behavior (create/get prompt-jobs) with deterministic outputs.
-2. Scope: admin RBAC + immutable audit, deterministic prompt construction/order, eligibility checks, idempotency + explicit validation errors.
-3. Out of scope: worker execution changes, frontend redesign, non-Style-DNA surfaces.
-4. DoD: SDNA-04 acceptance criteria implemented and verification checks listed with outcomes.
+1. Objective: align runbook/checklist and launch-gate references to include the now-hardened run-flow contract checks and evidence fields.
+2. Scope: docs + verification command contract alignment only; no backend/worker/UI behavior changes.
+3. Out of scope: worker inference redesign, frontend redesign, prompt-job redesign, non-Style-DNA work.
+4. DoD: runbook/task pointers reflect SDNA-11 hardening outcomes and verification command order.
 
 Canonical task detail location:
-1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Next Task (SDNA-04 / Prompt Generation Service + Endpoints)`).
+1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Next Task (SDNA-12 / Verification Runbook + Launch-Gate Sync)`).
+
+## Addendum - 2026-02-28 (SDNA-11 Run-Flow Integration Hardening Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Hardened deterministic run-flow integration checks for immutable audit invariants on run submit/list/get flows.
+2. Added explicit run-list invalid status filter validation-contract assertions (including allowed-values surface).
+3. Added explicit queue-unavailable contract verification for style-dna run submit (`503 QUEUE_UNAVAILABLE`) with persisted failed run state checks.
+4. Preserved and re-verified idempotency + lifecycle observability behavior:
+- one row per idempotency key,
+- deduplicated submit reuses original run id,
+- queued -> terminal lifecycle observability remains explicit.
+5. Kept model provenance lock verification in place (`modelSelectionSource=style_dna_locked_envelope`, model family/version from submitted envelope).
+
+### Files changed
+1. `scripts/style-dna/run-smoke.js`
+
+### Verification evidence
+1. `set -a && source .env.local && set +a && npm run style-dna:run-smoke` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+4. `npm run contracts` (pass).
+
+### Risks / follow-up notes
+1. Run list/get audit writes are immutable; high-frequency polling still increases audit volume.
+2. Queue-unavailable regression check intentionally forces SQS enqueue failure via invalid queue URLs; keep this smoke-only and avoid production config bleed.
+
+### Recommended next task kickoff
+1. Proceed with `SDNA-12` docs/runbook + launch-gate sync so SDNA-11 contract hardening is reflected in operator guidance and readiness sequencing.
+
+## Addendum - 2026-02-28 (SDNA-05 Run Submit/List/Get + Queue Hardening Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Hardened run submit idempotency path with immutable audit write for deduplicated submit responses.
+2. Added run eligibility checks parity with prompt jobs:
+- style influence type must be enabled,
+- run adjustment type must match influence type,
+- baseline set must be `active`.
+3. Locked queue envelope model provenance for style-dna runs:
+- enqueue now carries `modelFamily`/`modelVersion` from submitted locked envelope,
+- `modelSelectionSource` is set to `style_dna_locked_envelope`.
+4. Hardened run list validation with explicit status-filter contract errors (`400 INVALID_REQUEST` for invalid status).
+5. Added immutable audit writes for run list and run get flows.
+
+### Files changed
+1. `apps/api/src/index.js`
+2. `scripts/style-dna/run-smoke.js`
+
+### Verification evidence
+1. `set -a && source .env.local && set +a && npm run style-dna:run-smoke` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+4. `npm run contracts` (pass).
+
+### Risks / follow-up notes
+1. Run list/get now write immutable audit events; high-frequency polling can increase audit volume.
+2. Envelope model lock is strict by design; malformed/blank model fields will now fail validation earlier.
+
+### Recommended next task kickoff
+1. Proceed with focused SDNA-11 integration hardening for run-flow audit event verification and explicit error-contract regression coverage.
+
+## Addendum - 2026-02-28 (SDNA-04 Prompt Generation Service + Endpoints Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Hardened `POST /v1/admin/style-dna/prompt-jobs` with admin RBAC, idempotent create behavior (`idempotencyKey`), style-influence readiness checks (active + enabled type), and explicit type compatibility validation (`sref` vs `profile`).
+2. Hardened `GET /v1/admin/style-dna/prompt-jobs/:promptJobId` with immutable admin audit writes (`style_dna.prompt_job.get`).
+3. Added deterministic prompt rendering rules:
+- deterministic tier ordering (ascending),
+- deterministic prompt block ordering (`display_order`, then prompt key),
+- deterministic argument ordering including model-family selector (`--v` for `standard`, `--niji` for `niji`) and envelope args.
+4. Added explicit baseline compatibility checks for requested prompt-job tiers and explicit validation payloads on incompatibility.
+5. Added prompt-job render envelope response fields for reproducibility/audit (`mjModelFamily`, `mjModelVersion`, `seed`, `quality`, `aspectRatio`, `styleRaw`, `styleWeight`).
+
+### Files changed
+1. `apps/api/src/index.js`
+2. `packages/shared-contracts/src/style-dna-admin.js`
+3. `scripts/db/repository.js`
+4. `scripts/db/migrations/20260228120000_style_dna_prompt_job_idempotency.sql`
+5. `scripts/style-dna/prompt-generation-smoke.js`
+
+### Verification evidence
+1. `DATABASE_URL=file:./data/prostyle.local.db node scripts/db/migrate.js apply` (pass; applied `20260228120000_style_dna_prompt_job_idempotency.sql`).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `npm run contracts` (pass).
+4. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+
+### Risks / follow-up notes
+1. Prompt-job idempotency now depends on persisted `idempotency_key`; operators that omit key retain non-deduplicated create behavior.
+2. Model-family compatibility is strict (`standard|niji` only) to keep prompt selector output deterministic.
+
+### Recommended next task kickoff
+1. Proceed to `SDNA-05` run submit/list/get + queue enqueue hardening with the same constraints (surgical backend scope, no worker/UI redesign).
 
 ## Key Accomplishments
 

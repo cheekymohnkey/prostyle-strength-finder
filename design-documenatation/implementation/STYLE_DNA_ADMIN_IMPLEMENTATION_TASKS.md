@@ -18,15 +18,15 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-04` Prompt Generation Service + Endpoints.
+1. `SDNA-12` Verification Runbook + Launch-Gate Sync.
 
 Quick start:
-1. Jump to section: `Next Task (SDNA-04 / Prompt Generation Service + Endpoints)`.
-2. Implement only SDNA-04 scope in a fresh chat.
+1. Jump to section: `Next Task (SDNA-12 / Verification Runbook + Launch-Gate Sync)`.
+2. Implement only SDNA-12 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
-1. SDNA-05 run submit/list/get + queue.
+1. Worker inference redesign.
 2. UI redesign work.
 3. Non-Style-DNA tasks.
 
@@ -480,6 +480,151 @@ Definition of done:
 2. Prompt text generation is deterministic and includes required flags (e.g., `--v`), stylize tier, and envelope inputs.
 3. Ineligible influences or missing baseline coverage return clear errors.
 4. Tests/smokes for prompt generation flow are green (including existing `style-dna:prompt-generation-smoke` if present).
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Added prompt-job idempotency support (`idempotencyKey`) with DB persistence + deduplication response behavior.
+2. Added immutable audit writes for prompt-job fetch (`style_dna.prompt_job.get`) while retaining create audit write.
+3. Added deterministic prompt rendering rules:
+- sorted stylize tier processing,
+- deterministic prompt item ordering,
+- deterministic model selector (`--v` for `standard`, `--niji` for `niji`),
+- deterministic locked-envelope arg ordering.
+4. Added eligibility checks:
+- style influence must be active,
+- style influence type must be enabled,
+- style adjustment type must match influence type.
+5. Added explicit baseline compatibility check for requested stylize tiers.
+6. Added explicit render-envelope response payload on prompt-job create/get for reproducibility.
+
+Files changed:
+1. `apps/api/src/index.js`
+2. `packages/shared-contracts/src/style-dna-admin.js`
+3. `scripts/db/repository.js`
+4. `scripts/db/migrations/20260228120000_style_dna_prompt_job_idempotency.sql`
+5. `scripts/style-dna/prompt-generation-smoke.js`
+
+Verification:
+1. `DATABASE_URL=file:./data/prostyle.local.db node scripts/db/migrate.js apply` (pass; applied migration).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `npm run contracts` (pass).
+4. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+
+## Next Task (SDNA-05 / Run Submit-List-Get + Queue)
+
+Objective:
+1. Finalize run submit/list/get endpoint and queue-enqueue behavior with strict idempotency, deterministic validation errors, and immutable audit.
+
+Scope:
+1. Verify/harden `POST /v1/admin/style-dna/runs`, `GET /v1/admin/style-dna/runs`, and `GET /v1/admin/style-dna/runs/:styleDnaRunId` contracts.
+2. Enforce admin RBAC and immutable audit writes on run flows.
+3. Validate queue enqueue behavior and run lifecycle observability (`queued` -> terminal states) without worker redesign.
+4. Preserve idempotent run-submit semantics and explicit mismatch error payloads (locked envelope + control-baseline policy).
+
+Out of scope:
+1. Worker implementation redesign.
+2. Frontend redesign work.
+3. Prompt-job endpoint redesign completed in SDNA-04.
+
+Definition of done:
+1. Run endpoints pass validation, RBAC, and audit requirements.
+2. Queue enqueue behavior is deterministic and observable in verification.
+3. Idempotent run-submit + envelope mismatch/control-baseline failures return explicit errors.
+4. Existing style-dna and admin proxy smokes remain green.
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Added immutable audit writes for run submit (including deduplicated idempotency responses), run list, and run get flows.
+2. Added style influence readiness validation for runs:
+- style influence type must be enabled,
+- run adjustment type must match style influence type.
+3. Added baseline eligibility check for runs (`baseline_render_sets.status` must be `active`).
+4. Added explicit run-list status filter validation (`400 INVALID_REQUEST` for unsupported values).
+5. Locked style-dna queue envelope model provenance to submitted test envelope (`modelFamily`, `modelVersion`, `modelSelectionSource=style_dna_locked_envelope`).
+6. Expanded run smoke to assert:
+- invalid status filter rejection,
+- analysis job model provenance lock after queue/worker processing.
+
+Files changed:
+1. `apps/api/src/index.js`
+2. `scripts/style-dna/run-smoke.js`
+
+Verification:
+1. `set -a && source .env.local && set +a && npm run style-dna:run-smoke` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+4. `npm run contracts` (pass).
+
+## Next Task (SDNA-11 / Run-Flow Integration Hardening)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Extended `scripts/style-dna/run-smoke.js` with deterministic run-flow audit invariant checks across `style_dna.run.submit`, `style_dna.run.list`, and `style_dna.run.get`.
+2. Added explicit invalid run-list status filter contract assertions (error code + allowed-values payload checks).
+3. Added deterministic queue-unavailable behavior checks for run submit (`503 QUEUE_UNAVAILABLE`) and persisted failed run state (`status=failed`, `last_error_code=QUEUE_UNAVAILABLE`).
+4. Preserved and re-verified idempotency/lifecycle observability:
+- same idempotency key yields one persisted run row,
+- deduplicated submit returns original run id,
+- queued/pre-worker and terminal/succeeded run-state visibility remain explicit.
+5. Preserved and re-verified model provenance lock assertions in run-smoke (`model_family`, `model_version`, `model_selection_source=style_dna_locked_envelope`).
+
+Files changed:
+1. `scripts/style-dna/run-smoke.js`
+
+Verification:
+1. `set -a && source .env.local && set +a && npm run style-dna:run-smoke` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+4. `npm run contracts` (pass).
+
+Risks / notes:
+1. Immutable run list/get audit writes continue to increase audit-table volume under aggressive polling.
+2. Queue-unavailable regression path intentionally uses invalid SQS queue URLs within smoke harness; this remains a test-only contract check.
+
+Next kickoff:
+1. `SDNA-12` Verification Runbook + Launch-Gate Sync.
+2. Scope: documentation/readiness contract alignment only for SDNA-11 outcomes (no worker/frontend redesign).
+
+Objective:
+1. Expand deterministic integration evidence for run-flow contracts (audit + explicit validation surfaces) without changing worker/UI behavior.
+
+Scope:
+1. Add focused verification for run-flow audit write invariants (`submit`, `list`, `get`) under admin-only RBAC.
+2. Add focused verification for invalid list status filter and queue-unavailable error surfaces.
+3. Keep run lifecycle and idempotency assertions deterministic under local smoke setup.
+
+Out of scope:
+1. Worker inference redesign.
+2. Frontend redesign/new UI.
+3. Prompt-job endpoint redesign.
+
+Definition of done:
+1. Run-flow integration checks are explicit and deterministic.
+2. Existing style-dna and admin proxy smokes remain green.
+3. Handoff includes updated risks and next task pointers.
+
+## Next Task (SDNA-12 / Verification Runbook + Launch-Gate Sync)
+
+Objective:
+1. Align runbook/checklist/launch-readiness references with SDNA-11 run-flow hardening coverage and command ordering.
+
+Scope:
+1. Update style-dna verification runbook text to explicitly include run-flow audit/invalid-status/queue-unavailable contract expectations.
+2. Ensure launch/readiness references preserve the required command order and explicit pass/fail evidence capture fields.
+3. Keep changes docs-only.
+
+Out of scope:
+1. Worker inference redesign.
+2. Frontend redesign/new UI.
+3. Backend endpoint behavior changes.
+
+Definition of done:
+1. Runbook and kickoff pointers reflect SDNA-11 hardening outcomes.
+2. Verification command ordering is explicit and reproducible.
+3. No behavioral regressions introduced outside docs.
 
 ## Verification Runbook (Target End-State)
 

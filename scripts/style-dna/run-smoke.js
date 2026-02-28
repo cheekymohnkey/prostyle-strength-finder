@@ -25,6 +25,19 @@ function assertCondition(condition, message) {
   }
 }
 
+function queryRows(dbPath, sql) {
+  const output = runSql(dbPath, sql, { json: true });
+  if (!output || output.trim() === "") {
+    return [];
+  }
+  return JSON.parse(output);
+}
+
+function queryFirstRow(dbPath, sql) {
+  const rows = queryRows(dbPath, sql);
+  return rows.length > 0 ? rows[0] : null;
+}
+
 function extractApiErrorCode(payload) {
   const top = payload || {};
   const error = typeof top.error === "object" && top.error ? top.error : {};
@@ -88,7 +101,12 @@ async function waitForHealth(baseUrl, token) {
 }
 
 async function requestJson(url, options, expectedStatus) {
-  const response = await fetch(url, options);
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    throw new Error(`Request failed for ${options.method || "GET"} ${url}: ${error.message}`);
+  }
   const json = await response.json().catch(() => ({}));
   if (response.status !== expectedStatus) {
     throw new Error(`Expected ${expectedStatus} for ${options.method || "GET"} ${url}, got ${response.status}: ${JSON.stringify(json)}`);
@@ -284,6 +302,38 @@ async function main() {
     assertCondition(
       extractApiErrorText(forbiddenRunList).includes("admin role is required"),
       "Expected contributor run list rejection to mention admin role"
+    );
+
+    const invalidStatusRunList = await requestJson(
+      `${baseUrl}/admin/style-dna/runs?status=unknown_status`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      400
+    );
+    assertCondition(
+      extractApiErrorCode(invalidStatusRunList) === "INVALID_REQUEST",
+      `Expected INVALID_REQUEST for invalid run status filter, got ${JSON.stringify(invalidStatusRunList)}`
+    );
+    assertCondition(
+      extractApiErrorText(invalidStatusRunList).includes("status filter"),
+      `Expected invalid status filter message, got ${JSON.stringify(invalidStatusRunList)}`
+    );
+    assertCondition(
+      Array.isArray(invalidStatusRunList?.error?.details?.allowedValues)
+        || Array.isArray(invalidStatusRunList?.details?.allowedValues),
+      `Expected invalid status filter contract to include allowed values, got ${JSON.stringify(invalidStatusRunList)}`
+    );
+    const invalidStatusAllowedValues = Array.isArray(invalidStatusRunList?.error?.details?.allowedValues)
+      ? invalidStatusRunList.error.details.allowedValues
+      : invalidStatusRunList.details.allowedValues;
+    assertCondition(
+      invalidStatusAllowedValues.includes("queued")
+        && invalidStatusAllowedValues.includes("failed"),
+      `Expected invalid status filter contract to include allowed values, got ${JSON.stringify(invalidStatusRunList)}`
     );
 
     const baselineImageUpload = await requestJson(
@@ -631,6 +681,103 @@ async function main() {
     assertCondition(preWorkerRunDetail?.run?.status === "queued", `Expected pre-worker queued status, got ${preWorkerRunDetail?.run?.status}`);
     assertCondition(!preWorkerRunDetail?.result, "Expected no run result before worker execution");
 
+    const queuedRunList = await requestJson(
+      `${baseUrl}/admin/style-dna/runs?styleInfluenceId=si_style_dna_smoke&status=queued&limit=10`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      200
+    );
+    assertCondition(
+      Array.isArray(queuedRunList?.runs)
+        && queuedRunList.runs.some((item) => item?.styleDnaRunId === styleDnaRunId && item?.status === "queued"),
+      `Expected queued run list to include submitted run, got ${JSON.stringify(queuedRunList)}`
+    );
+
+    const queueUnavailablePort = String(Number.parseInt(smokePort, 10) + 11);
+    const queueUnavailableBaseUrl = `http://127.0.0.1:${queueUnavailablePort}/v1`;
+    const queueUnavailableApi = spawnProcess(process.execPath, ["apps/api/src/index.js"], {
+      ...process.env,
+      PORT: queueUnavailablePort,
+      QUEUE_ADAPTER_MODE: "sqs",
+      SQS_QUEUE_URL: "https://invalid.localhost/queue/style-dna-run-smoke",
+      SQS_DLQ_URL: "https://invalid.localhost/queue/style-dna-run-smoke-dlq",
+      STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "deterministic",
+    });
+
+    try {
+      await waitForHealth(queueUnavailableBaseUrl, adminToken);
+      const queueUnavailableIdempotencyKey = `style-dna-run-smoke:queue-unavailable:${Date.now()}`;
+      const queueUnavailableResponse = await fetch(
+        `${queueUnavailableBaseUrl}/admin/style-dna/runs`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            idempotencyKey: queueUnavailableIdempotencyKey,
+            styleInfluenceId: "si_style_dna_smoke",
+            baselineRenderSetId,
+            styleAdjustmentType,
+            styleAdjustmentMidjourneyId,
+            promptKey,
+            stylizeTier,
+            testGridImageId,
+            submittedTestEnvelope,
+          }),
+        }
+      );
+      const queueUnavailableJson = await queueUnavailableResponse.json().catch(() => ({}));
+      assertCondition(
+        queueUnavailableResponse.status === 503,
+        `Expected 503 queue unavailable for style-dna run submit, got ${queueUnavailableResponse.status}: ${JSON.stringify(queueUnavailableJson)}`
+      );
+      assertCondition(
+        extractApiErrorCode(queueUnavailableJson) === "QUEUE_UNAVAILABLE",
+        `Expected QUEUE_UNAVAILABLE code, got ${JSON.stringify(queueUnavailableJson)}`
+      );
+      assertCondition(
+        extractApiErrorText(queueUnavailableJson).includes("unable to enqueue style-dna run"),
+        `Expected queue unavailable submit message, got ${JSON.stringify(queueUnavailableJson)}`
+      );
+
+      const queueUnavailableRun = queryFirstRow(
+        dbPath,
+        `SELECT style_dna_run_id, status, last_error_code, last_error_message
+         FROM style_dna_runs
+         WHERE idempotency_key = ${quote(queueUnavailableIdempotencyKey)}
+         LIMIT 1;`
+      );
+      assertCondition(Boolean(queueUnavailableRun), "Expected persisted style-dna run row for queue-unavailable submit");
+      assertCondition(
+        String(queueUnavailableRun.status || "") === "failed",
+        `Expected queue-unavailable run to be marked failed, got ${JSON.stringify(queueUnavailableRun)}`
+      );
+      assertCondition(
+        String(queueUnavailableRun.last_error_code || "") === "QUEUE_UNAVAILABLE",
+        `Expected queue-unavailable run error code, got ${JSON.stringify(queueUnavailableRun)}`
+      );
+      assertCondition(
+        String(queueUnavailableRun.last_error_message || "").trim() !== "",
+        `Expected queue-unavailable run error message, got ${JSON.stringify(queueUnavailableRun)}`
+      );
+    } finally {
+      queueUnavailableApi.proc.kill("SIGTERM");
+      await sleep(200);
+      if (!queueUnavailableApi.proc.killed) {
+        queueUnavailableApi.proc.kill("SIGKILL");
+      }
+      const queueUnavailableLogs = queueUnavailableApi.getLogs();
+      if (queueUnavailableLogs.stderr.trim() !== "") {
+        process.stderr.write(queueUnavailableLogs.stderr);
+      }
+    }
+
     const worker = spawnProcess("node", ["apps/worker/src/index.js"], {
       ...process.env,
       TRAIT_INFERENCE_MODE: "deterministic",
@@ -680,6 +827,113 @@ async function main() {
       Number(runDetail?.result?.canonicalTraits?.deltaStrength?.score_1_to_10 || 0) >= 1,
       `Invalid canonical deltaStrength score: ${JSON.stringify(runDetail?.result?.canonicalTraits?.deltaStrength)}`
     );
+
+    const analysisJobRows = queryRows(
+      dbPath,
+      `SELECT aj.model_family, aj.model_version, aj.model_selection_source
+       FROM analysis_runs ar
+       JOIN analysis_jobs aj
+         ON aj.job_id = ar.job_id
+       WHERE ar.analysis_run_id = ${quote(String(runDetail?.run?.analysisRunId || ""))}
+       LIMIT 1;`
+    );
+    const analysisJob = analysisJobRows[0] || null;
+    assertCondition(Boolean(analysisJob), "Expected analysis job row for style-dna run analysisRunId");
+    assertCondition(
+      String(analysisJob.model_family || "") === "standard",
+      `Expected analysis job model family to be locked from submitted envelope, got ${JSON.stringify(analysisJob)}`
+    );
+    assertCondition(
+      String(analysisJob.model_version || "") === "7",
+      `Expected analysis job model version to be locked from submitted envelope, got ${JSON.stringify(analysisJob)}`
+    );
+    assertCondition(
+      String(analysisJob.model_selection_source || "") === "style_dna_locked_envelope",
+      `Expected style_dna_locked_envelope model source, got ${JSON.stringify(analysisJob)}`
+    );
+
+    const succeededRunList = await requestJson(
+      `${baseUrl}/admin/style-dna/runs?styleInfluenceId=si_style_dna_smoke&status=succeeded&limit=10`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      200
+    );
+    assertCondition(
+      Array.isArray(succeededRunList?.runs)
+        && succeededRunList.runs.some((item) => item?.styleDnaRunId === styleDnaRunId && item?.status === "succeeded"),
+      `Expected succeeded run list to include completed run, got ${JSON.stringify(succeededRunList)}`
+    );
+
+    const idempotencyRow = queryFirstRow(
+      dbPath,
+      `SELECT COUNT(*) AS row_count
+       FROM style_dna_runs
+       WHERE idempotency_key = ${quote(runIdempotencyKey)};`
+    );
+    assertCondition(
+      Number(idempotencyRow?.row_count || 0) === 1,
+      `Expected exactly one run row for idempotency key, got ${JSON.stringify(idempotencyRow)}`
+    );
+
+    const submitAuditRows = queryRows(
+      dbPath,
+      `SELECT action_type, target_id, reason
+       FROM admin_actions_audit
+       WHERE action_type = 'style_dna.run.submit'
+         AND target_type = 'style_dna_run'
+         AND target_id = ${quote(styleDnaRunId)}
+       ORDER BY created_at ASC, admin_action_audit_id ASC;`
+    );
+    assertCondition(
+      submitAuditRows.length === 2,
+      `Expected two submit audit rows (initial + deduplicated), got ${JSON.stringify(submitAuditRows)}`
+    );
+    assertCondition(
+      submitAuditRows.some((row) => row.reason === null || String(row.reason || "").trim() === ""),
+      `Expected one submit audit with null reason, got ${JSON.stringify(submitAuditRows)}`
+    );
+    assertCondition(
+      submitAuditRows.some((row) => String(row.reason || "").startsWith(`deduplicated:${runIdempotencyKey}`)),
+      `Expected one deduplicated submit audit reason, got ${JSON.stringify(submitAuditRows)}`
+    );
+
+    const listAuditRows = queryRows(
+      dbPath,
+      `SELECT reason
+       FROM admin_actions_audit
+       WHERE action_type = 'style_dna.run.list'
+         AND target_type = 'style_dna_run_collection'
+         AND target_id = 'style_dna_runs'
+       ORDER BY created_at ASC, admin_action_audit_id ASC;`
+    );
+    assertCondition(listAuditRows.length >= 2, `Expected run list audit rows, got ${JSON.stringify(listAuditRows)}`);
+    assertCondition(
+      listAuditRows.some((row) => String(row.reason || "").includes('"status":"queued"')),
+      `Expected run list audit reason to capture queued status filter, got ${JSON.stringify(listAuditRows)}`
+    );
+    assertCondition(
+      listAuditRows.some((row) => String(row.reason || "").includes('"status":"succeeded"')),
+      `Expected run list audit reason to capture succeeded status filter, got ${JSON.stringify(listAuditRows)}`
+    );
+
+    const getAuditRows = queryRows(
+      dbPath,
+      `SELECT COUNT(*) AS row_count
+       FROM admin_actions_audit
+       WHERE action_type = 'style_dna.run.get'
+         AND target_type = 'style_dna_run'
+         AND target_id = ${quote(styleDnaRunId)};`
+    );
+    const getAuditCount = Number(getAuditRows[0]?.row_count || 0);
+    assertCondition(
+      getAuditCount >= 2,
+      `Expected at least two run get audit rows (pre and post terminal lookups), got ${getAuditCount}`
+    );
+
     cleanupVerified = true;
 
     console.log(
@@ -691,6 +945,9 @@ async function main() {
           styleDnaRunId,
           runStatus: runDetail.run.status,
           resultId: runDetail.result.styleDnaRunResultId,
+          auditSubmitCount: submitAuditRows.length,
+          auditListCount: listAuditRows.length,
+          auditGetCount: getAuditCount,
           providerSummary: runDetail.result.summary,
         },
         null,
