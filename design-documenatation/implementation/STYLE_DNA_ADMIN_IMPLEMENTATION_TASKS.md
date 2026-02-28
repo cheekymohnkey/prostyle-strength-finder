@@ -537,3 +537,34 @@ Verification:
 
 Recommended next task:
 1. Split run-ops browser checks into focused specs (filter/paging, retry-disable UX, diagnostics modal) and add one no-runs-state assertion path for deterministic empty-state coverage.
+
+## Progress Addendum (2026-02-28) - Run Ops Regression Follow-up
+
+Status:
+1. Completed.
+
+Objective completed:
+1. Increase browser-level run-ops regression depth after focused spec split by validating modal trait parity, filter/limit transitions, and retry happy-path interactions.
+
+Completed in this follow-up:
+1. Added canonical trait rendering in run-detail modal for successful runs.
+2. Added browser assertions for queued/in-progress filter transitions and paging reset behavior.
+3. Added browser assertions for limit selector transitions and paging reset behavior.
+4. Added browser assertions for retry load-and-clear happy path (`Load for retry` -> stored grid visible -> `Clear` removes state).
+
+Commits (master):
+1. ceec4d6 — feat(style-dna): surface canonical traits in run-detail modal
+2. dd5f229 — test(playwright): cover queued/in-progress filters and paging reset
+3. e46501d — test(playwright): cover retry load-and-clear happy path
+
+Files changed:
+1. apps/frontend/app/admin/style-dna/StudioPage.tsx
+2. tests/playwright/style-dna-run-ops-detail-states.spec.ts
+3. tests/playwright/style-dna-run-ops-filter-paging.spec.ts
+4. tests/playwright/style-dna-run-ops-retry-disable.spec.ts
+
+Verification:
+1. set -a && source .env.local && set +a && npm run e2e:playwright (pass; 7 specs)
+
+Recommended next task:
+1. Add browser assertions for refresh-run selection persistence, stale-detail clearing on influence switch, and modal overlay-dismiss close behavior.

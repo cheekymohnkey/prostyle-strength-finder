@@ -170,3 +170,45 @@ Definition of done:
 1. Run-ops browser coverage is split into deterministic focused specs with stable selectors.
 2. Tests validate failed + succeeded + empty-state operator paths.
 3. `npm run e2e:playwright` remains green locally with fixture seeding.
+
+## Addendum - 2026-02-28 (Run Ops Regression Follow-up)
+
+### Summary
+Completed three additional run-operations regression slices focused on modal trait parity and filter/retry interaction depth, all merged to `master`.
+
+### Completed in this follow-up
+1. Run-detail modal now surfaces canonical trait fields for succeeded runs (vibe shift, DNA tags, delta strength) to match selected-details visibility.
+2. Browser coverage expanded for queued/in-progress status filters with explicit paging-reset assertions on filter transitions.
+3. Browser coverage expanded for fetch-limit transitions with explicit paging-reset assertions on limit changes.
+4. Browser coverage expanded for retry positive path (`Load for retry` hydrates stored grid context and `Clear` removes it).
+
+### Commits (master)
+1. `ceec4d6` — `feat(style-dna): surface canonical traits in run-detail modal`
+2. `dd5f229` — `test(playwright): cover queued/in-progress filters and paging reset`
+3. `e46501d` — `test(playwright): cover retry load-and-clear happy path`
+
+### Files changed
+1. `apps/frontend/app/admin/style-dna/StudioPage.tsx`
+2. `tests/playwright/style-dna-run-ops-detail-states.spec.ts`
+3. `tests/playwright/style-dna-run-ops-filter-paging.spec.ts`
+4. `tests/playwright/style-dna-run-ops-retry-disable.spec.ts`
+
+### Verification
+1. `set -a && source .env.local && set +a && npm run e2e:playwright` (pass, 7 specs)
+
+### Recommended Next Task Kickoff
+Objective:
+1. Close remaining run-ops browser interaction gaps without backend changes.
+
+Scope:
+1. Add browser assertion for `Refresh runs` behavior preserving selected-run intent when selected row remains in filtered result set.
+2. Add browser assertion that switching influence clears selected-run details until valid rows exist (no stale details leakage).
+3. Add one browser assertion for modal overlay dismissal (`click outside`) to validate close behavior parity with close button.
+
+Out of scope:
+1. API/schema changes.
+2. Non-Style-DNA surfaces.
+
+Definition of done:
+1. New interaction assertions are deterministic under seeded local data.
+2. `npm run e2e:playwright` remains green.
