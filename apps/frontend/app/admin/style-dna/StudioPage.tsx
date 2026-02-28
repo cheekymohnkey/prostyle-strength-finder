@@ -438,7 +438,9 @@ export default function StudioPage() {
     
     // Global/Set params
     const env = baselineSetDetailQuery.data?.baselineRenderSet?.parameterEnvelope;
-    if (env?.aspectRatio) line += ` --ar ${env.aspectRatio}`;
+    const aspectRatioValue = String(env?.aspectRatio || "").trim();
+    const isDefaultAspectRatio = /^1\s*:\s*1$/.test(aspectRatioValue);
+    if (aspectRatioValue && !isDefaultAspectRatio) line += ` --ar ${aspectRatioValue}`;
     if (env?.seed) line += ` --seed ${env.seed}`;
     if (env?.quality) line += ` --q ${env.quality}`;
     if (mjModelVersion) line += ` --v ${mjModelVersion}`;
