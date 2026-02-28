@@ -263,6 +263,25 @@ function seedRunOpsFixture(dbPath) {
       created_by = excluded.created_by,
       created_at = excluded.created_at;
 
+    INSERT INTO style_influences (
+      style_influence_id, style_influence_type_id, influence_code, status, pinned_flag, created_by, created_at
+    ) VALUES (
+      'si_playwright_empty',
+      'sit_playwright_seed',
+      'sref-playwright-empty',
+      'active',
+      0,
+      ${quote(adminUserId)},
+      ${quote(now)}
+    )
+    ON CONFLICT(style_influence_id) DO UPDATE SET
+      style_influence_type_id = excluded.style_influence_type_id,
+      influence_code = excluded.influence_code,
+      status = 'active',
+      pinned_flag = 0,
+      created_by = excluded.created_by,
+      created_at = excluded.created_at;
+
     INSERT INTO baseline_prompt_suites (
       suite_id, name, suite_version, status, created_by, created_at
     ) VALUES (
@@ -444,6 +463,7 @@ function seedRunOpsFixture(dbPath) {
   return {
     adminUserId,
     styleInfluenceId: "si_playwright_seed",
+    emptyStyleInfluenceId: "si_playwright_empty",
     styleDnaRunId: "sdr_success_001",
     failedRunId: "sdr_faildiag_001",
     retryDisabledRunId: "sdr_failmissing_001",
