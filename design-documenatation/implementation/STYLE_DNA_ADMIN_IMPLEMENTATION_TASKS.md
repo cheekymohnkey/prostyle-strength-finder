@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-35` LLM-Only Trait Inference Cutover.
+1. Post-SDNA-35 prioritization (TBD by roadmap owner).
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-35`.
-2. Implement only SDNA-35 scope in a fresh chat.
+1. Review latest completed addendum and choose next numbered SDNA ticket.
+2. Keep changes scoped to one ticket objective per session.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -82,7 +82,7 @@ Out of scope:
 - canonical trait governance endpoints are now implemented (`canonical-traits` list/create/status + `trait-aliases` list/create/status).
 - taxonomy seed endpoint is now implemented (`POST /v1/admin/style-dna/taxonomy-seed`) with idempotent apply, deprecated-status reactivation, and conflict reporting.
 3. SD3: Implemented (DISC-002 foundation now in place).
-- worker style-dna branch with strict-schema adapter and deterministic/openai modes is active.
+- worker style-dna branch now enforces strict-schema LLM-only inference mode for Style-DNA runs (SDNA-35).
 - canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
 - canonicalization semantic matching now supports OpenAI embeddings (`/embeddings`) with `auto` fallback to proxy similarity when embeddings are unavailable.
 - failure path reaches dead-letter behavior in schema-failure smoke.
@@ -882,7 +882,7 @@ Next kickoff:
 
 ## Next Task (SDNA-35 / LLM-Only Trait Inference Cutover)
 
-Status: Planned 2026-03-01.
+Status: Completed 2026-03-01.
 
 Objective:
 1. Remove application-side trait inference and make strict-schema LLM output the single inference source for Style-DNA runs.
@@ -920,7 +920,26 @@ Risks / notes:
 2. Model/version changes can alter output characteristics and should be monitored via existing smoke/readiness evidence.
 
 Next kickoff:
-1. `SDNA-35` LLM-Only Trait Inference Cutover.
+1. Select next SDNA ticket by roadmap priority (SDNA-35 is complete).
+
+Completed:
+1. Removed deterministic application-side Style-DNA inference fallback path and enforced `STYLE_DNA_INFERENCE_MODE=llm` as the only allowed worker mode.
+2. Added explicit Style-DNA LLM schema validation error contracts (`STYLE_DNA_LLM_SCHEMA_INVALID`) and non-retryable failure handling for malformed/missing payloads.
+3. Preserved canonicalization, taxonomy mapping, run-result persistence, and audit/lifecycle persistence behavior for valid strict-schema outputs.
+4. Updated Style-DNA run/schema-failure smokes to run with local OpenAI-compatible mock servers under LLM-only mode.
+5. Completed decommission sweep in active planning/workflow docs so deterministic app-side Style-DNA inference is archived context only.
+
+Files changed:
+1. `apps/worker/src/config.js`
+2. `apps/worker/src/index.js`
+3. `scripts/inference/style-dna-adapter.js`
+4. `scripts/style-dna/run-smoke.js`
+5. `scripts/style-dna/schema-failure-smoke.js`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+7. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+8. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+9. `design-documenatation/LLM_WORKFLOW.md`
+10. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
 
 ## Verification Runbook (Target End-State)
 

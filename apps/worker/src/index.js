@@ -95,6 +95,7 @@ async function handleProcessingFailure({
   analysisRunId,
   attempt,
   processingError,
+  nonRetryable,
 }) {
   const failedEvent = buildStatusEvent(analysisRunId, envelope.jobId, "failed", processingError);
 
@@ -126,7 +127,7 @@ async function handleProcessingFailure({
     }
   }
 
-  if (attempt < config.queue.maxAttempts) {
+  if (!nonRetryable && attempt < config.queue.maxAttempts) {
     const retryDelayMs = config.queue.retryBaseMs * 2 ** (attempt - 1);
     const retryingEvent = buildStatusEvent(analysisRunId, envelope.jobId, "retrying", processingError);
     logJson("info", "worker.job.lifecycle", {
@@ -274,6 +275,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
         code: "SIMULATED_FAILURE",
         message: "Simulated processing failure",
       },
+      nonRetryable: false,
     });
     return;
   }
@@ -405,6 +407,7 @@ async function processMessage(message, queue, config, dbPath, traitInferenceAdap
         code: error.code || "PROCESSING_ERROR",
         message: error.message || "Worker processing error",
       },
+      nonRetryable: error.nonRetryable === true,
     });
     return;
   }

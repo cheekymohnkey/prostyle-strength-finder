@@ -1,3 +1,4 @@
+const http = require("http");
 const { spawn } = require("child_process");
 const { parseDatabaseUrl, ensureDbParentDir, ensureMigrationsTable, runSql } = require("../db/lib");
 const { assertDatabaseReady } = require("../db/runtime");
@@ -260,6 +261,72 @@ async function waitForProcessExit(proc, timeoutMs) {
   });
 }
 
+function startValidOpenAiServer(port) {
+  let callCount = 0;
+  let listening = false;
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/chat/completions") {
+      callCount += 1;
+      req.resume();
+      res.statusCode = 200;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({
+        id: "cmpl_run_smoke",
+        object: "chat.completion",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: JSON.stringify({
+                profile_analysis: {
+                  delta_strength: {
+                    score_1_to_10: 6,
+                    description: "Moderate visual delta across composition and texture.",
+                  },
+                  extracted_traits: {
+                    composition_and_structure: ["Tighter framing", "Cleaner subject hierarchy"],
+                    lighting_and_contrast: ["Higher contrast key lighting"],
+                    color_palette: ["Warmer highlights", "Muted shadow tones"],
+                    texture_and_medium: ["Smoother skin rendering", "Reduced grain"],
+                  },
+                  vibe_shift: "Shifted toward polished editorial portrait styling.",
+                  dominant_dna_tags: ["editorial polish", "warm cinematic"],
+                },
+              }),
+            },
+          },
+        ],
+      }));
+      return;
+    }
+    res.statusCode = 404;
+    res.end("not found");
+  });
+
+  return {
+    async listen() {
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(port, "127.0.0.1", () => {
+          listening = true;
+          resolve();
+        });
+      });
+    },
+    async close() {
+      if (!listening) {
+        return;
+      }
+      await new Promise((resolve) => server.close(() => resolve()));
+      listening = false;
+    },
+    calls() {
+      return callCount;
+    },
+  };
+}
+
 async function main() {
   const databaseUrl = requireEnv("DATABASE_URL");
   requireEnv("COGNITO_ISSUER");
@@ -273,7 +340,9 @@ async function main() {
   const adminToken = buildToken("admin-style-dna-run-smoke-user");
   const contributorToken = buildToken("contributor-style-dna-run-smoke-user");
   const smokePort = process.env.SMOKE_API_PORT || "3024";
+  const openAiPort = process.env.SMOKE_OPENAI_PORT || "4024";
   const baseUrl = `http://127.0.0.1:${smokePort}/v1`;
+  const openAiServer = startValidOpenAiServer(Number(openAiPort));
   const suiteId = `suite_style_dna_run_smoke_${Date.now()}`;
   const createdImageIds = [];
   let cleanupVerified = false;
@@ -282,11 +351,12 @@ async function main() {
     ...process.env,
     PORT: smokePort,
     TRAIT_INFERENCE_MODE: process.env.TRAIT_INFERENCE_MODE || "deterministic",
-    STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "deterministic",
+    STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "llm",
   });
 
   try {
     await waitForHealth(baseUrl, adminToken);
+    await openAiServer.listen();
 
     const forbiddenRunList = await requestJson(
       `${baseUrl}/admin/style-dna/runs?limit=5`,
@@ -705,7 +775,7 @@ async function main() {
       QUEUE_ADAPTER_MODE: "sqs",
       SQS_QUEUE_URL: "https://invalid.localhost/queue/style-dna-run-smoke",
       SQS_DLQ_URL: "https://invalid.localhost/queue/style-dna-run-smoke-dlq",
-      STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "deterministic",
+      STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "llm",
     });
 
     try {
@@ -781,7 +851,10 @@ async function main() {
     const worker = spawnProcess("node", ["apps/worker/src/index.js"], {
       ...process.env,
       TRAIT_INFERENCE_MODE: "deterministic",
-      STYLE_DNA_INFERENCE_MODE: "deterministic",
+      STYLE_DNA_INFERENCE_MODE: "llm",
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY || "run-smoke-dummy-key",
+      OPENAI_MODEL: "gpt-5-mini",
+      OPENAI_BASE_URL: `http://127.0.0.1:${openAiPort}`,
       WORKER_RUN_ONCE: "true",
     });
 
@@ -816,6 +889,7 @@ async function main() {
     }
 
     assertCondition(runDetail?.run?.status === "succeeded", `Expected succeeded run status, got ${runDetail?.run?.status}`);
+    assertCondition(openAiServer.calls() >= 1, "Expected worker to call OpenAI completion endpoint");
     assertCondition(
       sawInProgress || preWorkerRunDetail?.run?.status === "queued",
       "Expected observable lifecycle progression from queued to terminal state"
@@ -961,6 +1035,7 @@ async function main() {
         imageIds: createdImageIds,
       });
     }
+    await openAiServer.close();
     api.proc.kill("SIGTERM");
     await sleep(200);
     if (!api.proc.killed) {

@@ -319,7 +319,7 @@ async function main() {
     ...process.env,
     PORT: smokePort,
     TRAIT_INFERENCE_MODE: process.env.TRAIT_INFERENCE_MODE || "deterministic",
-    STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "deterministic",
+    STYLE_DNA_INFERENCE_MODE: process.env.STYLE_DNA_INFERENCE_MODE || "llm",
   });
 
   try {
@@ -484,7 +484,7 @@ async function main() {
     assertCondition(openAiServer.calls() >= 1, "Expected worker to call OpenAI completion endpoint");
     assertCondition(runDetail?.run?.status === "dead_letter", `Expected dead_letter run status, got ${runDetail?.run?.status}`);
     assertCondition(runDetail?.result === null, "Expected no run result on schema failure");
-    assertCondition(runDetail?.run?.lastErrorCode === "PROCESSING_ERROR", `Unexpected error code: ${runDetail?.run?.lastErrorCode}`);
+    assertCondition(runDetail?.run?.lastErrorCode === "STYLE_DNA_LLM_SCHEMA_INVALID", `Unexpected error code: ${runDetail?.run?.lastErrorCode}`);
     assertCondition(
       String(runDetail?.run?.lastErrorMessage || "").includes("LLM response missing JSON object"),
       `Unexpected error message: ${runDetail?.run?.lastErrorMessage || "(empty)"}`

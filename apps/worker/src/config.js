@@ -69,7 +69,7 @@ function loadConfig() {
     },
     inference: {
       mode: (process.env.TRAIT_INFERENCE_MODE || "deterministic").trim(),
-      styleDnaMode: (process.env.STYLE_DNA_INFERENCE_MODE || process.env.TRAIT_INFERENCE_MODE || "deterministic").trim(),
+      styleDnaMode: (process.env.STYLE_DNA_INFERENCE_MODE || "llm").trim(),
       styleDnaCanonicalizationSemanticMode: (
         process.env.STYLE_DNA_CANONICALIZATION_SEMANTIC_MODE
         || "auto"

@@ -6,7 +6,7 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. `SDNA-35` LLM-Only Trait Inference Cutover.
+1. Post-SDNA-35 prioritization (TBD by roadmap owner).
 
 Use this as kickoff in a new chat:
 1. Objective: remove app-side trait inference and depend entirely on strict-schema LLM output.
@@ -51,7 +51,45 @@ Canonical task detail location:
 5. `set -a && source .env.local && set +a && npm run launch:readiness-smoke`
 
 ### Recommended next task kickoff
-1. Proceed with `SDNA-35` LLM-Only Trait Inference Cutover.
+1. Select next SDNA ticket by roadmap priority (`SDNA-35` is complete).
+
+## Addendum - 2026-03-01 (SDNA-35 LLM-Only Trait Inference Cutover Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Enforced LLM-only Style-DNA inference mode in worker runtime and removed deterministic app-side fallback inference path for Style-DNA run result generation.
+2. Added explicit strict-schema validation contracts for Style-DNA LLM responses with deterministic non-retryable failure codes on malformed/missing payloads.
+3. Preserved canonicalization/taxonomy mapping and run-result persistence behavior for validated strict-schema LLM output.
+4. Updated Style-DNA run/schema-failure smokes to use local OpenAI-compatible mock servers under LLM-only mode.
+5. Updated active planning/workflow docs so deterministic app-side Style-DNA inference references are no longer forward work.
+
+### Files changed
+1. `apps/worker/src/config.js`
+2. `apps/worker/src/index.js`
+3. `scripts/inference/style-dna-adapter.js`
+4. `scripts/style-dna/run-smoke.js`
+5. `scripts/style-dna/schema-failure-smoke.js`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+7. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+8. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+9. `design-documenatation/LLM_WORKFLOW.md`
+10. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
+
+### Verification command order
+1. `npm run contracts`
+2. `set -a && source .env.local && set +a && npm run style-dna:run-smoke`
+3. `set -a && source .env.local && set +a && npm run style-dna:schema-failure-smoke`
+4. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
+5. `set -a && source .env.local && set +a && npm run launch:readiness-smoke`
+
+### Risks / follow-up notes
+1. Style-DNA now hard-fails malformed LLM payloads by design (`STYLE_DNA_LLM_SCHEMA_INVALID`) with no app-side fallback.
+2. LLM provider/schema drift should continue to be monitored via existing smoke/readiness evidence.
+
+### Recommended next task kickoff
+1. Select next SDNA ticket by roadmap priority (no remaining deterministic app-side Style-DNA inference work).
 
 ## Addendum - 2026-02-28 (SDNA-19 Consolidated Rollout Artifact Generation + Naming Standards Complete)
 

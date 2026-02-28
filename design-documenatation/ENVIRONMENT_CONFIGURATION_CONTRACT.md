@@ -53,6 +53,7 @@ For the current phase, these are the only supported environments beyond local: `
 | `DEFAULT_STANDARD_MODEL_VERSION` | Yes | API, Worker | integer string | Current default MidJourney standard model version used when prompt has no `--v`/`--niji`. |
 | `DEFAULT_NIJI_MODEL_VERSION` | Yes | API, Worker | integer string | Current default niji model version used for default tables and operations that need niji fallback metadata. |
 | `TRAIT_INFERENCE_MODE` | No | API, Worker | `llm` (legacy: `deterministic`) | Trait inference execution mode. Forward path is `llm` only (SDNA-35). `deterministic` is deprecated and retained only for historical rollback context until decommission cleanup is complete. |
+| `STYLE_DNA_INFERENCE_MODE` | No | Worker | `llm` | Style-DNA worker inference mode. SDNA-35 enforces `llm` only for Style-DNA run processing; non-`llm` values are invalid. |
 | `OPENAI_API_KEY` | Conditional | API, Worker | string | Required when `TRAIT_INFERENCE_MODE=llm`. |
 | `OPENAI_MODEL` | No | API, Worker | string | OpenAI model id for trait inference (default `gpt-4.1-mini`). |
 | `OPENAI_BASE_URL` | No | API, Worker | URL | Base URL for OpenAI-compatible endpoint (default `https://api.openai.com/v1`). |

@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 const { createOpenAiDebugSession } = require("./openai-debug-log");
 
 const STYLE_DNA_SYSTEM_PROMPT_PATH = path.join(__dirname, "prompts", "style-dna-baseline-comparison-system.md");
@@ -22,86 +21,99 @@ function loadStyleDnaSchema() {
   return JSON.parse(raw);
 }
 
-function extractJsonObject(text) {
+function createInferenceError(code, message, nonRetryable) {
+  return Object.assign(new Error(message), {
+    code,
+    nonRetryable,
+  });
+}
+
+function parseJsonObjectText(text) {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) {
-    throw new Error("LLM response missing JSON object");
+    throw createInferenceError("STYLE_DNA_LLM_SCHEMA_INVALID", "LLM response missing JSON object", true);
   }
-  return JSON.parse(text.slice(start, end + 1));
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch (_error) {
+    throw createInferenceError("STYLE_DNA_LLM_SCHEMA_INVALID", "LLM response contained invalid JSON", true);
+  }
 }
 
-function ensureStringArray(value) {
-  const input = Array.isArray(value) ? value : [];
-  const normalized = input
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter((item) => item !== "");
-  return normalized.length > 0 ? normalized : ["No change"];
+function assertObject(value, pathLabel) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw createInferenceError("STYLE_DNA_LLM_SCHEMA_INVALID", `Invalid LLM payload: expected object at ${pathLabel}`, true);
+  }
+  return value;
 }
 
-function sanitizeStyleDnaResult(input) {
-  const root = input && typeof input === "object" ? input : {};
-  const profile = root.profile_analysis && typeof root.profile_analysis === "object"
-    ? root.profile_analysis
-    : {};
-  const delta = profile.delta_strength && typeof profile.delta_strength === "object"
-    ? profile.delta_strength
-    : {};
-  const extractedTraits = profile.extracted_traits && typeof profile.extracted_traits === "object"
-    ? profile.extracted_traits
-    : {};
+function assertString(value, pathLabel) {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw createInferenceError("STYLE_DNA_LLM_SCHEMA_INVALID", `Invalid LLM payload: expected non-empty string at ${pathLabel}`, true);
+  }
+  return value.trim();
+}
 
-  const rawScore = Number(delta.score_1_to_10);
-  const score = Number.isFinite(rawScore)
-    ? Math.max(1, Math.min(10, Math.round(rawScore)))
-    : 1;
+function assertIntegerInRange(value, pathLabel, min, max) {
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw createInferenceError(
+      "STYLE_DNA_LLM_SCHEMA_INVALID",
+      `Invalid LLM payload: expected integer ${min}-${max} at ${pathLabel}`,
+      true
+    );
+  }
+  return value;
+}
 
-  const description = typeof delta.description === "string" && delta.description.trim() !== ""
-    ? delta.description.trim()
-    : "No meaningful delta detected.";
+function assertStringArray(value, pathLabel) {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw createInferenceError("STYLE_DNA_LLM_SCHEMA_INVALID", `Invalid LLM payload: expected non-empty string array at ${pathLabel}`, true);
+  }
+  const normalized = value.map((item, index) => assertString(item, `${pathLabel}[${index}]`));
+  if (normalized.length === 0) {
+    throw createInferenceError("STYLE_DNA_LLM_SCHEMA_INVALID", `Invalid LLM payload: expected non-empty string array at ${pathLabel}`, true);
+  }
+  return normalized;
+}
 
-  const vibeShift = typeof profile.vibe_shift === "string" && profile.vibe_shift.trim() !== ""
-    ? profile.vibe_shift.trim()
-    : "No major stylistic vibe shift detected.";
+function validateStyleDnaSchemaPayload(input) {
+  const root = assertObject(input, "root");
+  const profile = assertObject(root.profile_analysis, "root.profile_analysis");
+  const deltaStrength = assertObject(profile.delta_strength, "root.profile_analysis.delta_strength");
+  const extractedTraits = assertObject(profile.extracted_traits, "root.profile_analysis.extracted_traits");
 
   return {
     profile_analysis: {
       delta_strength: {
-        score_1_to_10: score,
-        description,
+        score_1_to_10: assertIntegerInRange(
+          deltaStrength.score_1_to_10,
+          "root.profile_analysis.delta_strength.score_1_to_10",
+          1,
+          10
+        ),
+        description: assertString(deltaStrength.description, "root.profile_analysis.delta_strength.description"),
       },
       extracted_traits: {
-        composition_and_structure: ensureStringArray(extractedTraits.composition_and_structure),
-        lighting_and_contrast: ensureStringArray(extractedTraits.lighting_and_contrast),
-        color_palette: ensureStringArray(extractedTraits.color_palette),
-        texture_and_medium: ensureStringArray(extractedTraits.texture_and_medium),
+        composition_and_structure: assertStringArray(
+          extractedTraits.composition_and_structure,
+          "root.profile_analysis.extracted_traits.composition_and_structure"
+        ),
+        lighting_and_contrast: assertStringArray(
+          extractedTraits.lighting_and_contrast,
+          "root.profile_analysis.extracted_traits.lighting_and_contrast"
+        ),
+        color_palette: assertStringArray(
+          extractedTraits.color_palette,
+          "root.profile_analysis.extracted_traits.color_palette"
+        ),
+        texture_and_medium: assertStringArray(
+          extractedTraits.texture_and_medium,
+          "root.profile_analysis.extracted_traits.texture_and_medium"
+        ),
       },
-      vibe_shift: vibeShift,
-      dominant_dna_tags: ensureStringArray(profile.dominant_dna_tags),
-    },
-  };
-}
-
-function deterministicStyleDnaResult(seed) {
-  const digest = crypto.createHash("sha256").update(seed).digest("hex");
-  const score = (parseInt(digest.slice(0, 2), 16) % 10) + 1;
-  return {
-    profile_analysis: {
-      delta_strength: {
-        score_1_to_10: score,
-        description: "Deterministic fallback result for local scaffolding.",
-      },
-      extracted_traits: {
-        composition_and_structure: ["No change"],
-        lighting_and_contrast: ["No change"],
-        color_palette: ["No change"],
-        texture_and_medium: ["No change"],
-      },
-      vibe_shift: "No deterministic vibe shift inferred.",
-      dominant_dna_tags: [
-        `tag-${digest.slice(0, 4)}`,
-        `tag-${digest.slice(4, 8)}`,
-      ],
+      vibe_shift: assertString(profile.vibe_shift, "root.profile_analysis.vibe_shift"),
+      dominant_dna_tags: assertStringArray(profile.dominant_dna_tags, "root.profile_analysis.dominant_dna_tags"),
     },
   };
 }
@@ -185,51 +197,43 @@ async function callOpenAiStyleDnaInference(openAi, input) {
   if (!response.ok) {
     const message = responseJson?.error?.message || `OpenAI request failed with status ${response.status}`;
     debug.logError(message);
-    throw new Error(message);
+    throw createInferenceError("STYLE_DNA_LLM_UPSTREAM_ERROR", message, false);
   }
 
   const content = responseJson?.choices?.[0]?.message?.content;
   if (typeof content === "string" && content.trim() !== "") {
-    return sanitizeStyleDnaResult(extractJsonObject(content));
+    return validateStyleDnaSchemaPayload(parseJsonObjectText(content));
   }
 
   if (Array.isArray(content)) {
     const textPart = content.find((item) => item && item.type === "text" && typeof item.text === "string");
     if (textPart && typeof textPart.text === "string" && textPart.text.trim() !== "") {
-      return sanitizeStyleDnaResult(extractJsonObject(textPart.text));
+      return validateStyleDnaSchemaPayload(parseJsonObjectText(textPart.text));
     }
   }
 
-  throw new Error("OpenAI response did not include JSON content");
+  throw createInferenceError("STYLE_DNA_LLM_SCHEMA_INVALID", "OpenAI response did not include JSON content", true);
 }
 
 function createStyleDnaInferenceAdapter(config) {
-  const mode = (config?.inference?.styleDnaMode || config?.inference?.mode || "deterministic").trim();
+  const mode = (config?.inference?.styleDnaMode || "llm").trim();
   const openAi = config?.inference?.openAi || {};
 
-  if (mode === "llm" && (!openAi.apiKey || openAi.apiKey.trim() === "")) {
-    throw new Error("STYLE_DNA_INFERENCE_MODE=llm requires OPENAI_API_KEY");
+  if (mode !== "llm") {
+    throw createInferenceError(
+      "STYLE_DNA_LLM_ONLY_MODE_REQUIRED",
+      `STYLE_DNA_INFERENCE_MODE must be llm for Style-DNA runs; received: ${mode || "(empty)"}`,
+      true
+    );
+  }
+
+  if (!openAi.apiKey || openAi.apiKey.trim() === "") {
+    throw createInferenceError("STYLE_DNA_LLM_CONFIG_INVALID", "STYLE_DNA_INFERENCE_MODE=llm requires OPENAI_API_KEY", true);
   }
 
   return {
     mode,
     async compare(input) {
-      if (mode !== "llm") {
-        const seed = [
-          input.styleInfluenceId || "",
-          input.styleAdjustmentType || "",
-          input.styleAdjustmentMidjourneyId || "",
-          input.promptKey || "",
-          String(input.stylizeTier || ""),
-          input.baselineImageId || "",
-          input.testImageId || "",
-        ].join("|");
-        return {
-          profileAnalysis: deterministicStyleDnaResult(seed),
-          provider: "deterministic",
-        };
-      }
-
       const profileAnalysis = await callOpenAiStyleDnaInference(openAi, {
         styleAdjustmentType: input.styleAdjustmentType,
         styleAdjustmentMidjourneyId: input.styleAdjustmentMidjourneyId,

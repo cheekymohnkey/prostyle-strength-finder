@@ -7,13 +7,13 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 ## NEXT SESSION START HERE (as of 2026-03-01)
 
 Current next implementation task:
-1. `SDNA-35` LLM-Only Trait Inference Cutover.
+1. Post-SDNA-35 prioritization (next SDNA ticket TBD by roadmap owner).
 
 Primary pointers:
 1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
 2. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
 
-Copy/paste kickoff prompt for a fresh chat:
+Reference kickoff prompt for the completed SDNA-35 slice:
 
 ```text
 Use these docs as source of truth:
@@ -55,6 +55,12 @@ Definition of done:
 3. Reference source-of-truth docs by path instead of re-explaining history.
 4. Keep each task objective narrow and testable.
 5. End each task with a handoff summary.
+
+## SDNA-35 Status Note (2026-03-01)
+
+1. SDNA-35 is completed.
+2. Style-DNA run inference is now strict-schema LLM-only with deterministic explicit failure contracts for invalid/missing payloads.
+3. Deterministic app-side Style-DNA inference references are archived/decommissioned context only and are not forward implementation work.
 
 ## Source-of-Truth Docs
 
