@@ -22,7 +22,7 @@ Always anchor tasks to:
 04. `design-documenatation/TECHNICAL_DECISIONS.md`
 05. `design-documenatation/requirements/REQUIREMENTS_INDEX.md`
 06. `design-documenatation/requirements/PRODUCT_REQUIREMENTS_HIGH_LEVEL.md`
-07. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+07. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
 
 ## Implementation Plan Links
 
@@ -40,7 +40,7 @@ Current frontend runtime contract:
 5. UI upgrade handover (latest):
 - `design-documenatation/UI_UPGRADE_HANDOVER_2026-02-23.md`
 6. Style-DNA handover (latest):
-- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
 
 
 ## New Task Start Template
@@ -55,7 +55,7 @@ Use these docs as source of truth:
 - design-documenatation/TECHNICAL_DECISIONS.md
 - design-documenatation/requirements/REQUIREMENTS_INDEX.md
 - design-documenatation/requirements/PRODUCT_REQUIREMENTS_HIGH_LEVEL.md
-- design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md
+- design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md
 
 Task objective:
 <one concrete objective>

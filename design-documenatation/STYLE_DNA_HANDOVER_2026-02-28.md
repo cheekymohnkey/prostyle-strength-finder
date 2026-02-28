@@ -32,7 +32,7 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 5. [Done] Run detail UX drawer shipped with deeper diagnostics (status, error code/message, payload context, test/baseline image links).
 6. [Done] Run-log scalability controls shipped: status filter + limit selector + paging controls in Run Operations Log.
 7. [Done] Extended `admin:frontend-proxy-smoke` with run operations coverage for list filter/limit semantics and run-detail diagnostics fields.
-8. Next best task: add browser-level UI automation (Playwright/Cypress) for interaction behaviors proxy smoke cannot directly assert (selection highlight persistence, tooltip copy visibility, modal open/close UX).
+8. [Done] Browser-level Playwright automation baseline shipped for run-operations interactions; next extension is edge-state coverage (disable reasons + paging/filter transitions + failure-state path).
 
 ## Addendum - 2026-02-28 (Studio UX + Operability)
 
@@ -84,4 +84,46 @@ Out of scope:
 Definition of done:
 1. Browser-level tests catch regressions in run operations interaction behavior.
 2. Tests cover key operator UX actions now implemented in Studio.
+3. Existing proxy smoke remains green.
+
+## Addendum - 2026-02-28 (Playwright Deterministic Automation + Merge Closeout)
+
+### Summary
+Completed and merged deterministic browser-level automation for Studio run operations on `master`, then performed post-merge validation and workspace hygiene cleanup.
+
+### Completed in this slice
+1. Added deterministic Playwright seed fixture for run operations so tests no longer skip when local data is sparse.
+2. Wired Playwright scripts to seed fixture data before test execution.
+3. Updated run-ops browser test to explicitly select seeded influence and assert row/detail/modal interactions deterministically.
+4. Opened, merged, and cleaned up the spike PR branch used for safe experimentation.
+5. Added `tmp/` ignore housekeeping to keep local rollout artifacts from showing as untracked changes.
+
+### Files changed
+1. `tests/playwright/setup/seed-style-dna-run-ops.js`
+2. `tests/playwright/style-dna-run-ops.spec.ts`
+3. `playwright.config.ts`
+4. `package.json`
+5. `.gitignore`
+
+### Merge + verification status
+1. Playwright deterministic seed changes merged to `master` (via PR #1).
+2. Post-merge browser test check: `npm run e2e:playwright` (pass).
+3. Post-merge proxy contract check: `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+
+### Next session kickoff (recommended)
+Objective:
+1. Expand browser-level regression coverage from the current run-ops “happy path” to include disable-reason UX and paging/filter interaction edges.
+
+Scope:
+1. Add Playwright assertions for retry-disable reason visibility.
+2. Add Playwright assertions for run filter/limit/paging state transitions.
+3. Add one failure-state fixture assertion path (failed run with diagnostics visible).
+
+Out of scope:
+1. Backend endpoint changes.
+2. Non-Style-DNA UI work.
+
+Definition of done:
+1. Browser tests cover selected-run happy path + one failure path.
+2. Tests are deterministic in local runs.
 3. Existing proxy smoke remains green.

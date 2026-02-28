@@ -125,8 +125,13 @@ Out of scope:
 - retry submit now disables when required references are missing (test/baseline/context prerequisites)
 - explicit disable reason/tooltips are surfaced on retry actions
 - valid retry path remains unchanged
-2. Next recommended slice:
-- browser-level UI automation (Playwright/Cypress) for Studio run operations interactions that proxy-level smoke cannot assert directly
+2. [Done] Browser-level run-operations UI automation (Playwright):
+- deterministic fixture seeding added for run-ops interactions (`tests/playwright/setup/seed-style-dna-run-ops.js`)
+- run-ops interaction spec added and stabilized (`tests/playwright/style-dna-run-ops.spec.ts`)
+- Playwright scripts now seed fixture before execution (`package.json` `e2e:playwright*` scripts)
+- merged to `master` on 2026-02-28 and verified post-merge (`e2e:playwright` + `admin:frontend-proxy-smoke` pass)
+3. Next recommended slice:
+- expand Playwright coverage to include retry disable-reason visibility and run filter/limit/paging edge interactions
 
 ## SD1. Persistence + Shared Contracts
 

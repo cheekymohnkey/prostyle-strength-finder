@@ -4,7 +4,7 @@ Status: Planned
 Date: 2026-02-27  
 Depends on:
 - `design-documenatation/implementation/STYLE_DNA_UX_REDESIGN_PROPOSAL.md` (Source of Truth)
-- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-24.md`
+- `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
 - `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
 
 ## Purpose
