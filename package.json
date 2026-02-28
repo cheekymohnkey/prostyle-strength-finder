@@ -87,6 +87,13 @@
     "style-dna:schema-failure-smoke": "node scripts/style-dna/schema-failure-smoke.js",
     "style-dna:smokes:with-restore": "scripts/db/run-with-db-restore.sh /bin/zsh -lc \"npm run style-dna:tier-validation-smoke && npm run style-dna:baseline-smoke && npm run style-dna:baseline-delete-cascade-smoke && npm run style-dna:prompt-generation-smoke && npm run style-dna:canonicalization-smoke && npm run style-dna:run-smoke && npm run style-dna:schema-failure-smoke\"",
     "governance:verify": "node scripts/governance/verify-freshness.js",
-    "governance:verify:prod": "node scripts/governance/verify-freshness.js --env prod"
+    "governance:verify:prod": "node scripts/governance/verify-freshness.js --env prod",
+    "e2e:playwright": "playwright test -c playwright.config.ts",
+    "e2e:playwright:headed": "playwright test -c playwright.config.ts --headed",
+    "e2e:playwright:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "playwright": "^1.55.0"
   }
 }
