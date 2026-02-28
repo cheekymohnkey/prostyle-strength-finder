@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-17` Coverage-Gated Seed Apply Enforcement + Readiness Integration.
+1. `SDNA-18` Expanded v2 Seed Bundle + Versioned Rollout Workflow.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-17`.
-2. Implement only SDNA-17 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-18`.
+2. Implement only SDNA-18 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -785,6 +785,37 @@ Risks / notes:
 Next kickoff:
 1. `SDNA-17` Coverage-Gated Seed Apply Enforcement + Readiness Integration.
 2. Scope: coverage-gated apply + readiness wiring hardening only; no worker/frontend redesign.
+
+## Next Task (SDNA-17 / Coverage-Gated Seed Apply Enforcement + Readiness Integration)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Hardened apply-coverage contract output for explicit gate-state semantics:
+- blocked path now returns `coverageGateApplied=true`, `coverageGateResult=blocked`, and deterministic coverage counts.
+- successful paths now return explicit `blocked=false`, `coverageGateResult` (`passed|not_applied`), and evaluated/failure counts.
+2. Expanded apply-coverage smoke assertions to lock blocked/passed/not-applied contract behavior.
+3. Integrated `style-dna:taxonomy-seed-apply-coverage-smoke` into `launch:readiness-smoke` full + quick scope sequencing.
+4. Re-verified readiness smoke full scope with explicit apply-coverage step evidence.
+
+Files changed:
+1. `scripts/style-dna/apply-taxonomy-seed.js`
+2. `scripts/style-dna/taxonomy-seed-apply-coverage-smoke.js`
+3. `scripts/launch/readiness-smoke.js`
+
+Verification:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-apply-coverage-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run launch:readiness-smoke` (pass; full scope includes `style_dna_taxonomy_seed_apply_coverage_smoke`).
+4. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+
+Risks / notes:
+1. Readiness full-scope runtime increases slightly due to added apply-coverage smoke step.
+2. Gate-state output contracts are deterministic by design and avoid timestamp fields.
+
+Next kickoff:
+1. `SDNA-18` Expanded v2 Seed Bundle + Versioned Rollout Workflow.
+2. Scope: v2 seed bundle/rollout workflow hardening only; no worker/frontend redesign.
 
 ## Verification Runbook (Target End-State)
 

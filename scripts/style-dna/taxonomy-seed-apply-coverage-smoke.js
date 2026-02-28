@@ -104,9 +104,15 @@ function main() {
     assertCondition(blocked.status !== 0, "Expected require-coverage apply to fail for under-covered bundle");
     assertCondition(blocked.json?.ok === false, "Expected blocked apply output ok=false");
     assertCondition(blocked.json?.blocked === true, "Expected blocked apply output blocked=true");
+    assertCondition(blocked.json?.coverageGateApplied === true, "Expected blocked apply coverageGateApplied=true");
+    assertCondition(blocked.json?.coverageGateResult === "blocked", "Expected blocked apply coverageGateResult=blocked");
     assertCondition(
       String(blocked.json?.reason || "") === "coverage_requirements_failed",
       `Expected blocked reason=coverage_requirements_failed, got ${JSON.stringify(blocked.json)}`
+    );
+    assertCondition(
+      Number(blocked.json?.failedCoverageCount || 0) >= 1,
+      `Expected blocked failedCoverageCount>=1, got ${blocked.json?.failedCoverageCount}`
     );
     assertCondition(
       Array.isArray(blocked.json?.coverage?.deficits)
@@ -128,6 +134,9 @@ function main() {
     });
     assertCondition(ungated.status === 0, `Expected ungated apply to succeed, got ${ungated.status}`);
     assertCondition(ungated.json?.ok === true, "Expected ungated apply output ok=true");
+    assertCondition(ungated.json?.blocked === false, "Expected ungated apply blocked=false");
+    assertCondition(ungated.json?.coverageGateApplied === false, "Expected ungated apply coverageGateApplied=false");
+    assertCondition(ungated.json?.coverageGateResult === "not_applied", "Expected ungated apply coverageGateResult=not_applied");
 
     const rowsAfterUngated = {
       canonical: listStyleDnaCanonicalTraits(dbPath, { taxonomyVersion: "style_dna_v1", limit: 2000 }).length,
@@ -143,7 +152,9 @@ function main() {
     });
     assertCondition(gatedGood.status === 0, `Expected gated apply for full bundle to succeed, got ${gatedGood.status}`);
     assertCondition(gatedGood.json?.ok === true, "Expected gated full apply output ok=true");
+    assertCondition(gatedGood.json?.blocked === false, "Expected gated full apply blocked=false");
     assertCondition(gatedGood.json?.coverageGateApplied === true, "Expected coverageGateApplied=true");
+    assertCondition(gatedGood.json?.coverageGateResult === "passed", "Expected gated full apply coverageGateResult=passed");
 
     console.log(
       JSON.stringify(
