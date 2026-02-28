@@ -1,3 +1,4 @@
+# yaml-language-server: disable
 server {
   listen 80;
   server_name __API_HOST__ __APP_HOST__;
