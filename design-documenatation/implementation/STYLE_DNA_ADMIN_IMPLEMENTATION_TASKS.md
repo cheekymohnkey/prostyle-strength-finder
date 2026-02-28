@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-14` Versioned Taxonomy Seed Library + Import Tooling.
+1. `SDNA-15` Taxonomy Diff/Report Tooling for Governance Preview.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-14`.
-2. Implement only SDNA-14 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-15`.
+2. Implement only SDNA-15 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -681,6 +681,42 @@ Risks / notes:
 Next kickoff:
 1. `SDNA-14` Versioned Taxonomy Seed Library + Import Tooling.
 2. Scope: seed-library packaging/import tooling hardening only; no worker/frontend redesign.
+
+## Next Task (SDNA-14 / Versioned Taxonomy Seed Library + Import Tooling)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Added deterministic taxonomy seed library resolver to discover versioned bundles and enforce unique `taxonomyVersion` mapping.
+2. Extended taxonomy seed importer CLI with SDNA-14 import ergonomics:
+- `--taxonomy-version <value>` (library-based bundle selection),
+- `--all` (deterministic batch import across library versions),
+- `--list-library` (library inventory output),
+- `--seed-dir <path>` (explicit library location override).
+3. Preserved single-seed compatibility output while adding deterministic multi-seed coverage and apply summaries for batch mode.
+4. Expanded library smoke coverage to verify:
+- library listing includes v1+v2 bundles,
+- version-targeted import/replay is idempotent for `style_dna_v2`,
+- v1+v2 coexistence persistence remains explicit.
+
+Files changed:
+1. `scripts/style-dna/taxonomy-seed-library.js`
+2. `scripts/style-dna/apply-taxonomy-seed.js`
+3. `scripts/style-dna/taxonomy-seed-library-smoke.js`
+
+Verification:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-library-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-apply-coverage-smoke` (pass).
+4. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+
+Risks / notes:
+1. Batch import mode intentionally applies in deterministic taxonomy-version order and is not transactional across versions.
+2. `--all` imports every discovered bundle in the target seed directory; operators should use an explicit `--seed-dir` in controlled rollout contexts.
+
+Next kickoff:
+1. `SDNA-15` Taxonomy Diff/Report Tooling for Governance Preview.
+2. Scope: deterministic diff/report preview hardening only; no worker/frontend redesign.
 
 ## Verification Runbook (Target End-State)
 

@@ -1,13 +1,21 @@
 const fs = require("fs");
 const path = require("path");
 const { assertDatabaseReady } = require("../db/runtime");
-const { validateStyleDnaTaxonomySeedPayload } = require("../../packages/shared-contracts/src");
 const { applyStyleDnaTaxonomySeed } = require("./taxonomy-seed-service");
 const { buildSeedCoverageReport } = require("./taxonomy-seed-coverage-core");
+const {
+  DEFAULT_SEEDS_DIR,
+  loadTaxonomySeedLibrary,
+  resolveTaxonomySeedSelection,
+} = require("./taxonomy-seed-library");
 
 function resolveArgs(argv) {
   const args = {
-    file: "scripts/style-dna/seeds/style-dna-taxonomy-seed-v1.json",
+    file: "",
+    taxonomyVersion: "",
+    all: false,
+    listLibrary: false,
+    seedDir: DEFAULT_SEEDS_DIR,
     requireCoverage: false,
     minCanonicalPerAxis: 2,
     minAliasesPerAxis: 3,
@@ -17,6 +25,24 @@ function resolveArgs(argv) {
     if (token === "--file" && index + 1 < argv.length) {
       args.file = String(argv[index + 1]).trim();
       index += 1;
+      continue;
+    }
+    if (token === "--taxonomy-version" && index + 1 < argv.length) {
+      args.taxonomyVersion = String(argv[index + 1]).trim();
+      index += 1;
+      continue;
+    }
+    if (token === "--seed-dir" && index + 1 < argv.length) {
+      args.seedDir = String(argv[index + 1]).trim();
+      index += 1;
+      continue;
+    }
+    if (token === "--all") {
+      args.all = true;
+      continue;
+    }
+    if (token === "--list-library") {
+      args.listLibrary = true;
       continue;
     }
     if (token === "--require-coverage") {
@@ -46,24 +72,15 @@ function printHelp() {
   console.log(
     [
       "Usage:",
-      "  node scripts/style-dna/apply-taxonomy-seed.js [--file <path>] [--require-coverage] [--min-canonical <n>] [--min-aliases <n>]",
+      "  node scripts/style-dna/apply-taxonomy-seed.js [--file <path> | --taxonomy-version <value> | --all] [--seed-dir <path>] [--list-library] [--require-coverage] [--min-canonical <n>] [--min-aliases <n>]",
       "",
       "Defaults:",
-      "  --file scripts/style-dna/seeds/style-dna-taxonomy-seed-v1.json",
+      "  --taxonomy-version style_dna_v1 (from seed library when available)",
+      `  --seed-dir ${DEFAULT_SEEDS_DIR}`,
       "  --min-canonical 2",
       "  --min-aliases 3",
     ].join("\n")
   );
-}
-
-function resolveSeedPath(rawPath) {
-  const trimmed = String(rawPath || "").trim();
-  if (trimmed === "") {
-    throw new Error("Seed file path is required");
-  }
-  return path.isAbsolute(trimmed)
-    ? trimmed
-    : path.resolve(process.cwd(), trimmed);
 }
 
 function resolveActor() {
@@ -86,6 +103,37 @@ function main() {
     printHelp();
     return;
   }
+  if (args.file && args.all) {
+    throw new Error("--file and --all cannot be used together");
+  }
+  if (args.file && args.taxonomyVersion) {
+    throw new Error("Use either --file or --taxonomy-version, not both");
+  }
+  const seedDir = path.isAbsolute(String(args.seedDir || "").trim())
+    ? String(args.seedDir || "").trim()
+    : path.resolve(process.cwd(), String(args.seedDir || "").trim() || DEFAULT_SEEDS_DIR);
+
+  if (args.listLibrary) {
+    const library = loadTaxonomySeedLibrary(seedDir);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          seedDir,
+          bundles: library.entries.map((entry) => ({
+            taxonomyVersion: entry.taxonomyVersion,
+            seedPath: entry.seedPath,
+            fileName: entry.fileName,
+            entryCount: entry.entryCount,
+          })),
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
   assertPositiveInteger(args.minCanonicalPerAxis, "min-canonical");
   assertPositiveInteger(args.minAliasesPerAxis, "min-aliases");
 
@@ -93,24 +141,39 @@ function main() {
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
   }
-  const seedPath = resolveSeedPath(args.file);
-  const seedRaw = fs.readFileSync(seedPath, "utf8");
-  const seedJson = JSON.parse(seedRaw);
-  const payload = validateStyleDnaTaxonomySeedPayload(seedJson);
-  const coverage = buildSeedCoverageReport(payload, {
-    minCanonicalPerAxis: args.minCanonicalPerAxis,
-    minAliasesPerAxis: args.minAliasesPerAxis,
-  });
+  const selectedSeeds = args.all
+    ? loadTaxonomySeedLibrary(seedDir).entries
+    : [
+      resolveTaxonomySeedSelection({
+        seedDir,
+        file: args.file,
+        taxonomyVersion: args.taxonomyVersion,
+      }).selected,
+    ];
 
-  if (args.requireCoverage && !coverage.ok) {
+  const coverageResults = selectedSeeds.map((entry) => ({
+    taxonomyVersion: entry.taxonomyVersion,
+    seedPath: entry.seedPath,
+    coverage: buildSeedCoverageReport(entry.payload, {
+      minCanonicalPerAxis: args.minCanonicalPerAxis,
+      minAliasesPerAxis: args.minAliasesPerAxis,
+    }),
+  }));
+
+  const failedCoverage = coverageResults.filter((item) => !item.coverage.ok);
+  if (args.requireCoverage && failedCoverage.length > 0) {
     console.log(
       JSON.stringify(
         {
           ok: false,
           blocked: true,
           reason: "coverage_requirements_failed",
-          seedPath,
-          coverage,
+          mode: args.all ? "library-batch" : "single",
+          seedDir,
+          seedPath: coverageResults[0]?.seedPath || null,
+          coverage: coverageResults[0]?.coverage || null,
+          coverageResults,
+          failedCoverage,
         },
         null,
         2
@@ -122,18 +185,33 @@ function main() {
 
   const ready = assertDatabaseReady(databaseUrl);
   const actor = resolveActor();
-  const result = applyStyleDnaTaxonomySeed(ready.dbPath, actor, payload);
+  const results = selectedSeeds.map((entry) => {
+    const result = applyStyleDnaTaxonomySeed(ready.dbPath, actor, entry.payload);
+    return {
+      taxonomyVersion: entry.taxonomyVersion,
+      seedPath: entry.seedPath,
+      summary: result.summary,
+      conflicts: result.conflicts,
+    };
+  });
+
+  const firstResult = results[0];
 
   console.log(
     JSON.stringify(
       {
         ok: true,
-        seedPath,
+        mode: args.all ? "library-batch" : "single",
+        seedDir,
+        taxonomyVersion: firstResult.taxonomyVersion,
+        seedPath: firstResult.seedPath,
         actor,
-        coverage,
+        coverage: coverageResults[0].coverage,
+        coverageResults,
         coverageGateApplied: args.requireCoverage,
-        summary: result.summary,
-        conflicts: result.conflicts,
+        summary: firstResult.summary,
+        conflicts: firstResult.conflicts,
+        results,
       },
       null,
       2
