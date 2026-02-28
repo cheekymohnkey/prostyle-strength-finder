@@ -13,7 +13,8 @@
     "@tanstack/react-query": "^5.66.9",
     "next": "^15.2.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

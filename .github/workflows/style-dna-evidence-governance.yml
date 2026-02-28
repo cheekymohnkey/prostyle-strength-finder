@@ -89,6 +89,10 @@ jobs:
             --fail-on-stale \
             --output "$GOVERNANCE_STATUS_PATH"
 
+      - name: Verify governance artifacts present
+        run: |
+          npm run governance:verify -- --env "$APP_ENV" --status "$GOVERNANCE_STATUS_PATH" --requireArtifacts true
+
       - name: Upload governance status artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
