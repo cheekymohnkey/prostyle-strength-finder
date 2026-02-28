@@ -596,6 +596,7 @@ export default function StudioPage() {
 
     const selectedRunDetailData = selectedRunDetailQuery.data?.run;
     const selectedRunEnvelope = selectedRunDetailData?.submittedTestEnvelope;
+    const selectedRunCanonicalTraits = selectedRunDetailQuery.data?.result?.canonicalTraits;
 
     const totalRunPages = useMemo(() => {
         const total = Math.max(1, Math.ceil(sortedRuns.length / runPageSize));
@@ -1647,6 +1648,26 @@ export default function StudioPage() {
                                 {selectedRunSummary && (
                                     <div className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] text-blue-900">
                                         <span className="font-semibold">Summary:</span> {selectedRunSummary}
+                                    </div>
+                                )}
+
+                                {selectedRunCanonicalTraits && (
+                                    <div className="rounded border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] text-blue-900" data-testid="run-detail-canonical-traits">
+                                        <p>
+                                            <span className="font-semibold">Vibe Shift:</span>{" "}
+                                            {selectedRunCanonicalTraits.vibeShift || "(none)"}
+                                        </p>
+                                        <p>
+                                            <span className="font-semibold">DNA Tags:</span>{" "}
+                                            {(selectedRunCanonicalTraits.dominantDnaTags || []).join(", ") || "(none)"}
+                                        </p>
+                                        <p>
+                                            <span className="font-semibold">Delta Strength:</span>{" "}
+                                            {selectedRunCanonicalTraits.deltaStrength?.score_1_to_10 ?? "-"}
+                                            {selectedRunCanonicalTraits.deltaStrength?.description
+                                                ? ` (${selectedRunCanonicalTraits.deltaStrength.description})`
+                                                : ""}
+                                        </p>
                                     </div>
                                 )}
 

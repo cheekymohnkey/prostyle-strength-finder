@@ -59,6 +59,22 @@ test.describe("Style DNA Studio run operations - detail states", () => {
     await expect(selectedDetails.getByText("DNA Tags:")).toBeVisible();
     await expect(selectedDetails.getByText("Delta Strength:")).toBeVisible();
 
+    const viewDetails = page.getByTestId("view-run-details");
+    await expect(viewDetails).toBeVisible();
+    await viewDetails.click();
+
+    const modal = page.getByTestId("run-detail-modal");
+    await expect(modal).toBeVisible();
+
+    const modalCanonicalTraits = page.getByTestId("run-detail-canonical-traits");
+    await expect(modalCanonicalTraits).toBeVisible();
+    await expect(modalCanonicalTraits.getByText("Vibe Shift:")).toBeVisible();
+    await expect(modalCanonicalTraits.getByText("DNA Tags:")).toBeVisible();
+    await expect(modalCanonicalTraits.getByText("Delta Strength:")).toBeVisible();
+
+    await page.getByRole("button", { name: "Close" }).click();
+    await expect(modal).toHaveCount(0);
+
     const influenceSelect = page.locator("label:has-text('Style Influence (Target SREF)') select");
     await influenceSelect.selectOption("si_playwright_empty");
 
