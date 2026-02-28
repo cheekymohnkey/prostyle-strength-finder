@@ -87,6 +87,9 @@ function validateStyleDnaPromptJobPayload(value) {
   if (!isObject(value)) {
     throw new Error("Style-DNA prompt job payload must be an object");
   }
+  const idempotencyKey = typeof value.idempotencyKey === "string" && value.idempotencyKey.trim() !== ""
+    ? value.idempotencyKey.trim()
+    : null;
   const styleInfluenceId = assertRequiredString(value.styleInfluenceId, "styleInfluenceId");
   const baselineRenderSetId = assertRequiredString(value.baselineRenderSetId, "baselineRenderSetId");
   if (!Array.isArray(value.stylizeTiers) || value.stylizeTiers.length === 0) {
@@ -103,8 +106,16 @@ function validateStyleDnaPromptJobPayload(value) {
     parseIntegerField(tier, "stylizeTier"),
     "stylizeTier"
   ));
+  const seenTiers = new Set();
+  for (const tier of stylizeTiers) {
+    if (seenTiers.has(tier)) {
+      throw new Error(`stylizeTiers contains duplicate tier: ${tier}`);
+    }
+    seenTiers.add(tier);
+  }
 
   return {
+    idempotencyKey,
     styleInfluenceId,
     baselineRenderSetId,
     styleAdjustmentType,

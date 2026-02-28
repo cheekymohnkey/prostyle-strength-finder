@@ -70,6 +70,7 @@ const {
   deleteBaselineRenderSetCascade,
   insertStyleDnaPromptJob,
   getStyleDnaPromptJobById,
+  getStyleDnaPromptJobByIdempotencyKey,
   insertStyleDnaPromptJobItem,
   listStyleDnaPromptJobItems,
   getStyleDnaRunById,
@@ -734,6 +735,7 @@ function mapStyleDnaPromptJobRow(row) {
   }
   return {
     promptJobId: row.prompt_job_id,
+    idempotencyKey: row.idempotency_key || null,
     styleInfluenceId: row.style_influence_id,
     baselineRenderSetId: row.baseline_render_set_id,
     requestedTiers: JSON.parse(row.requested_tiers_json || "[]"),
@@ -1157,6 +1159,72 @@ function parseBaselineParameterEnvelope(parameterEnvelopeJson) {
   }
 }
 
+function resolvePromptModelSelector(baselineSet) {
+  const modelFamily = String(baselineSet?.mj_model_family || "").trim();
+  const modelVersion = String(baselineSet?.mj_model_version || "").trim();
+  if (modelFamily === "") {
+    return {
+      error: "Baseline set is missing mjModelFamily",
+      modelFamily,
+      modelVersion,
+      selectorArg: null,
+    };
+  }
+  if (modelVersion === "") {
+    return {
+      error: "Baseline set is missing mjModelVersion",
+      modelFamily,
+      modelVersion,
+      selectorArg: null,
+    };
+  }
+  if (modelFamily === "standard") {
+    return {
+      error: null,
+      modelFamily,
+      modelVersion,
+      selectorArg: `--v ${modelVersion}`,
+    };
+  }
+  if (modelFamily === "niji") {
+    return {
+      error: null,
+      modelFamily,
+      modelVersion,
+      selectorArg: `--niji ${modelVersion}`,
+    };
+  }
+  return {
+    error: `Unsupported mjModelFamily: ${modelFamily}`,
+    modelFamily,
+    modelVersion,
+    selectorArg: null,
+  };
+}
+
+function resolveStyleInfluenceAdjustmentType(styleInfluenceTypeRow) {
+  const typeKey = String(styleInfluenceTypeRow?.type_key || "").trim().toLowerCase();
+  if (typeKey.includes("profile")) {
+    return "profile";
+  }
+  if (typeKey.includes("sref")) {
+    return "sref";
+  }
+  return null;
+}
+
+function buildStyleDnaPromptEnvelopeResponse(baselineSet, envelope) {
+  return {
+    mjModelFamily: String(baselineSet?.mj_model_family || "").trim() || null,
+    mjModelVersion: String(baselineSet?.mj_model_version || "").trim() || null,
+    seed: envelope.seed,
+    quality: envelope.quality,
+    aspectRatio: envelope.aspectRatio,
+    styleRaw: envelope.styleRaw,
+    styleWeight: envelope.styleWeight,
+  };
+}
+
 function createStoredJobEnvelope(job, options = {}) {
   const requestId = typeof options.requestId === "string" && options.requestId.trim() !== ""
     ? options.requestId.trim()
@@ -1358,7 +1426,21 @@ function createJobEnvelope(submitBody, options = {}) {
     context.requestId = requestId;
   }
 
-  const modelSelection = resolveModelSelection({ promptText });
+  const explicitModelFamily = typeof submitBody.modelFamily === "string"
+    ? submitBody.modelFamily.trim()
+    : "";
+  const explicitModelVersion = typeof submitBody.modelVersion === "string"
+    ? submitBody.modelVersion.trim()
+    : "";
+  const modelSelection = (explicitModelFamily !== "" && explicitModelVersion !== "")
+    ? {
+      modelFamily: explicitModelFamily,
+      modelVersion: explicitModelVersion,
+      modelSelectionSource: typeof submitBody.modelSelectionSource === "string" && submitBody.modelSelectionSource.trim() !== ""
+        ? submitBody.modelSelectionSource.trim()
+        : "explicit",
+    }
+    : resolveModelSelection({ promptText });
   const envelope = {
     schemaVersion: CONTRACT_VERSION,
     jobId: crypto.randomUUID(),
@@ -3007,6 +3089,26 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
     try {
       const body = await parseJsonBody(req);
       const payload = validateStyleDnaPromptJobPayload(body);
+      if (payload.idempotencyKey) {
+        const existingPromptJob = getStyleDnaPromptJobByIdempotencyKey(dbPath, payload.idempotencyKey);
+        if (existingPromptJob) {
+          const existingBaselineSet = getBaselineRenderSetById(dbPath, existingPromptJob.baseline_render_set_id);
+          const existingEnvelope = parseBaselineParameterEnvelope(existingBaselineSet?.parameter_envelope_json);
+          sendJson(
+            res,
+            200,
+            {
+              promptJob: mapStyleDnaPromptJobRow(existingPromptJob),
+              prompts: listStyleDnaPromptJobItems(dbPath, existingPromptJob.prompt_job_id).map(mapStyleDnaPromptJobItemRow),
+              renderEnvelope: buildStyleDnaPromptEnvelopeResponse(existingBaselineSet, existingEnvelope),
+              deduplicated: true,
+            },
+            ctx
+          );
+          return;
+        }
+      }
+
       const styleInfluence = getStyleInfluenceById(dbPath, payload.styleInfluenceId);
       if (!styleInfluence) {
         sendError(res, 404, "NOT_FOUND", "Style influence not found", ctx);
@@ -3018,9 +3120,49 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         });
         return;
       }
+      const styleInfluenceType = getStyleInfluenceTypeById(dbPath, styleInfluence.style_influence_type_id);
+      if (!styleInfluenceType || Number(styleInfluenceType.enabled_flag || 0) !== 1) {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          reason: "style influence type is disabled",
+          styleInfluenceTypeId: styleInfluence.style_influence_type_id,
+        });
+        return;
+      }
+      const expectedAdjustmentType = resolveStyleInfluenceAdjustmentType(styleInfluenceType);
+      if (!expectedAdjustmentType) {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          reason: "style influence type key is not supported for prompt generation",
+          styleInfluenceTypeKey: styleInfluenceType.type_key,
+        });
+        return;
+      }
+      if (expectedAdjustmentType !== payload.styleAdjustmentType) {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          reason: "style adjustment type does not match style influence type",
+          expectedStyleAdjustmentType: expectedAdjustmentType,
+          styleAdjustmentType: payload.styleAdjustmentType,
+          styleInfluenceTypeKey: styleInfluenceType.type_key,
+        });
+        return;
+      }
+
       const baselineSet = getBaselineRenderSetById(dbPath, payload.baselineRenderSetId);
       if (!baselineSet) {
         sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+        return;
+      }
+      if (baselineSet.status !== "active") {
+        sendError(res, 409, "INVALID_STATE", "Baseline set is not eligible", ctx, {
+          status: baselineSet.status,
+        });
+        return;
+      }
+      const modelSelector = resolvePromptModelSelector(baselineSet);
+      if (modelSelector.error) {
+        sendError(res, 409, "INVALID_STATE", "Baseline set compatibility failed", ctx, {
+          reason: modelSelector.error,
+          baselineRenderSetId: payload.baselineRenderSetId,
+        });
         return;
       }
 
@@ -3032,12 +3174,28 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         return;
       }
 
+      const sortedStylizeTiers = Array.from(payload.stylizeTiers).sort((a, b) => a - b);
+      const baselineItems = listBaselineRenderSetItems(dbPath, payload.baselineRenderSetId);
+      const availableTiers = new Set(
+        baselineItems.map((item) => Number(item.stylize_tier))
+      );
+      const missingTiers = sortedStylizeTiers.filter((tier) => !availableTiers.has(tier));
+      if (missingTiers.length > 0) {
+        sendError(res, 409, "INVALID_STATE", "Baseline tier coverage missing for prompt job generation", ctx, {
+          baselineRenderSetId: payload.baselineRenderSetId,
+          requestedStylizeTiers: sortedStylizeTiers,
+          missingStylizeTiers: missingTiers,
+        });
+        return;
+      }
+
       const promptJobId = `sdpj_${crypto.randomUUID()}`;
       insertStyleDnaPromptJob(dbPath, {
         promptJobId,
+        idempotencyKey: payload.idempotencyKey,
         styleInfluenceId: payload.styleInfluenceId,
         baselineRenderSetId: payload.baselineRenderSetId,
-        requestedTiers: payload.stylizeTiers,
+        requestedTiers: sortedStylizeTiers,
         status: "generated",
         createdBy: authenticatedUserId,
       });
@@ -3046,16 +3204,28 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       const adjustmentArg = payload.styleAdjustmentType === "profile"
         ? `--profile ${payload.styleAdjustmentMidjourneyId}`
         : `--sref ${payload.styleAdjustmentMidjourneyId}`;
-      const modelVersion = String(baselineSet.mj_model_version || "").trim();
-      const versionArg = modelVersion !== "" ? ` --v ${modelVersion}` : "";
       const envelope = parseBaselineParameterEnvelope(baselineSet.parameter_envelope_json);
-      const aspectRatioArg = envelope.aspectRatio ? ` --ar ${envelope.aspectRatio}` : "";
-      const seedArg = envelope.seed ? ` --seed ${envelope.seed}` : "";
-      const rawArg = envelope.styleRaw !== false ? " --raw" : "";
-      const qualityArg = envelope.quality ? ` --q ${envelope.quality}` : "";
-      for (const tier of payload.stylizeTiers) {
+      const promptEnvelope = buildStyleDnaPromptEnvelopeResponse(baselineSet, envelope);
+      for (const tier of sortedStylizeTiers) {
         for (const promptItem of promptItems) {
-          const promptTextGenerated = `${promptItem.prompt_text}${aspectRatioArg}${seedArg}${rawArg} ${adjustmentArg} ${styleInfluence.influence_code} --stylize ${tier}${versionArg}${qualityArg}`;
+          const promptParts = [promptItem.prompt_text];
+          promptParts.push(modelSelector.selectorArg);
+          if (envelope.aspectRatio) {
+            promptParts.push(`--ar ${envelope.aspectRatio}`);
+          }
+          if (envelope.seed) {
+            promptParts.push(`--seed ${envelope.seed}`);
+          }
+          if (envelope.quality) {
+            promptParts.push(`--q ${envelope.quality}`);
+          }
+          if (envelope.styleRaw === true) {
+            promptParts.push("--raw");
+          }
+          promptParts.push(adjustmentArg);
+          promptParts.push(String(styleInfluence.influence_code || "").trim());
+          promptParts.push(`--stylize ${tier}`);
+          const promptTextGenerated = promptParts.join(" ").replace(/\s+/g, " ").trim();
           insertStyleDnaPromptJobItem(dbPath, {
             itemId: `sdpji_${crypto.randomUUID()}`,
             promptJobId,
@@ -3083,6 +3253,7 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         {
           promptJob: mapStyleDnaPromptJobRow(getStyleDnaPromptJobById(dbPath, promptJobId)),
           prompts: listStyleDnaPromptJobItems(dbPath, promptJobId).map(mapStyleDnaPromptJobItemRow),
+          renderEnvelope: promptEnvelope,
         },
         ctx
       );
@@ -3107,12 +3278,28 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       sendError(res, 404, "NOT_FOUND", "Prompt job not found", ctx);
       return;
     }
+
+    insertAdminActionAudit(dbPath, {
+      adminActionAuditId: `aud_${crypto.randomUUID()}`,
+      adminUserId: authenticatedUserId,
+      actionType: "style_dna.prompt_job.get",
+      targetType: "style_dna_prompt_job",
+      targetId: promptJobId,
+      reason: null,
+    });
+
+    const baselineSet = getBaselineRenderSetById(dbPath, promptJob.baseline_render_set_id);
+    const promptEnvelope = buildStyleDnaPromptEnvelopeResponse(
+      baselineSet,
+      parseBaselineParameterEnvelope(baselineSet?.parameter_envelope_json)
+    );
     sendJson(
       res,
       200,
       {
         promptJob: mapStyleDnaPromptJobRow(promptJob),
         prompts: listStyleDnaPromptJobItems(dbPath, promptJobId).map(mapStyleDnaPromptJobItemRow),
+        renderEnvelope: promptEnvelope,
       },
       ctx
     );
@@ -3131,6 +3318,14 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       const idempotencyKey = payload.idempotencyKey || `style-dna:${authenticatedUserId}:${crypto.randomUUID()}`;
       const existingRun = getStyleDnaRunByIdempotencyKey(dbPath, idempotencyKey);
       if (existingRun) {
+        insertAdminActionAudit(dbPath, {
+          adminActionAuditId: `aud_${crypto.randomUUID()}`,
+          adminUserId: authenticatedUserId,
+          actionType: "style_dna.run.submit",
+          targetType: "style_dna_run",
+          targetId: existingRun.style_dna_run_id,
+          reason: `deduplicated:${idempotencyKey}`,
+        });
         sendJson(
           res,
           200,
@@ -3154,9 +3349,40 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         });
         return;
       }
+      const styleInfluenceType = getStyleInfluenceTypeById(dbPath, styleInfluence.style_influence_type_id);
+      if (!styleInfluenceType || Number(styleInfluenceType.enabled_flag || 0) !== 1) {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          reason: "style influence type is disabled",
+          styleInfluenceTypeId: styleInfluence.style_influence_type_id,
+        });
+        return;
+      }
+      const expectedAdjustmentType = resolveStyleInfluenceAdjustmentType(styleInfluenceType);
+      if (!expectedAdjustmentType) {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          reason: "style influence type key is not supported for style-dna runs",
+          styleInfluenceTypeKey: styleInfluenceType.type_key,
+        });
+        return;
+      }
+      if (expectedAdjustmentType !== payload.styleAdjustmentType) {
+        sendError(res, 409, "INVALID_STATE", "Style influence is not eligible", ctx, {
+          reason: "style adjustment type does not match style influence type",
+          expectedStyleAdjustmentType: expectedAdjustmentType,
+          styleAdjustmentType: payload.styleAdjustmentType,
+          styleInfluenceTypeKey: styleInfluenceType.type_key,
+        });
+        return;
+      }
       const baselineSet = getBaselineRenderSetById(dbPath, payload.baselineRenderSetId);
       if (!baselineSet) {
         sendError(res, 404, "NOT_FOUND", "Baseline set not found", ctx);
+        return;
+      }
+      if (baselineSet.status !== "active") {
+        sendError(res, 409, "INVALID_STATE", "Baseline set is not eligible", ctx, {
+          status: baselineSet.status,
+        });
         return;
       }
       const baselineEnvelope = parseBaselineParameterEnvelope(baselineSet.parameter_envelope_json);
@@ -3263,6 +3489,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         idempotencyKey,
         runType: "style_dna",
         imageId: payload.testGridImageId,
+        modelFamily: String(submittedEnvelope.mjModelFamily || "").trim(),
+        modelVersion: String(submittedEnvelope.mjModelVersion || "").trim(),
+        modelSelectionSource: "style_dna_locked_envelope",
         context: {
           styleDnaRunId,
           styleInfluenceId: payload.styleInfluenceId,
@@ -3353,12 +3582,37 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       return;
     }
 
+    const statusFilterRaw = String(url.searchParams.get("status") || "").trim();
+    const allowedRunStatuses = new Set(["", "queued", "in_progress", "succeeded", "failed", "dead_letter"]);
+    if (!allowedRunStatuses.has(statusFilterRaw)) {
+      sendError(res, 400, "INVALID_REQUEST", "Invalid style-dna runs status filter", ctx, {
+        status: statusFilterRaw,
+        allowedValues: ["queued", "in_progress", "succeeded", "failed", "dead_letter"],
+      });
+      return;
+    }
+
     const rows = listStyleDnaRuns(dbPath, {
       styleInfluenceId: url.searchParams.get("styleInfluenceId") || undefined,
       baselineRenderSetId: url.searchParams.get("baselineRenderSetId") || undefined,
-      status: url.searchParams.get("status") || undefined,
+      status: statusFilterRaw || undefined,
       limit,
     });
+
+    insertAdminActionAudit(dbPath, {
+      adminActionAuditId: `aud_${crypto.randomUUID()}`,
+      adminUserId: authenticatedUserId,
+      actionType: "style_dna.run.list",
+      targetType: "style_dna_run_collection",
+      targetId: "style_dna_runs",
+      reason: JSON.stringify({
+        styleInfluenceId: url.searchParams.get("styleInfluenceId") || null,
+        baselineRenderSetId: url.searchParams.get("baselineRenderSetId") || null,
+        status: statusFilterRaw || null,
+        limit,
+      }),
+    });
+
     sendJson(
       res,
       200,
@@ -3382,6 +3636,14 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       sendError(res, 404, "NOT_FOUND", "Style-DNA run not found", ctx);
       return;
     }
+    insertAdminActionAudit(dbPath, {
+      adminActionAuditId: `aud_${crypto.randomUUID()}`,
+      adminUserId: authenticatedUserId,
+      actionType: "style_dna.run.get",
+      targetType: "style_dna_run",
+      targetId: styleDnaRunId,
+      reason: null,
+    });
     const result = getStyleDnaRunResultByRunId(dbPath, styleDnaRunId);
     sendJson(
       res,

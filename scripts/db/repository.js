@@ -1546,10 +1546,11 @@ function insertStyleDnaPromptJob(dbPath, input) {
   exec(
     dbPath,
     `INSERT INTO style_dna_prompt_jobs (
-       prompt_job_id, style_influence_id, baseline_render_set_id, requested_tiers_json,
+       prompt_job_id, idempotency_key, style_influence_id, baseline_render_set_id, requested_tiers_json,
        status, created_by, created_at
      ) VALUES (
        ${quote(input.promptJobId)},
+       ${quote(input.idempotencyKey || null)},
        ${quote(input.styleInfluenceId)},
        ${quote(input.baselineRenderSetId)},
        ${quote(JSON.stringify(input.requestedTiers || []))},
@@ -1563,10 +1564,22 @@ function insertStyleDnaPromptJob(dbPath, input) {
 function getStyleDnaPromptJobById(dbPath, promptJobId) {
   const rows = queryJson(
     dbPath,
-    `SELECT prompt_job_id, style_influence_id, baseline_render_set_id, requested_tiers_json,
+    `SELECT prompt_job_id, idempotency_key, style_influence_id, baseline_render_set_id, requested_tiers_json,
             status, created_by, created_at
      FROM style_dna_prompt_jobs
      WHERE prompt_job_id = ${quote(promptJobId)}
+     LIMIT 1;`
+  );
+  return rows[0] || null;
+}
+
+function getStyleDnaPromptJobByIdempotencyKey(dbPath, idempotencyKey) {
+  const rows = queryJson(
+    dbPath,
+    `SELECT prompt_job_id, idempotency_key, style_influence_id, baseline_render_set_id, requested_tiers_json,
+            status, created_by, created_at
+     FROM style_dna_prompt_jobs
+     WHERE idempotency_key = ${quote(idempotencyKey)}
      LIMIT 1;`
   );
   return rows[0] || null;
@@ -2197,6 +2210,7 @@ module.exports = {
   deleteBaselineRenderSetCascade,
   insertStyleDnaPromptJob,
   getStyleDnaPromptJobById,
+  getStyleDnaPromptJobByIdempotencyKey,
   insertStyleDnaPromptJobItem,
   listStyleDnaPromptJobItems,
   getStyleDnaRunById,

@@ -95,6 +95,19 @@ function seedData(dbPath) {
     )
     ON CONFLICT(style_influence_type_id) DO UPDATE SET enabled_flag = 1;
 
+    INSERT INTO style_influence_types (
+      style_influence_type_id, type_key, label, parameter_prefix, related_parameter_name, description, enabled_flag
+    ) VALUES (
+      'sit_style_dna_prompt_smoke_profile',
+      'profile_style_dna_prompt_smoke',
+      'PROFILE Style-DNA Prompt Smoke',
+      '--profile',
+      '--stylize',
+      'Style-DNA profile prompt generation smoke type',
+      1
+    )
+    ON CONFLICT(style_influence_type_id) DO UPDATE SET enabled_flag = 1;
+
     INSERT INTO style_influences (
       style_influence_id, style_influence_type_id, influence_code, status, pinned_flag, created_by, created_at
     ) VALUES (
@@ -107,6 +120,19 @@ function seedData(dbPath) {
       ${quote(now)}
     )
     ON CONFLICT(style_influence_id) DO UPDATE SET status = 'active', influence_code = '--sw 100';
+
+    INSERT INTO style_influences (
+      style_influence_id, style_influence_type_id, influence_code, status, pinned_flag, created_by, created_at
+    ) VALUES (
+      'si_style_dna_prompt_smoke_profile',
+      'sit_style_dna_prompt_smoke_profile',
+      '--sw 101',
+      'active',
+      0,
+      'admin-style-dna-prompt-smoke-user',
+      ${quote(now)}
+    )
+    ON CONFLICT(style_influence_id) DO UPDATE SET status = 'active', influence_code = '--sw 101';
     `
   );
 }
@@ -292,6 +318,70 @@ async function main() {
           "content-type": "application/json",
         },
         body: JSON.stringify({
+          promptKey: "coffee_cup_table",
+          stylizeTier: 100,
+          gridImageId: baselineImageId,
+        }),
+      },
+      200
+    );
+    await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets/${baselineRenderSetId}/items`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey: "person_camera",
+          stylizeTier: 100,
+          gridImageId: baselineImageId,
+        }),
+      },
+      200
+    );
+    await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets/${baselineRenderSetId}/items`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey: "coffee_cup_table",
+          stylizeTier: 1000,
+          gridImageId: baselineImageId,
+        }),
+      },
+      200
+    );
+    await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets/${baselineRenderSetId}/items`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          promptKey: "person_camera",
+          stylizeTier: 1000,
+          gridImageId: baselineImageId,
+        }),
+      },
+      200
+    );
+    await requestJson(
+      `${baseUrl}/admin/style-dna/baseline-sets/${baselineRenderSetId}/items`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
           promptKey: "person_camera",
           stylizeTier: 0,
           gridImageId: baselineImageId,
@@ -299,6 +389,8 @@ async function main() {
       },
       200
     );
+
+    const promptJobIdempotencyKey = `prompt-smoke-key-${Date.now()}`;
 
     const srefJob = await requestJson(
       `${baseUrl}/admin/style-dna/prompt-jobs`,
@@ -309,6 +401,7 @@ async function main() {
           "content-type": "application/json",
         },
         body: JSON.stringify({
+          idempotencyKey: promptJobIdempotencyKey,
           styleInfluenceId: "si_style_dna_prompt_smoke",
           baselineRenderSetId,
           styleAdjustmentType: "sref",
@@ -337,6 +430,53 @@ async function main() {
       `Missing model version arg in generated prompt: ${srefPrompts[0].promptTextGenerated}`
     );
 
+    const deduplicatedSrefJob = await requestJson(
+      `${baseUrl}/admin/style-dna/prompt-jobs`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: promptJobIdempotencyKey,
+          styleInfluenceId: "si_style_dna_prompt_smoke",
+          baselineRenderSetId,
+          styleAdjustmentType: "sref",
+          styleAdjustmentMidjourneyId: "sref-1967009800",
+          stylizeTiers: [0, 1000],
+        }),
+      },
+      200
+    );
+    assertCondition(
+      deduplicatedSrefJob?.deduplicated === true,
+      `Expected deduplicated prompt-job response for idempotent retry, got ${JSON.stringify(deduplicatedSrefJob)}`
+    );
+    assertCondition(
+      deduplicatedSrefJob?.promptJob?.promptJobId === srefJob?.promptJob?.promptJobId,
+      "Expected prompt-job id to match for idempotent retry"
+    );
+
+    const fetchedSrefJob = await requestJson(
+      `${baseUrl}/admin/style-dna/prompt-jobs/${encodeURIComponent(srefJob?.promptJob?.promptJobId || "")}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      },
+      200
+    );
+    assertCondition(
+      fetchedSrefJob?.prompts?.length === srefPrompts.length,
+      "Expected prompt-job fetch to return generated prompt rows"
+    );
+    assertCondition(
+      fetchedSrefJob?.renderEnvelope?.mjModelVersion === "7",
+      `Expected render envelope model version, got ${JSON.stringify(fetchedSrefJob?.renderEnvelope)}`
+    );
+
     const profileJob = await requestJson(
       `${baseUrl}/admin/style-dna/prompt-jobs`,
       {
@@ -346,7 +486,7 @@ async function main() {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          styleInfluenceId: "si_style_dna_prompt_smoke",
+          styleInfluenceId: "si_style_dna_prompt_smoke_profile",
           baselineRenderSetId,
           styleAdjustmentType: "profile",
           styleAdjustmentMidjourneyId: "profile-117944326",
