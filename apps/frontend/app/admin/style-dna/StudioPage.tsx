@@ -1049,30 +1049,6 @@ export default function StudioPage() {
                    </div>
                </div>
                
-               {/* Test Cell Selector (Visual) */}
-               {activeInfluence && (
-                   <div className="border-t border-gray-100 pt-4">
-                        <span className="text-xs font-medium text-gray-500 mb-2 block">Test Configuration (Step)</span>
-                        <div className="flex flex-wrap gap-2">
-                            {section3TestCells.map(cell => (
-                                <button
-                                    key={cell.cellId}
-                                    onClick={() => setActiveCellId(cell.cellId)}
-                                    className={`
-                                        group relative flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg border transition-all
-                                        ${activeCellId === cell.cellId 
-                                            ? "border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500" 
-                                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"}
-                                    `}
-                                >
-                                    <span className={`w-2 h-2 rounded-full ${activeCellId === cell.cellId ? "bg-blue-500" : "bg-gray-300 group-hover:bg-gray-400"}`}></span>
-                                    {cell.label}
-                                </button>
-                            ))}
-                        </div>
-                   </div>
-               )}
-
                <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-3" data-testid="trait-summary-panel">
                     <div className="mb-2 flex items-center justify-between">
                         <span className="text-xs font-semibold text-gray-900">Extracted Traits (Selected Influence)</span>
@@ -1403,14 +1379,9 @@ export default function StudioPage() {
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-900">Target (Test)</h3>
                             </div>
-                            <div className="h-4 w-px bg-gray-300"></div>
-                            <select 
-                                value={activeCellId} 
-                                onChange={(e) => setActiveCellId(e.target.value)}
-                                className="text-xs border-0 bg-transparent py-0 pl-0 pr-8 text-blue-600 font-medium focus:ring-0 cursor-pointer"
-                            >
-                                {section3TestCells.map(c => <option key={c.cellId} value={c.cellId}>{c.label}</option>)}
-                            </select>
+                            {activeTestCell?.label && (
+                                <span className="text-xs font-medium text-blue-600">{activeTestCell.label}</span>
+                            )}
                         </div>
                         <button 
                             onClick={handleCopyPrompt}
@@ -1421,6 +1392,29 @@ export default function StudioPage() {
                             <kbd className="hidden group-hover:inline-block font-sans bg-blue-700/50 px-1 rounded text-[9px] text-white/80">Cmd+C</kbd>
                         </button>
                     </div>
+
+                    {activeInfluence && (
+                        <div className="border-b border-gray-100 bg-white px-5 py-3">
+                            <span className="mb-2 block text-xs font-medium text-gray-500">Test Configuration (Step)</span>
+                            <div className="flex flex-wrap gap-2">
+                                {section3TestCells.map((cell) => (
+                                    <button
+                                        key={cell.cellId}
+                                        onClick={() => setActiveCellId(cell.cellId)}
+                                        className={`
+                                            group relative flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all
+                                            ${activeCellId === cell.cellId
+                                                ? "border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500"
+                                                : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"}
+                                        `}
+                                    >
+                                        <span className={`h-2 w-2 rounded-full ${activeCellId === cell.cellId ? "bg-blue-500" : "bg-gray-300 group-hover:bg-gray-400"}`}></span>
+                                        {cell.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex flex-1 flex-col gap-4 bg-gray-50/50 p-5">
                         {/* Test Grid Drop Zone */}
