@@ -79,4 +79,31 @@ test.describe("Style DNA Studio run operations - filter and paging", () => {
     await expect(statusFilter).toHaveValue("all");
     await expect(pageIndicator).toHaveText(/^1\/\d+$/);
   });
+
+  test("resets paging when fetch limit changes", async ({ page }) => {
+    await openRunOpsForInfluence(page, "si_playwright_seed");
+
+    const statusFilter = page.getByTestId("run-status-filter");
+    const limitSelect = page.getByTestId("run-limit-select");
+    const runRows = page.getByTestId("run-row");
+    const pageIndicator = page.getByTestId("run-page-indicator");
+
+    await statusFilter.selectOption("all");
+    await expect(statusFilter).toHaveValue("all");
+
+    await limitSelect.selectOption("20");
+    await expect(limitSelect).toHaveValue("20");
+    await expect(runRows).toHaveCount(10);
+
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(pageIndicator).toHaveText(/^2\/\d+$/);
+
+    await limitSelect.selectOption("50");
+    await expect(limitSelect).toHaveValue("50");
+    await expect(pageIndicator).toHaveText(/^1\/\d+$/);
+
+    const refreshedCount = await runRows.count();
+    expect(refreshedCount).toBeGreaterThan(0);
+    expect(refreshedCount).toBeLessThanOrEqual(10);
+  });
 });
