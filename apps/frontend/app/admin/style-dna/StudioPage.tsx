@@ -328,6 +328,7 @@ export default function StudioPage() {
     const [runStatusFilter, setRunStatusFilter] = useState<string>("all");
     const [runFetchLimit, setRunFetchLimit] = useState<number>(50);
     const [runPage, setRunPage] = useState<number>(1);
+    const [isExportingRunDetails, setIsExportingRunDetails] = useState(false);
     const runPageSize = 10;
     const newInfluenceTriggerRef = useRef<HTMLButtonElement | null>(null);
     const runDetailTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -623,6 +624,7 @@ export default function StudioPage() {
     const selectedRunDetailData = selectedRunDetailQuery.data?.run;
     const selectedRunEnvelope = selectedRunDetailData?.submittedTestEnvelope;
     const selectedRunCanonicalTraits = selectedRunDetailQuery.data?.result?.canonicalTraits;
+    const traitSummary = traitSummaryQuery.data?.summary;
 
     const totalRunPages = useMemo(() => {
         const total = Math.max(1, Math.ceil(sortedRuns.length / runPageSize));
@@ -754,6 +756,72 @@ export default function StudioPage() {
         const color = value === "succeeded" ? "bg-green-100 text-green-700" : value === "failed" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700";
         const label = value ? value.replace(/_/g, " ") : "unknown";
         return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${color}`}>{label}</span>;
+    };
+
+    const handleExportRunDetailsJson = async () => {
+        if (!activeStyleInfluenceId || isExportingRunDetails) return;
+        setIsExportingRunDetails(true);
+        try {
+            const params = new URLSearchParams({
+                styleInfluenceId: activeStyleInfluenceId,
+                limit: "200",
+            });
+            const listResp = await fetch(`/api/proxy/admin/style-dna/runs?${params.toString()}`);
+            const listData = await parseApiResponse<StyleDnaRunListResponse>(listResp);
+            const runIds = (listData.runs || [])
+                .map((run) => String(run.styleDnaRunId || "").trim())
+                .filter(Boolean);
+
+            const detailResults = await Promise.all(
+                runIds.map(async (runId) => {
+                    try {
+                        const detailResp = await fetch(`/api/proxy/admin/style-dna/runs/${encodeURIComponent(runId)}`, {
+                            cache: "no-store",
+                        });
+                        const detailData = await parseApiResponse<StyleDnaRunLookupResponse>(detailResp);
+                        return {
+                            runId,
+                            run: detailData.run || null,
+                            result: detailData.result || null,
+                            error: null,
+                        };
+                    } catch (error: any) {
+                        return {
+                            runId,
+                            run: null,
+                            result: null,
+                            error: String(error?.message || "Failed to load run detail"),
+                        };
+                    }
+                })
+            );
+
+            const exportedAtUtc = new Date().toISOString();
+            const payload = {
+                styleInfluenceId: activeStyleInfluenceId,
+                exportedAtUtc,
+                requestedLimit: 200,
+                totalRunsListed: runIds.length,
+                mayBeTruncatedAtLimit: runIds.length >= 200,
+                runDetails: detailResults,
+            };
+
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            const safeInfluenceId = activeStyleInfluenceId.replace(/[^a-zA-Z0-9_-]/g, "_");
+            const timestamp = exportedAtUtc.replace(/[:.]/g, "-");
+            anchor.href = url;
+            anchor.download = `style-dna-runs-${safeInfluenceId}-${timestamp}.json`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            URL.revokeObjectURL(url);
+        } catch (error: any) {
+            alert(`Failed to export run details JSON: ${error?.message || "Unknown error"}`);
+        } finally {
+            setIsExportingRunDetails(false);
+        }
     };
 
     const closeNewInfluenceModal = () => {
@@ -1004,6 +1072,77 @@ export default function StudioPage() {
                         </div>
                    </div>
                )}
+
+               <div className="rounded-lg border border-gray-200 bg-gray-50/70 p-3" data-testid="trait-summary-panel">
+                    <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-900">Extracted Traits (Selected Influence)</span>
+                        {traitSummaryQuery.isFetching && <span className="text-[10px] text-gray-500">Refreshing…</span>}
+                    </div>
+
+                    {!activeStyleInfluenceId && (
+                        <p className="text-xs text-gray-500">{formatActionRequiredCopy("Select a style influence to load extracted traits")}</p>
+                    )}
+
+                    {activeStyleInfluenceId && traitSummaryQuery.isLoading && (
+                        <p className="text-xs text-gray-500">Loading extracted traits…</p>
+                    )}
+
+                    {activeStyleInfluenceId && traitSummaryQuery.error && (
+                        <p className="text-xs text-red-600">Could not load extracted traits: {(traitSummaryQuery.error as any)?.message || "Unknown error"}</p>
+                    )}
+
+                    {activeStyleInfluenceId && !traitSummaryQuery.isLoading && !traitSummaryQuery.error && (
+                        <div className="space-y-2 text-xs text-gray-700">
+                            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                <p><span className="font-semibold text-gray-900">Completed runs:</span> {traitSummary?.completedRunCount ?? 0}</p>
+                                <p><span className="font-semibold text-gray-900">Avg delta:</span> {traitSummary?.averageDeltaStrength ?? "-"}</p>
+                            </div>
+
+                            <div className="rounded border border-gray-200 bg-white p-2">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Top DNA Tags</p>
+                                {(traitSummary?.topDnaTags || []).length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                        {(traitSummary?.topDnaTags || []).slice(0, 8).map((tag, index) => (
+                                            <span key={`dna-${String(tag.value || "unknown")}-${index}`} className="rounded bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700">
+                                                {tag.value} ({tag.count || 0})
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] text-gray-500">No extracted DNA tags yet.</p>
+                                )}
+                            </div>
+
+                            <div className="rounded border border-gray-200 bg-white p-2">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Top Vibe Shifts</p>
+                                {(traitSummary?.topVibeShifts || []).length > 0 ? (
+                                    <ul className="space-y-1">
+                                        {(traitSummary?.topVibeShifts || []).slice(0, 5).map((shift, index) => (
+                                            <li key={`vibe-${String(shift.value || "unknown")}-${index}`} className="text-[11px] text-gray-700">{shift.value} ({shift.count || 0})</li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-[11px] text-gray-500">No extracted vibe shifts yet.</p>
+                                )}
+                            </div>
+
+                            <div className="rounded border border-gray-200 bg-white p-2">
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">Top Atomic Traits</p>
+                                {(traitSummary?.topAtomicTraits || []).length > 0 ? (
+                                    <ul className="space-y-1">
+                                        {(traitSummary?.topAtomicTraits || []).slice(0, 6).map((trait, index) => (
+                                            <li key={`atomic-${String(trait.axis || "axis")}-${String(trait.trait || "trait")}-${index}`} className="text-[11px] text-gray-700">
+                                                {trait.axis || "axis"}: {trait.trait || "trait"} ({trait.count || 0})
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-[11px] text-gray-500">No extracted atomic traits yet.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+               </div>
                </div>
             </div>
 
@@ -1487,6 +1626,14 @@ export default function StudioPage() {
                                             className="text-[11px] px-3 py-1 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 disabled:opacity-50"
                                         >
                                             {runsQuery.isFetching ? "Refreshing..." : "Refresh runs"}
+                                        </button>
+                                        <button
+                                            onClick={handleExportRunDetailsJson}
+                                            disabled={!activeStyleInfluenceId || isExportingRunDetails}
+                                            className="text-[11px] px-3 py-1 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            data-testid="export-run-details-json"
+                                        >
+                                            {isExportingRunDetails ? "Exporting..." : "Export runs JSON"}
                                         </button>
                                     </div>
                                 </div>
