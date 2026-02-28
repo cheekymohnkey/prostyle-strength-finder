@@ -30,6 +30,9 @@ test-results/
 # Local database artifacts
 data/
 
+# Local temporary artifacts
+tmp/
+
 # Terraform
 **/.terraform/
 *.tfstate
