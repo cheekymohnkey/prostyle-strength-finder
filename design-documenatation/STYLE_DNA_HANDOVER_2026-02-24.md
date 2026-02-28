@@ -587,6 +587,57 @@ Capture the current Style-DNA implementation state and active risks so the next 
 5. Recommended next task:
 - Execute SDNA-34 runbook in CI and attach concrete warning-only/hard-gate/scheduled run evidence in handover.
 
+## This Session Addendum (SDNA-34 Execution Evidence)
+
+1. What was completed:
+- Ran the governance workflow in both modes via workflow_dispatch (app_env=prod, max_age_days=7).
+- Hard-gate run succeeded: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22483448659
+- Warning-only run succeeded: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22483481748
+- Both runs produced governance status artifacts and fresh evidence retention dirs with manifest and receipt present.
+
+### Additional governance runs (2026-02-27, manual dispatch)
+- Hard-gate (max_age_days=1): https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22483981729
+  - artifact: style-dna-governance-status-prod (id 5689000735, sha256 29511b52d9a389cbd0c4caf0f00473d83ed26bc971fd9668c8f8fed229794e97)
+  - retentionDir: /home/runner/work/prostyle-strength-finder/prostyle-strength-finder/tmp/style-dna-evidence/shared-ci/prod/20260227T111447Z
+  - manifest: .../gov_20260227T111447Z__export_manifest.json
+  - receipt: .../gov_20260227T111447Z__upload_receipt.json
+- Warning-only (max_age_days=1): https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22484006264
+  - artifact: style-dna-governance-status-prod (id 5689011800, sha256 c96f1c128245f410513ba53c20093e8414b3aa49415a7cccea74f60e026fe673)
+  - retentionDir: /home/runner/work/prostyle-strength-finder/prostyle-strength-finder/tmp/style-dna-evidence/shared-ci/prod/20260227T111539Z
+  - manifest: .../gov_20260227T111539Z__export_manifest.json
+  - receipt: .../gov_20260227T111539Z__upload_receipt.json
+- Attempted hard-gate run with max_age_days=0 failed early (validation: max-age-days must be >= 1) and produced no artifact; retentionDir still generated for rollout artifacts: /home/runner/work/prostyle-strength-finder/prostyle-strength-finder/tmp/style-dna-evidence/shared-ci/prod/20260227T111358Z.
+
+2. Evidence capture:
+- Hard-gate retentionDir: /home/runner/work/prostyle-strength-finder/prostyle-strength-finder/tmp/style-dna-evidence/shared-ci/prod/20260227T105731Z
+  - manifest: .../gov_20260227T105731Z__export_manifest.json
+  - receipt: .../gov_20260227T105731Z__upload_receipt.json
+  - artifact: style-dna-governance-status-prod (id 5688783713, sha256 bb49cafbf189976563f18cde05281602f8382e4cfad835416d0f6d61a4859114)
+- Warning-only retentionDir: /home/runner/work/prostyle-strength-finder/prostyle-strength-finder/tmp/style-dna-evidence/shared-ci/prod/20260227T105837Z
+  - manifest: .../gov_20260227T105837Z__export_manifest.json
+  - receipt: .../gov_20260227T105837Z__upload_receipt.json
+  - artifact: style-dna-governance-status-prod (id 5688797036, sha256 160bed412b7894818338afaee66baa4c0d020053d8524030eca8ebbb8c335334)
+
+3. Decisions made:
+- Treat these runs as the baseline evidence set for SDNA-34 handoff; future runs should keep the same naming/retention pattern under tmp/style-dna-evidence/shared-ci/<app_env>/<timestamp>.
+
+4. Outstanding risks/issues:
+- Scheduled weekly run path not yet explicitly verified for notification routing; rely on existing repo/org notification settings until checked.
+
+5. Recommended next task:
+- Verify scheduled cron execution and confirm notification/ownership path, then record schedule evidence similarly.
+
+## This Session Addendum (SDNA-34 Schedule Follow-up)
+
+1. Status:
+- Schedule verification pending; weekly cron (Mon 09:00 UTC) has not yet elapsed since the latest manual runs.
+
+2. Next action when cron fires:
+- Confirm the cron-triggered run appears in Actions history with `event: schedule`.
+- Capture retentionDir, manifest, receipt, artifact id/digest similar to manual runs.
+- Confirm notification/ownership routing (email/Slack/GitHub notifications) is received by the expected owners.
+- Append the scheduled-run evidence block here once captured.
+
 ## Suggested First Commands Next Session
 
 1. `set -a; source .env.local; set +a`

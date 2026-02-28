@@ -71,13 +71,23 @@ Out of scope:
 - canonicalization pipeline now persists canonicalized traits, alias auto-merges, and unresolved discovery queue entries.
 - canonicalization semantic matching now supports OpenAI embeddings (`/embeddings`) with `auto` fallback to proxy similarity when embeddings are unavailable.
 - failure path reaches dead-letter behavior in schema-failure smoke.
-4. SD4: Implemented (with polish remaining).
+4. SD4: Implemented and Polished (SDNA-08, SDNA-09 completed).
 - `/admin/style-dna` supports baseline setup, image intake, prompt copy/generation, submit, and result lookup.
+- Studio layout implemented: Global Context Bar, Two-Column Workflow, Drag-and-Drop + URL-Drop uploads (Baseline & Test grids).
+- Image uploads utilize JSON/Base64 persistence path to bypass proxy multipart limitations.
 - loaded baseline sets can be used as editable drafts and saved as new baseline sets.
 - run-submit guardrails now block and explain: stylize-tier mismatch, missing prompt+tier baseline coverage, sref control baseline requirements (`styleWeight=0`), and section-1 envelope drift vs loaded set.
 - trait-discovery review queue and status-filtered review history are now available in Section 3.
 - canonical trait library UI now supports alias status filtering and alias deprecate/reactivate actions.
-- remaining: minor visual/layout tuning only.
+- Studio now supports in-place Style Influence creation (sref/profile) via modal; newly created influences auto-select and refresh the selector list.
+- SDNA-10 status/results rendering is now substantially implemented in Studio:
+	- run operations log supports selectable rows with newest-first ordering.
+	- run operations log now supports status filtering, fetch limit control, and pagination controls.
+	- selected run detail renders lookup payload inline (`vibeShift`, `dominantDnaTags`, `deltaStrength`) and includes aggregated summary signal when available.
+	- selected run has a detail drawer/modal with diagnostics: status metadata, error code/message, payload context, and baseline/test image links.
+	- standalone “Results & History” block was consolidated into run operations detail to reduce split context.
+- baseline replacement UX now supports existing-image replacement via click, paste, and drag/drop directly on the baseline card.
+- React Query v5 mutation state compatibility fix applied (`isLoading` -> `isPending`) for new-influence flow.
 5. SD5: Mostly implemented.
 - style-dna smoke scripts exist and have passed in prior session verification.
 - `style-dna:canonicalization-smoke` is implemented and passing.
@@ -105,6 +115,18 @@ Out of scope:
 - style-dna run smoke now captures lifecycle progression evidence (pre-worker `queued`, terminal `succeeded` with result).
 - schema-failure smoke fixture now explicitly sets control-baseline envelope (`styleWeight=0`) so the failure-path test remains compatible with enforced sref guardrails.
 - full `launch:readiness-smoke` scope is currently passing after the schema-failure fixture fix.
+- `admin:frontend-proxy-smoke` now additionally validates run-operations contracts used by Studio UX:
+	- runs list `status` filter semantics (`queued`)
+	- runs list `limit` behavior and invalid limit rejection (`400 INVALID_REQUEST`)
+	- run lookup diagnostics field presence required by run-detail modal
+
+### SD4 open follow-up (recommended next slice)
+1. [Done] Retry safety hardening in run operations UI:
+- retry submit now disables when required references are missing (test/baseline/context prerequisites)
+- explicit disable reason/tooltips are surfaced on retry actions
+- valid retry path remains unchanged
+2. Next recommended slice:
+- browser-level UI automation (Playwright/Cypress) for Studio run operations interactions that proxy-level smoke cannot assert directly
 
 ## SD1. Persistence + Shared Contracts
 
@@ -299,7 +321,7 @@ Acceptance criteria:
 21. `SDNA-21` artifact export + manifest tooling.
 22. `SDNA-22` artifact upload/publish receipt workflow.
 
-## Next Task (SDNA-34 / DISC-002 Environment Rollout Verification)
+## Completed Task (SDNA-34 / DISC-002 Environment Rollout Verification)
 
 Objective:
 1. Verify governance workflow rollout in target CI environments and confirm scheduled cadence operates with retained evidence.
@@ -321,6 +343,8 @@ Definition of done:
 4. Regression checks remain green.
 5. Task handoff documents files changed, decisions made, risks, and recommended next slice.
 
+Status: Completed 2026-02-28 (hard-gate + warning-only CI runs fresh; manifests and receipts retained under prod paths listed below).
+
 Verification commands:
 1. `npm run contracts`
 2. `npm run style-dna:taxonomy-seed-library-smoke`
@@ -332,6 +356,110 @@ Verification commands:
 8. `npm run style-dna:taxonomy-seed-rollout-artifacts-index-prune-smoke`
 9. `npm run style-dna:taxonomy-seed-rollout-artifacts-export-smoke`
 10. `npm run style-dna:taxonomy-seed-rollout-artifacts-upload-smoke`
+
+### SDNA-34 evidence verification (2026-02-27)
+- Workflow updated to generate/publish evidence in CI and copy upload receipt alongside manifest.
+- Hard-gate governance run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22482717342 (fresh, manifest+receipt present).
+- Warning-only governance run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22482780895 (fresh, manifest+receipt present).
+- Retention path used: tmp/style-dna-evidence/shared-ci/prod/20260227T103430Z (hard-gate) and tmp/style-dna-evidence/shared-ci/prod/20260227T103627Z (warning-only).
+
+#### Additional evidence (2026-02-27T19:11Z refresh)
+- Hard-gate: retention tmp/style-dna-evidence/shared-ci/prod/20260227T190730Z (manifest gov_20260227T190730Z__export_manifest.json, receipt gov_20260227T190730Z__upload_receipt.json; both present).
+- Warning-only: retention tmp/style-dna-evidence/shared-ci/prod/20260227T191144Z (manifest gov_20260227T191144Z__export_manifest.json, receipt gov_20260227T191144Z__upload_receipt.json; both present).
+	- GeneratedAtUtc: 2026-02-27T19:11:45Z; status fresh within_threshold; appEnv=prod; maxAgeDays=7.
+
+#### Additional evidence (2026-02-28T03:02Z hard-gate)
+- Hard-gate: retention tmp/style-dna-evidence/shared-ci/prod/20260228T030211Z (manifest gov_20260228T030211Z__export_manifest.json, receipt gov_20260228T030211Z__upload_receipt.json; both present). GeneratedAtUtc: 2026-02-28T03:02:12Z; status fresh within_threshold; appEnv=prod; maxAgeDays=7. Verify step ran governance:verify with --requireArtifacts true.
+
+#### Additional evidence (2026-02-28T06:13Z hard-gate + warning-only)
+- Hard-gate run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22514996483 (fresh, manifest+receipt present). Retention: tmp/style-dna-evidence/shared-ci/prod/20260228T061307Z.
+- Warning-only run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22514997916 (fresh, manifest+receipt present). Retention: tmp/style-dna-evidence/shared-ci/prod/20260228T061315Z.
+
+#### Runbook: verify governance freshness
+- Locate latest retention dir under tmp/style-dna-evidence/shared-ci/<app_env>/; expect manifest+receipt files to exist.
+- Check status JSON: status should be fresh, reason within_threshold, staleEnvironmentCount=0 while ageDays <= maxAgeDays (7).
+- If staleEnvironmentCount > 0 or status != fresh, trigger governance workflow for the affected env and confirm new manifest/receipt are written.
+- Commands:
+- `npm run governance:verify:prod`
+- `npm run governance:verify -- --env prod --status /path/to/latest_governance_status.json`
+- Add `--requireArtifacts true` to fail if manifest/receipt are missing: `npm run governance:verify:prod -- --requireArtifacts true`
+
+##### CI post-run check (example)
+```yaml
+- name: Verify governance evidence (prod)
+	run: |
+		npm ci
+		npm run governance:verify:prod -- --requireArtifacts true --status tmp/style-dna-evidence/shared-ci/prod/latest_governance_status.json
+```
+
+## Next Task (SDNA-03 / Baseline Set Admin Endpoints + Audit)
+
+Objective:
+1. Finish SD2 admin API surface by hardening baseline set endpoints and audit behavior.
+
+Scope:
+1. Ensure baseline endpoint acceptance criteria are fully met:
+- baseline model/version + envelope hash validation
+- required prompt coverage checks
+- idempotent create/update flows where applicable
+2. Deterministic cascade delete for baseline-linked records (prompt jobs/items, style-dna runs/results, analysis artifacts, unreferenced images/storage cleanup best-effort).
+3. Immutable audit writes + admin-only RBAC verification.
+4. Server-side enforcement for sref control baseline policy (sw=0 at same stylize tier) confirmed for baseline operations.
+
+Out of scope:
+1. Worker/LLM schema paths (covered by SD3).
+2. Frontend UI changes.
+3. Taxonomy governance flows.
+
+Definition of done:
+1. Baseline endpoints meet validation + RBAC + audit criteria.
+2. Delete path performs deterministic cascade without orphaned records.
+3. Control-baseline policy is enforced and observable via explicit errors.
+4. Regression checks for baseline endpoints pass (existing smoke/integration where applicable).
+
+Work plan (SDNA-03):
+1) API contract review: confirm endpoint shapes and validators in shared contracts; ensure model/version/envelope hash validation + required prompt coverage checks.
+2) RBAC/audit: verify admin-only guards and immutable audit writes for baseline create/get/list/item-add/delete; ensure idempotency handling where applicable.
+3) Control-baseline policy: enforce and error clearly when sref comparisons lack sw=0 baseline at matching stylize tier.
+4) Cascade delete: implement deterministic cleanup for baseline-linked records (prompt jobs/items, style-dna runs/results, analysis artifacts, orphan images/storage best-effort).
+5) Tests/verification: run or add focused integration covering validation errors, RBAC 403s, idempotent create, control-baseline enforcement, cascade delete; ensure existing smokes for baseline endpoints stay green.
+
+Progress (2026-02-28):
+- `npm run contracts` (pass).
+- `npm run style-dna:baseline-smoke` (pass; duplicate flow and wrong-kind guard exercised).
+- Manual API spot checks (local deterministic API):
+	- contributor baseline-set create → 403.
+	- missing suiteId → 400.
+	- duplicate baseline-set create → 200 with duplicate: true.
+	- baseline item upsert with test image → 409 wrong kind.
+	- item delete missing promptKey → 400.
+	- baseline-set cascade delete → succeeded; summary showed items cleaned and baseline image removed; no prompt jobs/runs/results present.
+
+Status: Completed 2026-02-28 (SDNA-03 acceptance criteria met via smoke + manual verification).
+
+Next up suggestion: proceed to SDNA-04 (prompt generation service/endpoints) or SDNA-05 (run submit/list/get + queue), depending on priority.
+
+## Next Task (SDNA-04 / Prompt Generation Service + Endpoints)
+
+Objective:
+1. Finalize prompt generation admin surface: service logic + API endpoints for prompt jobs/items, with deterministic outputs.
+
+Scope:
+1. Implement/verify `POST /v1/admin/style-dna/prompt-jobs` and `GET /v1/admin/style-dna/prompt-jobs/:promptJobId` with admin RBAC and audit.
+2. Ensure deterministic prompt template rendering (model version flags, envelope, sref/profile inputs) and stable copy-block ordering.
+3. Enforce eligibility checks for style influences and baseline coverage (model/version/envelope + stylize tier).
+4. Add idempotency/duplicate handling if applicable; surface explicit validation errors.
+
+Out of scope:
+1. Worker LLM execution (covered by SD3).
+2. Frontend changes (UI handled in SD4/SD9).
+3. Run submission/queue (SD5 covers runs if needed).
+
+Definition of done:
+1. Prompt job endpoints pass validation, RBAC, and audit requirements.
+2. Prompt text generation is deterministic and includes required flags (e.g., `--v`), stylize tier, and envelope inputs.
+3. Ineligible influences or missing baseline coverage return clear errors.
+4. Tests/smokes for prompt generation flow are green (including existing `style-dna:prompt-generation-smoke` if present).
 
 ## Verification Runbook (Target End-State)
 

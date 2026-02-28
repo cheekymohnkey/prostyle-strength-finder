@@ -949,6 +949,80 @@ async function main() {
       throw new Error(`Frontend proxy style-dna run lookup failed (${styleDnaLookupResponse.status}): ${JSON.stringify(styleDnaLookupJson)}`);
     }
     assertCondition(Boolean(styleDnaLookupJson?.run?.status), "Expected style-dna run lookup status");
+    assertCondition(
+      String(styleDnaLookupJson?.run?.baselineRenderSetId || "").trim() !== "",
+      "Expected style-dna run lookup to include baselineRenderSetId for modal diagnostics"
+    );
+    assertCondition(
+      String(styleDnaLookupJson?.run?.testGridImageId || "").trim() !== "",
+      "Expected style-dna run lookup to include testGridImageId for modal diagnostics"
+    );
+    assertCondition(
+      String(styleDnaLookupJson?.run?.styleAdjustmentType || "").trim() !== "",
+      "Expected style-dna run lookup to include styleAdjustmentType for modal diagnostics"
+    );
+    assertCondition(
+      String(styleDnaLookupJson?.run?.styleAdjustmentMidjourneyId || "").trim() !== "",
+      "Expected style-dna run lookup to include styleAdjustmentMidjourneyId for modal diagnostics"
+    );
+
+    const styleDnaRunsQueuedResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/runs?styleInfluenceId=${encodeURIComponent("si_frontend_proxy_sref_smoke")}&status=queued&limit=1`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const styleDnaRunsQueuedJson = await styleDnaRunsQueuedResponse.json();
+    if (!styleDnaRunsQueuedResponse.ok) {
+      throw new Error(`Frontend proxy style-dna queued runs list failed (${styleDnaRunsQueuedResponse.status}): ${JSON.stringify(styleDnaRunsQueuedJson)}`);
+    }
+    assertCondition(Array.isArray(styleDnaRunsQueuedJson?.runs), "Expected style-dna queued runs list array");
+    assertCondition(
+      styleDnaRunsQueuedJson.runs.length <= 1,
+      `Expected style-dna queued runs list limit=1 to return <=1 rows, got ${styleDnaRunsQueuedJson.runs.length}`
+    );
+    assertCondition(
+      styleDnaRunsQueuedJson.runs.every((row) => String(row?.status || "") === "queued"),
+      `Expected style-dna queued runs list to contain only queued status rows: ${JSON.stringify(styleDnaRunsQueuedJson.runs)}`
+    );
+
+    const styleDnaRunsLimitResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/runs?styleInfluenceId=${encodeURIComponent("si_frontend_proxy_sref_smoke")}&limit=1`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const styleDnaRunsLimitJson = await styleDnaRunsLimitResponse.json();
+    if (!styleDnaRunsLimitResponse.ok) {
+      throw new Error(`Frontend proxy style-dna runs list limit failed (${styleDnaRunsLimitResponse.status}): ${JSON.stringify(styleDnaRunsLimitJson)}`);
+    }
+    assertCondition(Array.isArray(styleDnaRunsLimitJson?.runs), "Expected style-dna runs limit list array");
+    assertCondition(
+      styleDnaRunsLimitJson.runs.length <= 1,
+      `Expected style-dna runs list limit=1 to return <=1 rows, got ${styleDnaRunsLimitJson.runs.length}`
+    );
+
+    const styleDnaRunsInvalidLimitResponse = await fetch(
+      `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/runs?styleInfluenceId=${encodeURIComponent("si_frontend_proxy_sref_smoke")}&limit=0`,
+      {
+        headers: {
+          "x-auth-token": adminToken,
+        },
+      }
+    );
+    const styleDnaRunsInvalidLimitJson = await styleDnaRunsInvalidLimitResponse.json();
+    assertCondition(
+      styleDnaRunsInvalidLimitResponse.status === 400,
+      `Expected style-dna runs list invalid limit to return 400, got ${styleDnaRunsInvalidLimitResponse.status}: ${JSON.stringify(styleDnaRunsInvalidLimitJson)}`
+    );
+    assertCondition(
+      extractApiErrorCode(styleDnaRunsInvalidLimitJson) === "INVALID_REQUEST",
+      `Expected style-dna runs invalid limit code INVALID_REQUEST, got ${JSON.stringify(styleDnaRunsInvalidLimitJson)}`
+    );
 
     const canonicalForbiddenResponse = await fetch(
       `http://127.0.0.1:${frontendPort}/api/proxy/admin/style-dna/canonical-traits?axis=lighting_and_contrast&status=active&limit=5`,
@@ -1158,6 +1232,15 @@ async function main() {
             stylizeMismatchRunStatus: stylizeMismatchRunResponse.status,
             runStatus: styleDnaLookupJson?.run?.status || "(unknown)",
             promptJobId: styleDnaPromptJobJson?.promptJob?.promptJobId || styleDnaPromptJobJson?.promptJobId || "",
+            runListQueuedCount: Array.isArray(styleDnaRunsQueuedJson?.runs) ? styleDnaRunsQueuedJson.runs.length : -1,
+            runListLimitCount: Array.isArray(styleDnaRunsLimitJson?.runs) ? styleDnaRunsLimitJson.runs.length : -1,
+            runListInvalidLimitStatus: styleDnaRunsInvalidLimitResponse.status,
+            runDetailHasDiagnostics: Boolean(
+              styleDnaLookupJson?.run?.baselineRenderSetId
+              && styleDnaLookupJson?.run?.testGridImageId
+              && styleDnaLookupJson?.run?.styleAdjustmentType
+              && styleDnaLookupJson?.run?.styleAdjustmentMidjourneyId
+            ),
           },
           canonicalGovernance: {
             canonicalTraitId,
