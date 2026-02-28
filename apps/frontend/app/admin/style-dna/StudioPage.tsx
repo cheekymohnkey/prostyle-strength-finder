@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { StudioLayout } from "./components/StudioLayout";
 import { NewInfluenceModal } from "./components/NewInfluenceModal";
@@ -32,6 +32,12 @@ function buildStyleDnaProvenanceReceipt(input: { imageKind: "baseline" | "test";
         capturedAtUtc: new Date().toISOString(),
         operatorAssertion: `${input.imageKind}_grid_uploaded_via_studio:${input.fileName}`,
     };
+}
+
+function formatActionRequiredCopy(message: string): string {
+    const normalized = String(message || "").trim().replace(/[.\s]+$/g, "");
+    if (!normalized) return "Action required.";
+    return `Action required: ${normalized}.`;
 }
 
 export default function StudioPage() {
@@ -323,6 +329,10 @@ export default function StudioPage() {
     const [runFetchLimit, setRunFetchLimit] = useState<number>(50);
     const [runPage, setRunPage] = useState<number>(1);
     const runPageSize = 10;
+    const newInfluenceTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const runDetailTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const runDetailModalRef = useRef<HTMLDivElement | null>(null);
+    const runDetailCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   
   // Test Cells Configuration
   const section3TestCells = useMemo<Section3TestCell[]>(() => {
@@ -737,7 +747,7 @@ export default function StudioPage() {
     const canSubmitStoredRetry = retryDisableReasons.length === 0;
     const retryDisabledTooltip = canSubmitStoredRetry
         ? "Submit retry with stored test grid"
-        : `Retry disabled: ${retryDisableReasons.join(" ")}`;
+        : retryDisableReasons.map((reason) => formatActionRequiredCopy(reason)).join(" ");
 
     const renderStatusBadge = (status?: string) => {
         const value = (status || "").toLowerCase();
@@ -745,6 +755,63 @@ export default function StudioPage() {
         const label = value ? value.replace(/_/g, " ") : "unknown";
         return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${color}`}>{label}</span>;
     };
+
+    const closeNewInfluenceModal = () => {
+        setShowNewInfluenceModal(false);
+        setNewInfluenceError(null);
+        requestAnimationFrame(() => {
+            newInfluenceTriggerRef.current?.focus();
+        });
+    };
+
+    const closeRunDetailModal = () => {
+        setIsRunDetailModalOpen(false);
+        requestAnimationFrame(() => {
+            runDetailTriggerRef.current?.focus();
+        });
+    };
+
+    useEffect(() => {
+        if (!isRunDetailModalOpen) return;
+        const timer = window.setTimeout(() => {
+            runDetailCloseButtonRef.current?.focus();
+        }, 0);
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!isRunDetailModalOpen) return;
+            if (event.key === "Escape") {
+                event.preventDefault();
+                closeRunDetailModal();
+                return;
+            }
+            if (event.key !== "Tab") return;
+
+            const container = runDetailModalRef.current;
+            if (!container) return;
+            const focusable = container.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (!focusable.length) return;
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const active = document.activeElement as HTMLElement | null;
+
+            if (event.shiftKey && active === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && active === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.clearTimeout(timer);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [isRunDetailModalOpen]);
 
 
 
@@ -834,25 +901,28 @@ export default function StudioPage() {
                             const hasBaseline = baselineSetDetailQuery.data?.items?.some(i => i.promptKey === def.promptKey && i.stylizeTier === Number(stylizeTier));
                             
                             return (
-                                <li 
-                                    key={def.promptKey}
-                                    onClick={() => setActivePromptKey(def.promptKey)}
-                                    className={`
-                                        cursor-pointer p-3 hover:bg-white/50 transition-colors relative
-                                        ${isActive ? "bg-white shadow-sm z-10" : ""}
-                                    `}
-                                >
-                                    {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
-                                    <div className="flex items-center justify-between mb-1 pl-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] bg-gray-200 text-gray-600 px-1 rounded">{idx + 1}</span>
-                                            <span className="font-mono text-xs font-semibold text-gray-900">{def.promptKey}</span>
+                                <li key={def.promptKey}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActivePromptKey(def.promptKey)}
+                                        className={`
+                                            relative w-full p-3 text-left hover:bg-white/50 transition-colors
+                                            ${isActive ? "bg-white shadow-sm z-10" : ""}
+                                        `}
+                                        aria-current={isActive ? "true" : undefined}
+                                    >
+                                        {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600"></div>}
+                                        <div className="flex items-center justify-between mb-1 pl-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] bg-gray-200 text-gray-600 px-1 rounded">{idx + 1}</span>
+                                                <span className="font-mono text-xs font-semibold text-gray-900">{def.promptKey}</span>
+                                            </div>
+                                            {hasBaseline && (
+                                                <span className="h-2 w-2 rounded-full bg-green-500 ring-2 ring-white" title="Baseline Ready" />
+                                            )}
                                         </div>
-                                        {hasBaseline && (
-                                            <span className="h-2 w-2 rounded-full bg-green-500 ring-2 ring-white" title="Baseline Ready" />
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-gray-600 line-clamp-2 pl-2 border-l-2 border-transparent">{def.promptText}</p>
+                                        <p className="text-xs text-gray-600 line-clamp-2 pl-2 border-l-2 border-transparent">{def.promptText}</p>
+                                    </button>
                                 </li>
                             );
                         })}
@@ -862,10 +932,11 @@ export default function StudioPage() {
         </div>
 
         {/* Main Workspace */}
-        <div className="flex flex-1 flex-col overflow-y-auto bg-gray-50 p-6">
+        <div className="flex flex-1 flex-col overflow-y-auto bg-gray-50 p-6 lg:p-7">
             
             {/* Target Selection & Analysis Controls */}
-            <div className="mb-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4">
+                <div className="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-col gap-5">
                <div className="flex items-end justify-between gap-4">
                     <label className="flex flex-col text-xs min-w-[300px] flex-1 max-w-md">
                         <span className="text-gray-500 font-medium mb-1">Style Influence (Target SREF)</span>
@@ -882,6 +953,7 @@ export default function StudioPage() {
                     </label>
 
                         <button
+                            ref={newInfluenceTriggerRef}
                             type="button"
                             onClick={() => {
                                 setNewInfluenceError(null);
@@ -932,15 +1004,16 @@ export default function StudioPage() {
                         </div>
                    </div>
                )}
+               </div>
             </div>
 
 
             {/* Split Pane: Source vs Target */}
-            <div className="grid grid-cols-2 gap-6 min-h-[500px]">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 items-start">
                 
                 {/* LEFT: SOURCE (Baseline) */}
-                <div className="flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden h-fit">
-                    <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 flex justify-between items-center">
+                <div className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <div className="flex min-h-[64px] items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3">
                         <div>
                             <h3 className="text-sm font-semibold text-gray-900">Source (Baseline)</h3>
                             <p className="text-xs text-gray-500">Stylize: {stylizeTier}</p>
@@ -952,7 +1025,7 @@ export default function StudioPage() {
                         )}
                     </div>
 
-                    <div className="p-4 bg-gray-50/50 flex flex-col gap-4">
+                    <div className="flex flex-1 flex-col gap-4 bg-gray-50/50 p-5">
                         {/* Current Baseline Image Display */}
                         {activeBaselineItem?.gridImageId ? (
                             <div className="space-y-3">
@@ -1118,7 +1191,7 @@ export default function StudioPage() {
                                     }
                                 }}
                                 className={`
-                                    min-h-[300px] flex flex-col items-center justify-center rounded-lg border-2 border-dashed 
+                                    min-h-[320px] flex flex-col items-center justify-center rounded-lg border-2 border-dashed 
                                     ${baselineFile 
                                         ? "border-green-400 bg-green-50" 
                                         : isDraggingBaseline 
@@ -1174,7 +1247,7 @@ export default function StudioPage() {
                         
                         {/* Baseline Prompt Info */}
                         {activePromptDefinition && (
-                            <div className="bg-white p-3 rounded border border-gray-200 space-y-1">
+                            <div className="min-h-[120px] rounded border border-gray-200 bg-white p-3 space-y-1">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase">Prompt Text</span>
                                 <div className="text-xs font-mono text-gray-600 break-words leading-relaxed">
                                     {activePromptDefinition.promptText}
@@ -1185,8 +1258,8 @@ export default function StudioPage() {
                 </div>
 
                 {/* RIGHT: TARGET (Style Influence) */}
-                <div className={`flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden h-fit transition-opacity ${!activeBaselineItem ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
-                     <div className="border-b border-gray-100 bg-gray-50 px-4 py-3 flex justify-between items-center">
+                 <div className={`flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-opacity ${!activeBaselineItem ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                     <div className="flex min-h-[64px] items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3">
                         <div className="flex items-center gap-3">
                             <div>
                                 <h3 className="text-sm font-semibold text-gray-900">Target (Test)</h3>
@@ -1210,7 +1283,7 @@ export default function StudioPage() {
                         </button>
                     </div>
 
-                    <div className="p-4 bg-gray-50/50 flex flex-col gap-4">
+                    <div className="flex flex-1 flex-col gap-4 bg-gray-50/50 p-5">
                         {/* Test Grid Drop Zone */}
                         <div 
                              onPaste={(e) => {
@@ -1262,7 +1335,7 @@ export default function StudioPage() {
                                 }
                             }}
                             className={`
-                                min-h-[300px] flex flex-col items-center justify-center rounded-lg border-2 border-dashed 
+                                min-h-[320px] flex flex-col items-center justify-center rounded-lg border-2 border-dashed 
                                 ${testFile 
                                     ? "border-blue-400 bg-blue-50" 
                                     : isDraggingTest 
@@ -1362,7 +1435,7 @@ export default function StudioPage() {
                         </div>
 
                         {/* Computed Prompt Display */}
-                        <div className="bg-white p-3 rounded border border-blue-100 shadow-sm relative group">
+                        <div className="relative min-h-[120px] rounded border border-blue-100 bg-white p-3 shadow-sm group">
                             <div className="flex justify-between items-center mb-1">
                                 <p className="text-[10px] font-bold text-blue-400 uppercase">Generated Prompt</p>
                                 {constructedPrompt && (
@@ -1374,7 +1447,8 @@ export default function StudioPage() {
                             </p>
                         </div>
 
-                        <div className="bg-white p-3 rounded border border-gray-200 shadow-sm space-y-3">
+                        <div className="rounded border border-gray-200 bg-white p-3 shadow-sm">
+                            <div className="space-y-3">
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <div className="flex flex-col">
@@ -1418,7 +1492,7 @@ export default function StudioPage() {
                                 </div>
 
                                 {!activeStyleInfluenceId && (
-                                    <p className="text-xs text-gray-500">Select a style influence to load runs.</p>
+                                    <p className="text-xs text-gray-500">{formatActionRequiredCopy("Select a style influence to load runs")}</p>
                                 )}
 
                                 {activeStyleInfluenceId && runsQuery.isLoading && (
@@ -1437,7 +1511,10 @@ export default function StudioPage() {
                                                     <span className="font-semibold text-gray-900">Selected Run Details</span>
                                                     <div className="flex items-center gap-2">
                                                         <button
-                                                            onClick={() => setIsRunDetailModalOpen(true)}
+                                                            onClick={(event) => {
+                                                                runDetailTriggerRef.current = event.currentTarget;
+                                                                setIsRunDetailModalOpen(true);
+                                                            }}
                                                             disabled={!selectedRunDetailData}
                                                             className="rounded-md border border-blue-100 bg-white px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                             data-testid="view-run-details"
@@ -1538,7 +1615,7 @@ export default function StudioPage() {
                                                         const loadRetryDisableReason = getLoadRetryDisableReason(run);
                                                         const canLoadRetry = !loadRetryDisableReason;
                                                         return (
-                                                            <div title={canLoadRetry ? "Load run context for retry" : `Retry unavailable: ${loadRetryDisableReason}`}>
+                                                            <div title={canLoadRetry ? "Load run context for retry" : formatActionRequiredCopy(loadRetryDisableReason || "Run context is incomplete for retry") }>
                                                                 <button
                                                                     onClick={(event) => {
                                                                         event.stopPropagation();
@@ -1589,6 +1666,7 @@ export default function StudioPage() {
                                     </div>
                                 )}
                         </div>
+                            </div>
                     </div>
                 </div>
 
@@ -1602,20 +1680,21 @@ export default function StudioPage() {
             initialType={styleAdjustmentType}
             loading={createInfluenceMutation.isPending}
             errorMessage={newInfluenceError}
-            onClose={() => {
-                setShowNewInfluenceModal(false);
-                setNewInfluenceError(null);
-            }}
+            onClose={closeNewInfluenceModal}
             onSubmit={(input) => {
                 setNewInfluenceError(null);
                 createInfluenceMutation.mutate(input);
             }}
         />
         {isRunDetailModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/30" onClick={() => setIsRunDetailModalOpen(false)} data-testid="run-detail-modal-overlay">
+            <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/30" onClick={closeRunDetailModal} data-testid="run-detail-modal-overlay">
                 <div
+                    ref={runDetailModalRef}
                     className="h-full w-full max-w-xl overflow-y-auto border-l border-gray-200 bg-white shadow-xl"
                     onClick={(event) => event.stopPropagation()}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Run Detail"
                     data-testid="run-detail-modal"
                 >
                     <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
@@ -1624,8 +1703,9 @@ export default function StudioPage() {
                             <span className="text-[11px] text-gray-500">Diagnostics for selected run</span>
                         </div>
                         <button
+                            ref={runDetailCloseButtonRef}
                             type="button"
-                            onClick={() => setIsRunDetailModalOpen(false)}
+                            onClick={closeRunDetailModal}
                             className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
                         >
                             Close
@@ -1642,13 +1722,13 @@ export default function StudioPage() {
                                 <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2">
                                     <div className="mb-1 flex items-center gap-2">
                                         {renderStatusBadge(selectedRunDetailData.status)}
-                                        <span className="font-mono text-[11px] text-gray-700">{selectedRunDetailData.styleDnaRunId || selectedRunId}</span>
+                                        <span className="max-w-[260px] truncate font-mono text-[11px] text-gray-700" title={selectedRunDetailData.styleDnaRunId || selectedRunId || ""}>{selectedRunDetailData.styleDnaRunId || selectedRunId}</span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 text-[11px]">
-                                        <p><span className="font-semibold text-gray-900">Prompt:</span> {selectedRunDetailData.promptKey || "-"}</p>
+                                        <p className="truncate" title={selectedRunDetailData.promptKey || "-"}><span className="font-semibold text-gray-900">Prompt:</span> {selectedRunDetailData.promptKey || "-"}</p>
                                         <p><span className="font-semibold text-gray-900">Stylize:</span> s{selectedRunDetailData.stylizeTier ?? "-"}</p>
-                                        <p><span className="font-semibold text-gray-900">Adjustment:</span> {selectedRunDetailData.styleAdjustmentType || "-"}</p>
-                                        <p><span className="font-semibold text-gray-900">MJ ID:</span> {selectedRunDetailData.styleAdjustmentMidjourneyId || "-"}</p>
+                                        <p className="truncate" title={selectedRunDetailData.styleAdjustmentType || "-"}><span className="font-semibold text-gray-900">Adjustment:</span> {selectedRunDetailData.styleAdjustmentType || "-"}</p>
+                                        <p className="truncate" title={selectedRunDetailData.styleAdjustmentMidjourneyId || "-"}><span className="font-semibold text-gray-900">MJ ID:</span> {selectedRunDetailData.styleAdjustmentMidjourneyId || "-"}</p>
                                         <p><span className="font-semibold text-gray-900">Created:</span> {selectedRunDetailData.createdAt || "-"}</p>
                                         <p><span className="font-semibold text-gray-900">Updated:</span> {selectedRunDetailData.updatedAt || "-"}</p>
                                     </div>
@@ -1656,8 +1736,9 @@ export default function StudioPage() {
 
                                 {(selectedRunDetailData.lastErrorCode || selectedRunDetailData.lastErrorMessage) && (
                                     <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
-                                        <p><span className="font-semibold">Error code:</span> {selectedRunDetailData.lastErrorCode || "(none)"}</p>
-                                        <p><span className="font-semibold">Error message:</span> {selectedRunDetailData.lastErrorMessage || "(none)"}</p>
+                                        <p className="truncate" title={selectedRunDetailData.lastErrorCode || "(none)"}><span className="font-semibold">Error code:</span> {selectedRunDetailData.lastErrorCode || "(none)"}</p>
+                                        <p className="mt-1"><span className="font-semibold">Error message:</span></p>
+                                        <p className="line-clamp-6 whitespace-pre-wrap break-words" title={selectedRunDetailData.lastErrorMessage || "(none)"}>{selectedRunDetailData.lastErrorMessage || "(none)"}</p>
                                     </div>
                                 )}
 
@@ -1719,9 +1800,9 @@ export default function StudioPage() {
 
                                 <div className="rounded border border-gray-200 bg-white px-3 py-2 text-[11px]">
                                     <p className="mb-2 font-semibold text-gray-900">Payload context</p>
-                                    <p><span className="font-semibold">Baseline set:</span> {selectedRunDetailData.baselineRenderSetId || "-"}</p>
+                                    <p className="truncate" title={selectedRunDetailData.baselineRenderSetId || "-"}><span className="font-semibold">Baseline set:</span> {selectedRunDetailData.baselineRenderSetId || "-"}</p>
                                     {selectedRunEnvelope ? (
-                                        <pre className="mt-2 overflow-x-auto rounded border border-gray-100 bg-gray-50 p-2 text-[10px] text-gray-700">
+                                        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded border border-gray-100 bg-gray-50 p-2 text-[10px] text-gray-700">
 {JSON.stringify(selectedRunEnvelope, null, 2)}
                                         </pre>
                                     ) : (

@@ -6,7 +6,7 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. Post-SDNA-37 prioritization (next SDNA ticket TBD by roadmap owner).
+1. Post-SDNA-37 prioritization (next SDNA ticket TBD by roadmap owner; Epic F Style-DNA Studio UX redesign and polish backlog are closed).
 
 Use this as kickoff in a new chat:
 1. Objective: select the next highest-priority SDNA ticket after SDNA-37 closeout.
@@ -16,6 +16,39 @@ Use this as kickoff in a new chat:
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
+
+## Addendum - 2026-03-01 (Epic F Style-DNA Studio UX Redesign Closeout)
+
+### Status
+1. Closed.
+
+### Completed in this closeout
+1. Completed post-epic polish item #1: standardized Studio spacing/visual rhythm across baseline/test/run-operation cards.
+2. Completed post-epic polish item #2: normalized warning/blocked-state copy to a consistent short actionable sentence pattern.
+3. Completed post-epic polish item #3: tightened run-detail modal readability for long payloads (wrap + truncation consistency).
+4. Completed post-epic polish item #4: fixed keyboard focus order/focus-return behavior across Prompt Playlist, New Influence modal, and Run Detail modal.
+5. Completed post-epic polish item #5: expanded Playwright run-ops edge coverage for retry disable-reason visibility and filter/limit/paging boundary interactions.
+
+### Files changed
+1. `apps/frontend/app/admin/style-dna/StudioPage.tsx`
+2. `apps/frontend/app/admin/style-dna/components/NewInfluenceModal.tsx`
+3. `tests/playwright/style-dna-run-ops-retry-disable.spec.ts`
+4. `tests/playwright/style-dna-run-ops-filter-paging.spec.ts`
+5. `design-documenatation/implementation/EPIC_F_STYLE_DNA_UX_REDESIGN.md`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+7. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+
+### Verification command order
+1. `npx playwright test tests/playwright/style-dna-run-ops-retry-disable.spec.ts tests/playwright/style-dna-run-ops-filter-paging.spec.ts`
+2. `npm run contracts`
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
+
+### Risks / follow-up notes
+1. No functional/API contract changes were introduced in these polish slices; risk is low and scoped to UX refinements + test coverage expansion.
+2. Remaining Style-DNA work should proceed via roadmap-prioritized SDNA tickets only (no reopen of Epic F architecture/design scope).
+
+### Recommended next task kickoff
+1. Select the next highest-priority SDNA ticket after SDNA-37/Epic F closeout.
 
 ## Addendum - 2026-03-01 (SDNA-36 DISC-002 CI Governance Evidence Closeout Complete)
 

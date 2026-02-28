@@ -21,8 +21,8 @@ Current next task:
 1. Post-SDNA-37 prioritization (next SDNA ticket TBD by roadmap owner).
 
 If Style-DNA Studio UX polish is selected next:
-1. Use `design-documenatation/implementation/EPIC_F_STYLE_DNA_UX_REDESIGN.md` as the execution list for remaining minor UX polish only.
-2. Keep scope to the documented polish backlog; do not reopen Studio architecture redesign.
+1. Epic F Studio UX redesign is closed, including post-epic polish items 1-5.
+2. Do not reopen Studio architecture redesign scope under this track; proceed via the next roadmap-prioritized SDNA ticket.
 
 Quick start:
 1. Use SDNA-36 post-fix green evidence refresh as the baseline state.

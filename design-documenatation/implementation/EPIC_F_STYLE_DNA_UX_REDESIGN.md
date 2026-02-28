@@ -1,6 +1,6 @@
 # Prostyle Strength Finder - Epic F: Style DNA UX Redesign
 
-Status: Implemented (Core) / Polish Backlog Open  
+Status: Closed (Implemented + Polish Complete)  
 Date: 2026-03-01  
 Depends on:
 - `design-documenatation/implementation/STYLE_DNA_UX_REDESIGN_PROPOSAL.md` (Source of Truth)
@@ -101,18 +101,20 @@ Replace the 3-section vertical layout with a Master-Detail Console layout featur
     7. Verify status updates in Playlist.
 - [x] Create/Update smoke test script if possible (UI interactions are hard to script in CLI, so focus on manual verification plan or unit tests for the store logic).
 
-## Remaining UX Polish Backlog (Post-Epic)
+## Completed UX Polish Backlog (Post-Epic)
 
-These are minor refinements only and do not block launch readiness:
+All post-epic Studio polish items are now complete:
 
-1. Standardize spacing/visual rhythm across Studio cards so baseline/test/run-operation panels align consistently at common desktop widths.
-2. Normalize warning/blocked-state panel copy so all actionable prerequisites use the same short sentence pattern.
-3. Tighten run-detail modal readability for long error payloads (line-wrap + truncation behavior consistency).
-4. Validate keyboard focus order and focus-return behavior across Prompt Playlist, New Influence modal, and run-detail modal.
-5. Expand Playwright run-ops edge coverage for retry disable-reason visibility and filter/limit/paging edge interactions.
+1. Standardized spacing/visual rhythm across Studio cards for baseline/test/run-operation panel alignment at common desktop widths.
+2. Normalized warning/blocked-state panel copy to a single actionable prerequisite sentence pattern.
+3. Tightened run-detail modal readability for long error payloads (line-wrap + truncation consistency).
+4. Validated and fixed keyboard focus order and focus-return behavior across Prompt Playlist, New Influence modal, and run-detail modal.
+5. Expanded Playwright run-ops edge coverage for retry disable-reason visibility and filter/limit/paging boundary interactions.
 
-Execution note:
-1. Treat these as separate polish tickets under post-SDNA-37 prioritization; do not reopen Studio architecture redesign scope.
+Verification snapshot:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+3. Targeted Playwright run-ops suite: `npx playwright test tests/playwright/style-dna-run-ops-retry-disable.spec.ts tests/playwright/style-dna-run-ops-filter-paging.spec.ts` (pass).
 
 ## Definition of Done
 

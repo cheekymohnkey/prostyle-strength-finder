@@ -9,6 +9,20 @@ import {
 } from "./support/run-ops-helpers";
 
 test.describe("Style DNA Studio run operations - filter and paging", () => {
+  test("disables paging controls for single-page result sets", async ({ page }) => {
+    await openRunOpsForInfluence(page, "si_playwright_seed");
+
+    await selectStatus(page, "queued");
+
+    const runRows = getRunRows(page);
+    await expect.poll(async () => runRows.count()).toBe(1);
+
+    const pageIndicator = getPageIndicator(page);
+    await expect(pageIndicator).toHaveText(/^1\/1$/);
+    await expect(page.getByRole("button", { name: "Prev", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+  });
+
   test("supports status transitions and paging controls", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
@@ -95,5 +109,28 @@ test.describe("Style DNA Studio run operations - filter and paging", () => {
     const refreshedCount = await runRows.count();
     expect(refreshedCount).toBeGreaterThan(0);
     expect(refreshedCount).toBeLessThanOrEqual(10);
+  });
+
+  test("disables next when reaching the last page and keeps previous enabled", async ({ page }) => {
+    await openRunOpsForInfluence(page, "si_playwright_seed");
+
+    const limitSelect = getLimitSelect(page);
+    await limitSelect.selectOption("20");
+    await expect(limitSelect).toHaveValue("20");
+
+    await selectStatus(page, "all");
+
+    const nextButton = page.getByRole("button", { name: "Next", exact: true });
+    const prevButton = page.getByRole("button", { name: "Prev", exact: true });
+    const pageIndicator = getPageIndicator(page);
+
+    for (let index = 0; index < 20; index += 1) {
+      if (await nextButton.isDisabled()) break;
+      await nextButton.click();
+    }
+
+    await expect(nextButton).toBeDisabled();
+    await expect(pageIndicator).toHaveText(/^\d+\/\d+$/);
+    await expect(prevButton).toBeEnabled();
   });
 });
