@@ -413,6 +413,18 @@ Verification commands:
 	- Expected owner response when schedule is stale/missing: release owner triggers immediate hard-gate dispatch for `prod`, infra owner verifies artifact upload + `latest_governance_status.json`, on-call maintainer confirms `manifestExists=true` and `receiptExists=true` and records the run URL + retention dir in handover.
 	- Escalation expectation: if stale persists after one rerun, open incident thread and attach failing/succeeding run URLs plus governance status artifact summary.
 
+	#### SDNA-36 post-fix green refresh (2026-02-28T12:02Z UTC; captured 2026-03-01 local)
+	- Warning-only run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520357488.
+		- Mode proof: `Governance Check (warning-only)` succeeded, `Governance Check (hard-gate)` skipped, and `Verify governance artifacts present` succeeded.
+		- Artifact: `style-dna-governance-status-prod` (not expired; expires at `2026-05-29T12:02:32Z`; size `576` bytes).
+		- Status JSON: `generatedAtUtc=2026-02-28T12:02:46.033Z`, `status=fresh`, `reason=within_threshold`, `staleEnvironmentCount=0`.
+		- Retention/evidence: `tmp/style-dna-evidence/shared-ci/prod/20260228T120244Z`; manifest `gov_20260228T120244Z__export_manifest.json`; receipt `gov_20260228T120244Z__upload_receipt.json`; `manifestExists=true`; `receiptExists=true`.
+	- Hard-gate run: https://github.com/cheekymohnkey/prostyle-strength-finder/actions/runs/22520358189.
+		- Mode proof: `Governance Check (hard-gate)` succeeded, `Governance Check (warning-only)` skipped, and `Verify governance artifacts present` succeeded.
+		- Artifact: `style-dna-governance-status-prod` (not expired; expires at `2026-05-29T12:02:34Z`; size `576` bytes).
+		- Status JSON: `generatedAtUtc=2026-02-28T12:02:48.965Z`, `status=fresh`, `reason=within_threshold`, `staleEnvironmentCount=0`.
+		- Retention/evidence: `tmp/style-dna-evidence/shared-ci/prod/20260228T120247Z`; manifest `gov_20260228T120247Z__export_manifest.json`; receipt `gov_20260228T120247Z__upload_receipt.json`; `manifestExists=true`; `receiptExists=true`.
+
 #### Runbook: verify governance freshness
 - Locate latest retention dir under tmp/style-dna-evidence/shared-ci/<app_env>/; expect manifest+receipt files to exist.
 - Check status JSON: status should be fresh, reason within_threshold, staleEnvironmentCount=0 while ageDays <= maxAgeDays (7).

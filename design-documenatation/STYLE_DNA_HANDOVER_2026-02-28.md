@@ -51,6 +51,13 @@ Canonical task detail location:
 1. Fresh CI runs `22520274603` and `22520275229` generated valid governance artifacts and fresh status payloads, but failed at post-check before parser fix (`--requireArtifacts true` parsing); parser handling is now corrected for subsequent runs.
 2. Scheduled run ownership remains process-dependent; keep Monday review + stale escalation discipline in release/on-call handoff.
 
+### Post-fix evidence refresh
+1. Warning-only run `22520357488` succeeded end-to-end, including verify step and governance artifact upload.
+2. Hard-gate run `22520358189` succeeded end-to-end, including verify step and governance artifact upload.
+3. Both runs recorded fresh governance status with manifest/receipt present under prod retention paths:
+- `tmp/style-dna-evidence/shared-ci/prod/20260228T120244Z` (warning-only)
+- `tmp/style-dna-evidence/shared-ci/prod/20260228T120247Z` (hard-gate)
+
 ### Recommended next task kickoff
 1. Select next SDNA ticket by roadmap priority (`DISC-002` CI governance evidence closeout is complete).
 
