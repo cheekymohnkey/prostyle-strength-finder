@@ -76,6 +76,12 @@ function main() {
   const output = {
     ok: true,
     seedPath,
+    preview: {
+      taxonomyVersion: report.taxonomyVersion,
+      seedEntryCount: report.seedEntryCount,
+      reportSignature: report.reportSignature,
+      summaryByAxisCount: Array.isArray(report.summaryByAxis) ? report.summaryByAxis.length : 0,
+    },
     report,
   };
   const rendered = `${JSON.stringify(output, null, 2)}\n`;

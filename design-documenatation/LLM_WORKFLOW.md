@@ -7,7 +7,7 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 ## NEXT SESSION START HERE (as of 2026-02-28)
 
 Current next implementation task:
-1. `SDNA-15` Taxonomy Diff/Report Tooling for Governance Preview.
+1. `SDNA-16` Seed Per-Axis Coverage Validation Tooling.
 
 Primary pointers:
 1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
@@ -27,13 +27,13 @@ Use these docs as source of truth:
 - design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md
 
 Task objective:
-Implement SDNA-15 Taxonomy Diff/Report Tooling for Governance Preview.
+Implement SDNA-16 Seed Per-Axis Coverage Validation Tooling.
 
 Scope:
-1) Add deterministic taxonomy diff/report preview hardening for governance workflows.
-2) Ensure preview output remains stable and explicit across repeated runs.
+1) Add deterministic per-axis seed coverage validation hardening for taxonomy bundles.
+2) Ensure validation output remains explicit and stable across repeated runs.
 3) Preserve existing Style-DNA launch/readiness gate behavior with explicit evidence.
-4) Keep changes surgical to taxonomy diff/report tooling surfaces only.
+4) Keep changes surgical to taxonomy coverage tooling surfaces only.
 
 Out of scope:
 1) Worker inference redesign.
@@ -41,7 +41,7 @@ Out of scope:
 3) Non-Style-DNA surfaces.
 
 Definition of done:
-1) SDNA-15 diff/report preview acceptance criteria are implemented.
+1) SDNA-16 per-axis coverage acceptance criteria are implemented.
 2) Relevant smokes/checks are listed and passing (or explicitly marked not run with reason).
 3) Task end includes handoff summary with files changed + risks + next task.
 ```

@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-15` Taxonomy Diff/Report Tooling for Governance Preview.
+1. `SDNA-16` Seed Per-Axis Coverage Validation Tooling.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-15`.
-2. Implement only SDNA-15 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-16`.
+2. Implement only SDNA-16 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -717,6 +717,39 @@ Risks / notes:
 Next kickoff:
 1. `SDNA-15` Taxonomy Diff/Report Tooling for Governance Preview.
 2. Scope: deterministic diff/report preview hardening only; no worker/frontend redesign.
+
+## Next Task (SDNA-15 / Taxonomy Diff-Report Tooling for Governance Preview)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Hardened taxonomy diff/report output with deterministic governance-preview metadata:
+- stable `reportSignature` (sha256 over deterministic report JSON),
+- explicit per-axis rollup surface (`summaryByAxis`).
+2. Added CLI preview metadata block to diff output for governance workflows:
+- taxonomy version,
+- seed entry count,
+- report signature,
+- axis-rollup count.
+3. Expanded diff smoke assertions to verify signature stability and per-axis rollup presence under repeated runs.
+
+Files changed:
+1. `scripts/style-dna/taxonomy-seed-diff-core.js`
+2. `scripts/style-dna/taxonomy-seed-diff.js`
+3. `scripts/style-dna/taxonomy-seed-diff-smoke.js`
+
+Verification:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-diff-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+
+Risks / notes:
+1. Signature stability depends on deterministic key/array ordering; future report-shape changes must preserve deterministic serialization contract.
+2. Preview metadata is contract-focused and does not include freshness/timestamp fields by design.
+
+Next kickoff:
+1. `SDNA-16` Seed Per-Axis Coverage Validation Tooling.
+2. Scope: per-axis coverage validation hardening only; no worker/frontend redesign.
 
 ## Verification Runbook (Target End-State)
 

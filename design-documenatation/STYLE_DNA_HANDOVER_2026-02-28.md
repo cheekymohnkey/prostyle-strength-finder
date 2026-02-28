@@ -6,16 +6,44 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. `SDNA-15` Taxonomy Diff/Report Tooling for Governance Preview.
+1. `SDNA-16` Seed Per-Axis Coverage Validation Tooling.
 
 Use this as kickoff in a new chat:
-1. Objective: complete deterministic taxonomy diff/report preview hardening for governance review.
-2. Scope: taxonomy diff/report tooling + deterministic preview evidence only.
+1. Objective: complete per-axis taxonomy seed coverage validation hardening.
+2. Scope: per-axis coverage validation tooling + deterministic coverage evidence only.
 3. Out of scope: worker inference redesign, frontend redesign/new UI, non-Style-DNA work.
-4. DoD: taxonomy diff/report preview checks are explicit, deterministic, and captured in handoff evidence.
+4. DoD: per-axis coverage validation checks are explicit, deterministic, and captured in handoff evidence.
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
+
+## Addendum - 2026-02-28 (SDNA-15 Taxonomy Diff-Report Tooling for Governance Preview Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Added deterministic governance-preview signature (`reportSignature`) to taxonomy diff report output.
+2. Added deterministic per-axis rollup output (`summaryByAxis`) to make governance preview deltas explicit.
+3. Added diff CLI preview metadata block for lightweight governance inspection (`taxonomyVersion`, `seedEntryCount`, `reportSignature`, `summaryByAxisCount`).
+4. Expanded diff smoke assertions to lock signature stability and per-axis rollup coverage under replay.
+
+### Files changed
+1. `scripts/style-dna/taxonomy-seed-diff-core.js`
+2. `scripts/style-dna/taxonomy-seed-diff.js`
+3. `scripts/style-dna/taxonomy-seed-diff-smoke.js`
+
+### Verification evidence
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-diff-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+
+### Risks / follow-up notes
+1. Signature determinism relies on stable serialization ordering; future report-schema edits should preserve ordering contract.
+2. Preview metadata intentionally excludes timestamps to keep replay signatures stable.
+
+### Recommended next task kickoff
+1. Proceed with `SDNA-16` Seed Per-Axis Coverage Validation Tooling.
 
 ## Addendum - 2026-02-28 (SDNA-14 Versioned Taxonomy Seed Library + Import Tooling Complete)
 

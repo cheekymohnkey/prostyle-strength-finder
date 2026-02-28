@@ -1,6 +1,7 @@
 const {
   normalizeTraitText,
 } = require("../inference/style-dna-canonicalizer");
+const crypto = require("crypto");
 const {
   listStyleDnaCanonicalTraits,
   listStyleDnaTraitAliases,
@@ -18,6 +19,23 @@ function buildCanonicalKey(taxonomyVersion, axis, normalizedLabel) {
 
 function buildAliasKey(taxonomyVersion, axis, normalizedAlias) {
   return `${taxonomyVersion}::${axis}::${normalizedAlias}`;
+}
+
+function toDeterministicJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => toDeterministicJson(item)).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    const keys = Object.keys(value).sort(compareByKey);
+    return `{${keys
+      .map((key) => `${JSON.stringify(key)}:${toDeterministicJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
 }
 
 function normalizeSeedPayload(payload) {
@@ -244,7 +262,37 @@ function buildTaxonomySeedDiffReport(dbPath, payload) {
   sortByFields(canonicalMissingInBundle, ["axis", "normalizedLabel", "canonicalTraitId"]);
   sortByFields(aliasesMissingInBundle, ["axis", "normalizedAlias", "aliasId"]);
 
-  return {
+  const axisSet = new Set();
+  [
+    ...missingCanonicalInDb,
+    ...canonicalReactivationCandidates,
+    ...canonicalLabelMismatches,
+    ...missingAliasInDb,
+    ...aliasReactivationCandidates,
+    ...aliasConflicts,
+    ...canonicalMissingInBundle,
+    ...aliasesMissingInBundle,
+  ].forEach((row) => {
+    if (row && row.axis) {
+      axisSet.add(String(row.axis));
+    }
+  });
+
+  const byAxis = Array.from(axisSet)
+    .sort(compareByKey)
+    .map((axis) => ({
+      axis,
+      missingCanonicalInDb: missingCanonicalInDb.filter((row) => row.axis === axis).length,
+      canonicalReactivationCandidates: canonicalReactivationCandidates.filter((row) => row.axis === axis).length,
+      canonicalLabelMismatches: canonicalLabelMismatches.filter((row) => row.axis === axis).length,
+      missingAliasInDb: missingAliasInDb.filter((row) => row.axis === axis).length,
+      aliasReactivationCandidates: aliasReactivationCandidates.filter((row) => row.axis === axis).length,
+      aliasConflicts: aliasConflicts.filter((row) => row.axis === axis).length,
+      canonicalMissingInBundle: canonicalMissingInBundle.filter((row) => row.axis === axis).length,
+      aliasesMissingInBundle: aliasesMissingInBundle.filter((row) => row.axis === axis).length,
+    }));
+
+  const baseReport = {
     taxonomyVersion,
     seedEntryCount: canonicalKeys.length,
     summary: {
@@ -257,6 +305,7 @@ function buildTaxonomySeedDiffReport(dbPath, payload) {
       canonicalMissingInBundle: canonicalMissingInBundle.length,
       aliasesMissingInBundle: aliasesMissingInBundle.length,
     },
+    summaryByAxis: byAxis,
     missingCanonicalInDb,
     canonicalReactivationCandidates,
     canonicalLabelMismatches,
@@ -265,6 +314,13 @@ function buildTaxonomySeedDiffReport(dbPath, payload) {
     aliasConflicts,
     canonicalMissingInBundle,
     aliasesMissingInBundle,
+  };
+
+  const reportSignature = sha256Hex(toDeterministicJson(baseReport));
+
+  return {
+    ...baseReport,
+    reportSignature,
   };
 }
 

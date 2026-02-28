@@ -143,6 +143,22 @@ function main() {
       JSON.stringify(firstReport) === JSON.stringify(secondReport),
       "Expected taxonomy diff report to be deterministic across repeated runs"
     );
+    assertCondition(
+      typeof firstReport.reportSignature === "string" && firstReport.reportSignature.length === 64,
+      "Expected deterministic reportSignature sha256"
+    );
+    assertCondition(
+      firstReport.reportSignature === secondReport.reportSignature,
+      "Expected reportSignature to remain stable across repeated runs"
+    );
+    assertCondition(
+      Array.isArray(firstReport.summaryByAxis) && firstReport.summaryByAxis.length >= 1,
+      "Expected summaryByAxis rollups in diff report"
+    );
+    assertCondition(
+      firstReport.summaryByAxis.some((row) => Number(row.aliasConflicts || 0) >= 1),
+      "Expected summaryByAxis to include alias conflict axis counts"
+    );
     assertCondition(firstReport.summary.canonicalReactivationCandidates >= 1, "Expected canonical reactivation candidate");
     assertCondition(firstReport.summary.aliasReactivationCandidates >= 1, "Expected alias reactivation candidate");
     assertCondition(firstReport.summary.aliasConflicts >= 1, "Expected alias conflict candidate");
@@ -155,6 +171,12 @@ function main() {
         {
           ok: true,
           seedPath,
+          preview: {
+            taxonomyVersion: firstReport.taxonomyVersion,
+            seedEntryCount: firstReport.seedEntryCount,
+            reportSignature: firstReport.reportSignature,
+            summaryByAxisCount: firstReport.summaryByAxis.length,
+          },
           report: firstReport,
         },
         null,
@@ -166,6 +188,14 @@ function main() {
     const parsed = JSON.parse(rendered);
     assertCondition(parsed?.ok === true, "Expected output report file with ok=true");
     assertCondition(parsed?.report?.summary?.aliasConflicts >= 1, "Expected output report alias conflicts");
+    assertCondition(
+      parsed?.preview?.reportSignature === firstReport.reportSignature,
+      "Expected output preview reportSignature to match generated report"
+    );
+    assertCondition(
+      parsed?.preview?.summaryByAxisCount === firstReport.summaryByAxis.length,
+      "Expected output preview summaryByAxisCount to match rollups"
+    );
 
     console.log(
       JSON.stringify(
