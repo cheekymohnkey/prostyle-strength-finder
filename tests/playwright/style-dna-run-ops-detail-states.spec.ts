@@ -1,30 +1,25 @@
 import { expect, test } from "@playwright/test";
-
-async function openRunOpsForInfluence(page: Parameters<typeof test>[0]["page"], influenceId: string) {
-  await page.goto("/admin/style-dna");
-  await expect(page.getByRole("heading", { name: "Style DNA Studio" })).toBeVisible();
-  await expect(page.getByText("Run Operations Log")).toBeVisible();
-
-  const influenceSelect = page.locator("label:has-text('Style Influence (Target SREF)') select");
-  await expect(influenceSelect).toBeVisible();
-  await influenceSelect.selectOption(influenceId);
-}
+import {
+  closeRunDetailModalWithButton,
+  getRefreshRunsButton,
+  openRunDetailModal,
+  openRunOpsForInfluence,
+  runRowByText,
+  selectInfluence,
+  selectStatus,
+} from "./support/run-ops-helpers";
 
 test.describe("Style DNA Studio run operations - detail states", () => {
   test("preserves selected run when refreshing run list", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
-    const statusFilter = page.getByTestId("run-status-filter");
-    await statusFilter.selectOption("failed");
-    await expect(statusFilter).toHaveValue("failed");
+    await selectStatus(page, "failed");
 
-    const selectedRow = page.locator('[data-testid="run-row"]', {
-      hasText: "Seeded failed run without test grid reference.",
-    });
+    const selectedRow = runRowByText(page, "Seeded failed run without test grid reference.");
     await selectedRow.click();
     await expect(selectedRow).toHaveAttribute("data-selected", "true");
 
-    const refreshRuns = page.getByRole("button", { name: "Refresh runs" });
+    const refreshRuns = getRefreshRunsButton(page);
     await refreshRuns.click();
 
     await expect(selectedRow).toHaveAttribute("data-selected", "true");
@@ -34,23 +29,16 @@ test.describe("Style DNA Studio run operations - detail states", () => {
   test("shows failed-run diagnostics in selected details and modal", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
-    const statusFilter = page.getByTestId("run-status-filter");
-    await statusFilter.selectOption("failed");
-    await expect(statusFilter).toHaveValue("failed");
+    await selectStatus(page, "failed");
 
-    const diagnosticsFailedRow = page.locator('[data-testid="run-row"]', {
-      hasText: "Seeded failed run for diagnostics assertions.",
-    });
+    const diagnosticsFailedRow = runRowByText(page, "Seeded failed run for diagnostics assertions.");
     await diagnosticsFailedRow.click();
     await expect(diagnosticsFailedRow).toHaveAttribute("data-selected", "true");
 
     await expect(page.getByTestId("selected-run-details")).toBeVisible();
     await expect(page.getByText("Run failed before result payload was persisted.")).toBeVisible();
 
-    const viewDetails = page.getByTestId("view-run-details");
-    await expect(viewDetails).toBeVisible();
-    await viewDetails.click();
-
+    await openRunDetailModal(page);
     const modal = page.getByTestId("run-detail-modal");
     await expect(modal).toBeVisible();
     await expect(modal.getByText("Run Detail")).toBeVisible();
@@ -58,16 +46,13 @@ test.describe("Style DNA Studio run operations - detail states", () => {
     await expect(modal.getByText("PLAYWRIGHT_SIMULATED_FAILURE")).toBeVisible();
     await expect(modal.getByText("Seeded failed run for diagnostics assertions.")).toBeVisible();
 
-    await page.getByRole("button", { name: "Close" }).click();
-    await expect(modal).toHaveCount(0);
+    await closeRunDetailModalWithButton(page);
   });
 
   test("shows successful-run canonical traits and empty influence state", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
-    const statusFilter = page.getByTestId("run-status-filter");
-    await statusFilter.selectOption("succeeded");
-    await expect(statusFilter).toHaveValue("succeeded");
+    await selectStatus(page, "succeeded");
 
     const firstSucceededRow = page.getByTestId("run-row").first();
     await firstSucceededRow.click();
@@ -79,10 +64,7 @@ test.describe("Style DNA Studio run operations - detail states", () => {
     await expect(selectedDetails.getByText("DNA Tags:")).toBeVisible();
     await expect(selectedDetails.getByText("Delta Strength:")).toBeVisible();
 
-    const viewDetails = page.getByTestId("view-run-details");
-    await expect(viewDetails).toBeVisible();
-    await viewDetails.click();
-
+    await openRunDetailModal(page);
     const modal = page.getByTestId("run-detail-modal");
     await expect(modal).toBeVisible();
 
@@ -92,11 +74,9 @@ test.describe("Style DNA Studio run operations - detail states", () => {
     await expect(modalCanonicalTraits.getByText("DNA Tags:")).toBeVisible();
     await expect(modalCanonicalTraits.getByText("Delta Strength:")).toBeVisible();
 
-    await page.getByRole("button", { name: "Close" }).click();
-    await expect(modal).toHaveCount(0);
+    await closeRunDetailModalWithButton(page);
 
-    const influenceSelect = page.locator("label:has-text('Style Influence (Target SREF)') select");
-    await influenceSelect.selectOption("si_playwright_empty");
+    await selectInfluence(page, "si_playwright_empty");
 
     await expect(page.getByText("No runs found for this influence.")).toBeVisible();
     await expect(page.getByTestId("run-row")).toHaveCount(0);
@@ -106,19 +86,12 @@ test.describe("Style DNA Studio run operations - detail states", () => {
   test("closes run-detail modal when clicking overlay", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
-    const statusFilter = page.getByTestId("run-status-filter");
-    await statusFilter.selectOption("failed");
-    await expect(statusFilter).toHaveValue("failed");
+    await selectStatus(page, "failed");
 
-    const diagnosticsFailedRow = page.locator('[data-testid="run-row"]', {
-      hasText: "Seeded failed run for diagnostics assertions.",
-    });
+    const diagnosticsFailedRow = runRowByText(page, "Seeded failed run for diagnostics assertions.");
     await diagnosticsFailedRow.click();
 
-    const viewDetails = page.getByTestId("view-run-details");
-    await expect(viewDetails).toBeVisible();
-    await viewDetails.click();
-
+    await openRunDetailModal(page);
     const modal = page.getByTestId("run-detail-modal");
     await expect(modal).toBeVisible();
 

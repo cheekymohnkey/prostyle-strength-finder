@@ -1,34 +1,31 @@
 import { expect, test } from "@playwright/test";
-
-async function openRunOpsForInfluence(page: Parameters<typeof test>[0]["page"], influenceId: string) {
-  await page.goto("/admin/style-dna");
-  await expect(page.getByRole("heading", { name: "Style DNA Studio" })).toBeVisible();
-  await expect(page.getByText("Run Operations Log")).toBeVisible();
-
-  const influenceSelect = page.locator("label:has-text('Style Influence (Target SREF)') select");
-  await expect(influenceSelect).toBeVisible();
-  await influenceSelect.selectOption(influenceId);
-}
+import {
+  getLimitSelect,
+  getPageIndicator,
+  getRunRows,
+  getStatusFilter,
+  openRunOpsForInfluence,
+  selectStatus,
+} from "./support/run-ops-helpers";
 
 test.describe("Style DNA Studio run operations - filter and paging", () => {
   test("supports status transitions and paging controls", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
-    const statusFilter = page.getByTestId("run-status-filter");
-    const limitSelect = page.getByTestId("run-limit-select");
+    const statusFilter = getStatusFilter(page);
+    const limitSelect = getLimitSelect(page);
     await expect(statusFilter).toBeVisible();
     await expect(limitSelect).toBeVisible();
 
     await limitSelect.selectOption("20");
     await expect(limitSelect).toHaveValue("20");
 
-    await statusFilter.selectOption("all");
-    await expect(statusFilter).toHaveValue("all");
+    await selectStatus(page, "all");
 
-    const runRows = page.getByTestId("run-row");
+    const runRows = getRunRows(page);
     await expect(runRows).toHaveCount(10);
 
-    const pageIndicator = page.getByTestId("run-page-indicator");
+    const pageIndicator = getPageIndicator(page);
     await expect(pageIndicator).toHaveText(/^1\/\d+$/);
 
     await page.getByRole("button", { name: "Next", exact: true }).click();
@@ -40,56 +37,49 @@ test.describe("Style DNA Studio run operations - filter and paging", () => {
     await page.getByRole("button", { name: "Prev", exact: true }).click();
     await expect(pageIndicator).toHaveText(/^1\/\d+$/);
 
-    await statusFilter.selectOption("failed");
-    await expect(statusFilter).toHaveValue("failed");
+    await selectStatus(page, "failed");
     await expect.poll(async () => runRows.count()).toBeGreaterThanOrEqual(2);
 
-    await statusFilter.selectOption("all");
-    await expect(statusFilter).toHaveValue("all");
+    await selectStatus(page, "all");
     await expect(pageIndicator).toHaveText(/^1\/\d+$/);
   });
 
   test("supports queued and in-progress filters and resets paging on filter change", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
-    const statusFilter = page.getByTestId("run-status-filter");
+    const statusFilter = getStatusFilter(page);
     await expect(statusFilter).toBeVisible();
 
-    const runRows = page.getByTestId("run-row");
-    const pageIndicator = page.getByTestId("run-page-indicator");
+    const runRows = getRunRows(page);
+    const pageIndicator = getPageIndicator(page);
 
-    await statusFilter.selectOption("all");
-    await expect(statusFilter).toHaveValue("all");
+    await selectStatus(page, "all");
     await expect(runRows).toHaveCount(10);
 
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await expect(pageIndicator).toHaveText(/^2\/\d+$/);
 
-    await statusFilter.selectOption("queued");
-    await expect(statusFilter).toHaveValue("queued");
+    await selectStatus(page, "queued");
     await expect.poll(async () => runRows.count()).toBe(1);
     await expect(pageIndicator).toHaveText(/^1\/1$/);
 
-    await statusFilter.selectOption("in_progress");
-    await expect(statusFilter).toHaveValue("in_progress");
+    await selectStatus(page, "in_progress");
     await expect.poll(async () => runRows.count()).toBe(1);
     await expect(pageIndicator).toHaveText(/^1\/1$/);
 
-    await statusFilter.selectOption("all");
-    await expect(statusFilter).toHaveValue("all");
+    await selectStatus(page, "all");
     await expect(pageIndicator).toHaveText(/^1\/\d+$/);
   });
 
   test("resets paging when fetch limit changes", async ({ page }) => {
     await openRunOpsForInfluence(page, "si_playwright_seed");
 
-    const statusFilter = page.getByTestId("run-status-filter");
-    const limitSelect = page.getByTestId("run-limit-select");
-    const runRows = page.getByTestId("run-row");
-    const pageIndicator = page.getByTestId("run-page-indicator");
+    const statusFilter = getStatusFilter(page);
+    const limitSelect = getLimitSelect(page);
+    const runRows = getRunRows(page);
+    const pageIndicator = getPageIndicator(page);
 
-    await statusFilter.selectOption("all");
-    await expect(statusFilter).toHaveValue("all");
+    await selectStatus(page, "all");
 
     await limitSelect.selectOption("20");
     await expect(limitSelect).toHaveValue("20");
