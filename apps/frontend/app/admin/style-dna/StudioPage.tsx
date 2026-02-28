@@ -40,6 +40,10 @@ function formatActionRequiredCopy(message: string): string {
     return `Action required: ${normalized}.`;
 }
 
+function normalizeAspectRatioValue(input: unknown): string {
+    return String(input || "").trim().replace(/\s+/g, "");
+}
+
 export default function StudioPage() {
   const queryClient = useQueryClient();
   const { 
@@ -66,12 +70,18 @@ export default function StudioPage() {
   // Auto-select the first Baseline Set if none is active
   useEffect(() => {
     if (!activeBaselineSetId && baselineSetListQuery.data?.baselineSets?.length) {
-      // Prefer v7 standard if available, otherwise just the first one
-      const preferred = baselineSetListQuery.data.baselineSets.find(s => 
-        s.mjModelFamily === 'standard' && s.mjModelVersion === '7' && Number(s.parameterEnvelope?.stylizeTier) === 100
-      );
+            // Prefer v7 standard s100 with 16:9 if available, then any v7 standard s100, then first set.
+            const preferred169 = baselineSetListQuery.data.baselineSets.find(s => 
+                s.mjModelFamily === 'standard' &&
+                s.mjModelVersion === '7' &&
+                Number(s.parameterEnvelope?.stylizeTier) === 100 &&
+                normalizeAspectRatioValue((s as any)?.parameterEnvelope?.aspectRatio) === '16:9'
+            );
+            const preferred = baselineSetListQuery.data.baselineSets.find(s => 
+                s.mjModelFamily === 'standard' && s.mjModelVersion === '7' && Number(s.parameterEnvelope?.stylizeTier) === 100
+            );
       const fallback = baselineSetListQuery.data.baselineSets[0];
-      setActiveBaselineSetId((preferred || fallback).baselineRenderSetId);
+            setActiveBaselineSetId((preferred169 || preferred || fallback).baselineRenderSetId);
     }
   }, [activeBaselineSetId, baselineSetListQuery.data, setActiveBaselineSetId]);
 
@@ -401,6 +411,14 @@ export default function StudioPage() {
     const currentSet = baselineSetListQuery.data.baselineSets.find(s => s.baselineRenderSetId === activeBaselineSetId);
     const preferredFamily = currentSet?.mjModelFamily || 'standard';
     const preferredVersion = currentSet?.mjModelVersion || '7';
+    const preferredAspectRatio = normalizeAspectRatioValue((currentSet as any)?.parameterEnvelope?.aspectRatio) || '16:9';
+
+    const matchingSetSameAr = baselineSetListQuery.data.baselineSets.find(s => 
+        s.mjModelFamily === preferredFamily &&
+        s.mjModelVersion === preferredVersion &&
+        Number(s.parameterEnvelope?.stylizeTier) === targetTier &&
+        normalizeAspectRatioValue((s as any)?.parameterEnvelope?.aspectRatio) === preferredAspectRatio
+    );
 
     const matchingSet = baselineSetListQuery.data.baselineSets.find(s => 
         s.mjModelFamily === preferredFamily && 
@@ -408,9 +426,11 @@ export default function StudioPage() {
         Number(s.parameterEnvelope?.stylizeTier) === targetTier
     );
 
-    if (matchingSet && matchingSet.baselineRenderSetId !== activeBaselineSetId) {
+    const chosenSet = matchingSetSameAr || matchingSet;
+
+    if (chosenSet && chosenSet.baselineRenderSetId !== activeBaselineSetId) {
         // console.log(`Auto-switching baseline context to match tier s${targetTier}`);
-        setActiveBaselineSetId(matchingSet.baselineRenderSetId);
+        setActiveBaselineSetId(chosenSet.baselineRenderSetId);
     }
   }, [activeTestCell, baselineSetListQuery.data, activeBaselineSetId, setActiveBaselineSetId]);
 
@@ -907,7 +927,7 @@ export default function StudioPage() {
                 <option value="">-- Select Baseline Set --</option>
                 {(baselineSetListQuery.data?.baselineSets || []).map(set => (
                     <option key={set.baselineRenderSetId} value={set.baselineRenderSetId}>
-                         {set.parameterEnvelope?.stylizeTier !== undefined ? `Stylize ${set.parameterEnvelope.stylizeTier}` : 'N/A'} • {set.mjModelFamily} v{set.mjModelVersion}
+                         {set.parameterEnvelope?.stylizeTier !== undefined ? `Stylize ${set.parameterEnvelope.stylizeTier}` : 'N/A'} • {set.mjModelFamily} v{set.mjModelVersion} • AR {normalizeAspectRatioValue((set as any)?.parameterEnvelope?.aspectRatio) || 'unspecified'}
                     </option>
                 ))}
             </select>

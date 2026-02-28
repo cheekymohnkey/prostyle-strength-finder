@@ -100,6 +100,22 @@ Strict-mode rollout checklist:
 4. Confirm strict-policy rejection path still returns `400 INVALID_REQUEST` for missing receipt.
 5. Confirm handover evidence block includes digest + provenance tuple fields.
 
+## Style-DNA Baseline AR Audit (Prod)
+
+Use this read-only audit before or after deploy when prompt AR behavior appears inconsistent.
+
+Command:
+1. `set -a && source .env.prod && set +a && npm run style-dna:baseline-ar-audit -- --modelFamily standard --modelVersion 7 --expectedAr 16:9 --expectedTiers 0,100,1000 --failOnMismatch true`
+
+Output interpretation:
+1. `ok=true` means all expected tiers exist with expected AR.
+2. `checks.missingExpectedTiers` lists stylize tiers with no baseline set for the selected model/version.
+3. `checks.mismatchedExpectedTiers` lists tiers where expected AR is absent.
+4. `checks.mixedAspectRatiosAtExpectedTiers` flags data hygiene drift (multiple AR values at same model/version/stylize tier).
+
+Operational note:
+1. If mixed AR sets exist, Studio may still be operator-confusing even with AR preference logic; clean up or deprecate stale baseline sets to restore deterministic selection behavior.
+
 ## Notes
 
 1. In restricted/sandboxed environments, localhost bind/listen permissions may block smoke runs.
