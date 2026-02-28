@@ -1,7 +1,7 @@
 # Prostyle Strength Finder - Epic F: Style DNA UX Redesign
 
-Status: Planned  
-Date: 2026-02-27  
+Status: Implemented (Core) / Polish Backlog Open  
+Date: 2026-03-01  
 Depends on:
 - `design-documenatation/implementation/STYLE_DNA_UX_REDESIGN_PROPOSAL.md` (Source of Truth)
 - `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
@@ -38,34 +38,34 @@ Replace the 3-section vertical layout with a Master-Detail Console layout featur
 
 ### F1: State Management & Studio Layout Skeleton
 **Objective:** Establish the new layout structure and centralize the "Global Context" state.
-- [ ] Create `StyleStudioStore` (or `useStyleStudioState` hook) to manage:
+- [x] Create `StyleStudioStore` (or `useStyleStudioState` hook) to manage:
     - User selection: `activeModel`, `activeStylizeTier`, `activePromptKey`, `activeStyleInfluenceId`.
     - Derived data: `activeBaselineSetId` (found from model/stylize), `activePromptDefinition`.
-- [ ] Implement `StudioLayout` component structure:
+- [x] Implement `StudioLayout` component structure:
     - `GlobalToolbar` (Top): Selectors for Model Family and Stylize Tier. Show "Baseline Set Status".
     - `MainContainer`: Flex/Grid layout for Sidebar + content.
-- [ ] Refactor `admin/style-dna/page.tsx` to use this new skeleton (temporarily rendering placeholders for inner sections).
-- [ ] verification: Page loads with new header. Changing "Stylize Tier" updates the global state.
+- [x] Refactor `admin/style-dna/page.tsx` to use this new skeleton (temporarily rendering placeholders for inner sections).
+- [x] verification: Page loads with new header. Changing "Stylize Tier" updates the global state.
 
 ### F2: Prompt Playlist & Navigation
 **Objective:** Implement the sidebar navigation that drives the workflow.
-- [ ] Create `PromptPlaylist` component:
+- [x] Create `PromptPlaylist` component:
     - List all prompts from the standard suite.
     - Highlight the `activePromptKey`.
-- [ ] Integrate status indicators per prompt (requires querying baseline coverage and run status for the active Style Influence).
+- [x] Integrate status indicators per prompt (requires querying baseline coverage and run status for the active Style Influence).
     - 🔴 No Baseline
     - 🟡 Ready to Run (Baseline present, Test missing)
     - 🟢 Analyzed (Run complete)
-- [ ] Verification: Clicking a prompt in the list updates the `activePromptKey` in the global store. Status dots reflect mock/real state.
+- [x] Verification: Clicking a prompt in the list updates the `activePromptKey` in the global store. Status dots reflect mock/real state.
 
 ### F3: Smart Drop Zones & Comparison Studio
 **Objective:** Implement the core two-column workspace with friction-free file handling.
-- [ ] Create `SmartDropZone` component:
+- [x] Create `SmartDropZone` component:
     - Props: `label`, `isEmpty`, `onFileSelect`, `onPaste`, `isUploading`.
     - Visuals: Large target area when empty, thumbnail preview when filled.
     - Interaction: Handle drag-enter/leave/drop.
     - Clipboard: Handle click-to-focus + paste event (or dedicated "Paste" button).
-- [ ] Implement `ComparisonStudio` component (The Main View):
+- [x] Implement `ComparisonStudio` component (The Main View):
     - **Left Column (Baseline):**
         - Connects to `SmartDropZone`.
         - Logic: On drop, `uploadBaselineImage` -> `attachBaselineItem` automatically.
@@ -74,24 +74,24 @@ Replace the 3-section vertical layout with a Master-Detail Console layout featur
         - Connects to `SmartDropZone`.
         - Logic: On drop, `uploadTestImage` -> `createStyleDnaRun` (or queue for submit) automatically.
         - Displays test grid if run exists.
-- [ ] Verification: Can drag-drop images into both slots. Console logs successful upload/attach chains.
+- [x] Verification: Can drag-drop images into both slots. Console logs successful upload/attach chains.
 
 ### F4: Style Influence Controls & Prompt Copy
 **Objective:** Complete the "Target" column workflow.
-- [ ] Implement `StyleInfluenceSelector` in the Right Column header.
+- [x] Implement `StyleInfluenceSelector` in the Right Column header.
     - Dropdown to switch `activeStyleInfluenceId`.
     - "New Influence" button triggering a simple modal/popover (Midjourney ID + Type).
-- [ ] Implement `CopyPromptButton`:
+- [x] Implement `CopyPromptButton`:
     - Logic: Construct the CLI prompt string: `/imagine prompt: <prompt_text> --sref <code_or_url> --sw <stylize_tier> ...` based on active context.
     - Behavior: Copies to clipboard, shows ephemeral "Copied!" toast.
-- [ ] Verification: "Copy Prompt" puts valid CLI command in clipboard. Creating a new influence immediately selects it.
+- [x] Verification: "Copy Prompt" puts valid CLI command in clipboard. Creating a new influence immediately selects it.
 
 ### F5: Integration & Smoke Verification
 **Objective:** Polish the assembly and verify the full workflow against real APIs.
-- [ ] Connect all components in `page.tsx`.
-- [ ] Ensure "Smart Drop" actions correctly invalidate/refetch React Query data (so list statuses update instantly).
-- [ ] Add error handling (toasts/alerts) for upload failures.
-- [ ] Run manual acceptance test:
+- [x] Connect all components in `page.tsx`.
+- [x] Ensure "Smart Drop" actions correctly invalidate/refetch React Query data (so list statuses update instantly).
+- [x] Add error handling (toasts/alerts) for upload failures.
+- [x] Run manual acceptance test:
     1. Select v6/Stylize 100.
     2. Select Prompt 1.
     3. Drop Baseline -> Auto-saves.
@@ -99,7 +99,20 @@ Replace the 3-section vertical layout with a Master-Detail Console layout featur
     5. Copy Prompt.
     6. Drop Test Grid -> Run launches.
     7. Verify status updates in Playlist.
-- [ ] Create/Update smoke test script if possible (UI interactions are hard to script in CLI, so focus on manual verification plan or unit tests for the store logic).
+- [x] Create/Update smoke test script if possible (UI interactions are hard to script in CLI, so focus on manual verification plan or unit tests for the store logic).
+
+## Remaining UX Polish Backlog (Post-Epic)
+
+These are minor refinements only and do not block launch readiness:
+
+1. Standardize spacing/visual rhythm across Studio cards so baseline/test/run-operation panels align consistently at common desktop widths.
+2. Normalize warning/blocked-state panel copy so all actionable prerequisites use the same short sentence pattern.
+3. Tighten run-detail modal readability for long error payloads (line-wrap + truncation behavior consistency).
+4. Validate keyboard focus order and focus-return behavior across Prompt Playlist, New Influence modal, and run-detail modal.
+5. Expand Playwright run-ops edge coverage for retry disable-reason visibility and filter/limit/paging edge interactions.
+
+Execution note:
+1. Treat these as separate polish tickets under post-SDNA-37 prioritization; do not reopen Studio architecture redesign scope.
 
 ## Definition of Done
 

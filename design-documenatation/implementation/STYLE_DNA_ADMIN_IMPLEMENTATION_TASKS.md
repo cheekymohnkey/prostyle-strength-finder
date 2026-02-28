@@ -20,9 +20,13 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 Current next task:
 1. Post-SDNA-37 prioritization (next SDNA ticket TBD by roadmap owner).
 
+If Style-DNA Studio UX polish is selected next:
+1. Use `design-documenatation/implementation/EPIC_F_STYLE_DNA_UX_REDESIGN.md` as the execution list for remaining minor UX polish only.
+2. Keep scope to the documented polish backlog; do not reopen Studio architecture redesign.
+
 Quick start:
 1. Use SDNA-36 post-fix green evidence refresh as the baseline state.
-2. Continue DISC-003 hardening in surgical slices (no workflow architecture redesign).
+2. Continue DISC-003 hardening in surgical slices when selected by roadmap owner (no workflow architecture redesign).
 3. End each slice with handoff summary + verification outcomes.
 
 SDNA-37 progress snapshot:
