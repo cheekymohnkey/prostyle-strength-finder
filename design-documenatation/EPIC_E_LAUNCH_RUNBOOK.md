@@ -44,6 +44,12 @@ Pass:
 - error-rate visibility check passes (or reports `insufficient_sample` warning, not failure)
 3. Critical frontend flow smoke passes:
 - `npm run frontend:critical-flow-smoke` returns `ok: true`
+4. Style-DNA run-flow contract evidence passes:
+- `set -a && source .env.local && set +a && npm run style-dna:run-smoke`
+- `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke`
+- `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
+- `npm run contracts`
+- run-smoke output preserves SDNA-11 invariants (audit submit/list/get, invalid status-filter contract, queue-unavailable contract, idempotency/lifecycle observability).
 
 Fail:
 1. Any smoke command exits non-zero.
@@ -62,6 +68,11 @@ Fail:
 5. E4 additions:
 - frontend critical-flow smoke
 - operational checks
+6. Style-DNA run-flow hardening evidence checks:
+- run submit/list/get audit invariant assertions
+- invalid run-list status filter contract assertions
+- queue-unavailable submit contract assertions
+- idempotency + lifecycle observability assertions
 
 ## Notes
 

@@ -7,7 +7,7 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 ## NEXT SESSION START HERE (as of 2026-02-28)
 
 Current next implementation task:
-1. `SDNA-04` Prompt Generation Service + Endpoints.
+1. `SDNA-13` Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
 
 Primary pointers:
 1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
@@ -27,21 +27,21 @@ Use these docs as source of truth:
 - design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md
 
 Task objective:
-Implement SDNA-04 Prompt Generation Service + Endpoints.
+Implement SDNA-13 Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
 
 Scope:
-1) Finalize prompt-job create/get endpoints with admin RBAC + immutable audit.
-2) Ensure deterministic prompt generation output and ordering.
-3) Enforce eligibility checks (influence readiness + baseline coverage/context checks).
-4) Preserve/verify idempotency behavior and explicit validation errors.
+1) Add focused replay-safety verification for taxonomy seed apply/reapply behavior.
+2) Ensure deterministic conflict/reactivation surfaces across repeated seed runs.
+3) Preserve existing Style-DNA launch/readiness gate behavior with explicit evidence.
+4) Keep changes surgical to taxonomy seeding/replay-safety surfaces only.
 
 Out of scope:
-1) Worker execution path changes.
-2) Frontend redesign.
+1) Worker inference redesign.
+2) Frontend redesign/new UI.
 3) Non-Style-DNA surfaces.
 
 Definition of done:
-1) SDNA-04 endpoint/service acceptance criteria are implemented.
+1) SDNA-13 replay-safety acceptance criteria are implemented.
 2) Relevant smokes/checks are listed and passing (or explicitly marked not run with reason).
 3) Task end includes handoff summary with files changed + risks + next task.
 ```

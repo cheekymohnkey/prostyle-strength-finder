@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-12` Verification Runbook + Launch-Gate Sync.
+1. `SDNA-13` Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
 
 Quick start:
-1. Jump to section: `Next Task (SDNA-12 / Verification Runbook + Launch-Gate Sync)`.
-2. Implement only SDNA-12 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-13`.
+2. Implement only SDNA-13 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -608,6 +608,34 @@ Definition of done:
 
 ## Next Task (SDNA-12 / Verification Runbook + Launch-Gate Sync)
 
+Status: Completed 2026-02-28.
+
+Completed:
+1. Aligned Style-DNA verification runbook wording to explicitly include SDNA-11 run-flow contract expectations (audit invariants, invalid-status filter contract, queue-unavailable behavior).
+2. Aligned launch checklist/runbook references so evidence capture includes deterministic pass/fail expectations for Style-DNA run-flow hardening.
+3. Updated session pointers/handover references to close SDNA-12 and point to the next implementation slice.
+
+Files changed:
+1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+2. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+3. `design-documenatation/LAUNCH_CHECKLIST.md`
+4. `design-documenatation/EPIC_E_LAUNCH_RUNBOOK.md`
+5. `design-documenatation/LLM_WORKFLOW.md`
+
+Verification:
+1. `set -a && source .env.local && set +a && npm run style-dna:run-smoke` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+4. `npm run contracts` (pass).
+
+Risks / notes:
+1. Evidence expectations now explicitly mention immutable audit count growth risk under heavy polling.
+2. Queue-unavailable contract evidence remains smoke-only and must not be mirrored in production configuration.
+
+Next kickoff:
+1. `SDNA-13` Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
+2. Scope: taxonomy replay-safety assertions and deterministic seed/reseed behavior hardening only.
+
 Objective:
 1. Align runbook/checklist/launch-readiness references with SDNA-11 run-flow hardening coverage and command ordering.
 
@@ -639,6 +667,12 @@ Definition of done:
 - `npm run admin:governance-smoke`
 - `npm run admin:role-management-smoke`
 - `npm run recommendation:smoke`
+
+Style-DNA run-flow contract expectations (from SDNA-11):
+1. Run smoke covers immutable audit invariants for `submit`, `list`, `get`.
+2. Run smoke covers invalid list status filter contract (`400 INVALID_REQUEST` with explicit `allowedValues`).
+3. Run smoke covers queue-unavailable submit contract (`503 QUEUE_UNAVAILABLE`) and persisted failed run state.
+4. Run smoke preserves idempotency/lifecycle evidence (`queued` -> terminal, one row per idempotency key).
 
 Expected:
 1. All style-dna smokes return `ok: true`.

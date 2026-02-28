@@ -6,16 +6,50 @@ Added run visibility and retry affordances to the Style DNA Studio so operators 
 ## NEXT SESSION START HERE
 
 Next task:
-1. `SDNA-12` Verification Runbook + Launch-Gate Sync (Style-DNA run-flow hardening closeout).
+1. `SDNA-13` Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
 
 Use this as kickoff in a new chat:
-1. Objective: align runbook/checklist and launch-gate references to include the now-hardened run-flow contract checks and evidence fields.
-2. Scope: docs + verification command contract alignment only; no backend/worker/UI behavior changes.
-3. Out of scope: worker inference redesign, frontend redesign, prompt-job redesign, non-Style-DNA work.
-4. DoD: runbook/task pointers reflect SDNA-11 hardening outcomes and verification command order.
+1. Objective: complete taxonomy seeding replay-safety hardening and deterministic reseed behavior checks under `DISC-002`.
+2. Scope: taxonomy seed/reseed behavior + replay-safety tests and docs evidence only.
+3. Out of scope: worker inference redesign, frontend redesign/new UI, non-Style-DNA work.
+4. DoD: replay-safety contract checks are explicit, deterministic, and captured in handoff evidence.
 
 Canonical task detail location:
-1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Next Task (SDNA-12 / Verification Runbook + Launch-Gate Sync)`).
+1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
+
+## Addendum - 2026-02-28 (SDNA-12 Verification Runbook + Launch-Gate Sync Complete)
+
+### Status
+1. Completed.
+
+### Completed in this slice
+1. Aligned Style-DNA runbook/checklist wording to explicitly include SDNA-11 run-flow contract expectations.
+2. Added explicit launch-readiness evidence expectations for:
+- audit invariants (`submit`, `list`, `get`),
+- invalid run-list status-filter contract,
+- queue-unavailable submit contract,
+- idempotency + lifecycle observability invariants.
+3. Updated handover/workflow pointers to move kickoff from SDNA-12 to SDNA-13.
+
+### Files changed
+1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+2. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+3. `design-documenatation/LAUNCH_CHECKLIST.md`
+4. `design-documenatation/EPIC_E_LAUNCH_RUNBOOK.md`
+5. `design-documenatation/LLM_WORKFLOW.md`
+
+### Verification evidence
+1. `set -a && source .env.local && set +a && npm run style-dna:run-smoke` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke` (pass).
+4. `npm run contracts` (pass).
+
+### Risks / follow-up notes
+1. Immutable audit writes in run list/get continue to accumulate volume under high-frequency polling.
+2. Queue-unavailable contract evidence is smoke-only and should not be replicated as production config behavior.
+
+### Recommended next task kickoff
+1. Proceed with `SDNA-13` Taxonomy Seeding + Replay-Safety Tests (`DISC-002` completion).
 
 ## Addendum - 2026-02-28 (SDNA-11 Run-Flow Integration Hardening Complete)
 

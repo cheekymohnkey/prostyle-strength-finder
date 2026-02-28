@@ -29,6 +29,12 @@ Run in order:
 1. `npm run launch:readiness-smoke`
 2. `npm run ops:checks`
 
+Style-DNA run-flow contract evidence (SDNA-11/SDNA-12 sync):
+1. `set -a && source .env.local && set +a && npm run style-dna:run-smoke`
+2. `set -a && source .env.local && set +a && npm run style-dna:prompt-generation-smoke`
+3. `set -a && source .env.local && set +a && npm run admin:frontend-proxy-smoke`
+4. `npm run contracts`
+
 ## Pass Criteria
 
 All must be true:
@@ -36,6 +42,11 @@ All must be true:
 2. Launch readiness smoke returns `failedStep: null`.
 3. Operational checks return `ok: true`.
 4. No command exits non-zero.
+5. Style-DNA run smoke evidence includes explicit run-flow contract checks:
+- immutable audit invariants for `submit`, `list`, `get`,
+- invalid status filter contract (`400 INVALID_REQUEST` + `allowedValues`),
+- queue-unavailable submit contract (`503 QUEUE_UNAVAILABLE` + failed run persisted),
+- idempotency/lifecycle observability invariants.
 
 ## Fail Criteria
 
