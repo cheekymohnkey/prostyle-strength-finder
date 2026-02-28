@@ -1370,6 +1370,7 @@ export default function StudioPage() {
                                             onChange={(event) => setRunStatusFilter(event.target.value)}
                                             className="rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700"
                                             title="Filter runs by status"
+                                            data-testid="run-status-filter"
                                         >
                                             <option value="all">All statuses</option>
                                             <option value="queued">Queued</option>
@@ -1382,6 +1383,7 @@ export default function StudioPage() {
                                             onChange={(event) => setRunFetchLimit(Number(event.target.value) || 50)}
                                             className="rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-700"
                                             title="Number of recent runs to fetch"
+                                            data-testid="run-limit-select"
                                         >
                                             <option value="20">Limit 20</option>
                                             <option value="50">Limit 50</option>
@@ -1413,7 +1415,7 @@ export default function StudioPage() {
                                 {activeStyleInfluenceId && runsQuery.data && (
                                     <div className="space-y-2">
                                         {selectedRunId && (
-                                            <div className="rounded border border-blue-100 bg-blue-50/30 px-3 py-2 text-xs text-gray-800">
+                                            <div className="rounded border border-blue-100 bg-blue-50/30 px-3 py-2 text-xs text-gray-800" data-testid="selected-run-details">
                                                 <div className="mb-2 flex items-center justify-between gap-3">
                                                     <span className="font-semibold text-gray-900">Selected Run Details</span>
                                                     <div className="flex items-center gap-2">
@@ -1421,6 +1423,7 @@ export default function StudioPage() {
                                                             onClick={() => setIsRunDetailModalOpen(true)}
                                                             disabled={!selectedRunDetailData}
                                                             className="rounded-md border border-blue-100 bg-white px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            data-testid="view-run-details"
                                                         >
                                                             View details
                                                         </button>
@@ -1498,6 +1501,8 @@ export default function StudioPage() {
                                                     const runId = String(run.styleDnaRunId || "").trim();
                                                     if (runId) setSelectedRunId(runId);
                                                 }}
+                                                data-testid="run-row"
+                                                data-selected={selectedRunId === String(run.styleDnaRunId || "").trim() ? "true" : "false"}
                                                 className={`flex cursor-pointer items-start justify-between gap-3 rounded border px-3 py-2 text-xs text-gray-800 shadow-[0_1px_0_rgba(0,0,0,0.03)] ${selectedRunId === String(run.styleDnaRunId || "").trim() ? "border-blue-200 bg-blue-50/40" : "border-gray-100 bg-white hover:bg-gray-50"}`}
                                             >
                                                 <div className="flex flex-col gap-1">
@@ -1553,6 +1558,7 @@ export default function StudioPage() {
                                                         Prev
                                                     </button>
                                                     <span>Page {runPage} / {totalRunPages}</span>
+                                                    <span data-testid="run-page-indicator" className="hidden">{runPage}/{totalRunPages}</span>
                                                     <button
                                                         onClick={() => setRunPage((prev) => Math.min(totalRunPages, prev + 1))}
                                                         disabled={runPage >= totalRunPages}
@@ -1589,10 +1595,11 @@ export default function StudioPage() {
             }}
         />
         {isRunDetailModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/30" onClick={() => setIsRunDetailModalOpen(false)}>
+            <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-black/30" onClick={() => setIsRunDetailModalOpen(false)} data-testid="run-detail-modal-overlay">
                 <div
                     className="h-full w-full max-w-xl overflow-y-auto border-l border-gray-200 bg-white shadow-xl"
                     onClick={(event) => event.stopPropagation()}
+                    data-testid="run-detail-modal"
                 >
                     <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
                         <div className="flex flex-col">
