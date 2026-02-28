@@ -25,6 +25,11 @@ Quick start:
 2. Continue DISC-003 hardening in surgical slices (no workflow architecture redesign).
 3. End each slice with handoff summary + verification outcomes.
 
+SDNA-37 progress snapshot:
+1. `contentSha256` image digest persistence is implemented and smoke-verified.
+2. Provenance receipt baseline fields are now implemented for Style-DNA image uploads with backward-compatible defaults.
+3. Remaining SDNA-37 work is documentation/runbook evidence-template consistency and any policy tightening decisions.
+
 Do not start with:
 1. Worker inference redesign.
 2. UI redesign work.

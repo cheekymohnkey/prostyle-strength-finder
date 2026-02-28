@@ -1747,7 +1747,8 @@ function insertStyleDnaRunResult(dbPath, input) {
 function getStyleDnaImageById(dbPath, styleDnaImageId) {
   const rows = queryJson(
     dbPath,
-    `SELECT style_dna_image_id, image_kind, storage_key, storage_uri, mime_type, file_name, size_bytes, content_sha256, created_by, created_at
+    `SELECT style_dna_image_id, image_kind, storage_key, storage_uri, mime_type, file_name, size_bytes, content_sha256,
+            provenance_source, provenance_captured_at, provenance_operator_assertion, created_by, created_at
      FROM style_dna_images
      WHERE style_dna_image_id = ${quote(styleDnaImageId)}
      LIMIT 1;`
@@ -1760,7 +1761,8 @@ function insertStyleDnaImage(dbPath, input) {
   exec(
     dbPath,
     `INSERT INTO style_dna_images (
-       style_dna_image_id, image_kind, storage_key, storage_uri, mime_type, file_name, size_bytes, content_sha256, created_by, created_at
+       style_dna_image_id, image_kind, storage_key, storage_uri, mime_type, file_name, size_bytes, content_sha256,
+       provenance_source, provenance_captured_at, provenance_operator_assertion, created_by, created_at
      ) VALUES (
        ${quote(input.styleDnaImageId)},
        ${quote(input.imageKind)},
@@ -1770,6 +1772,9 @@ function insertStyleDnaImage(dbPath, input) {
        ${quote(input.fileName)},
        ${Number(input.sizeBytes)},
        ${quote(input.contentSha256 || null)},
+       ${quote(input.provenanceSource || null)},
+       ${quote(input.provenanceCapturedAt || null)},
+       ${quote(input.provenanceOperatorAssertion || null)},
        ${quote(input.createdBy)},
        ${quote(createdAt)}
      );`

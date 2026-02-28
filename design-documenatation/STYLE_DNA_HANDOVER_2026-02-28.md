@@ -12,7 +12,7 @@ Use this as kickoff in a new chat:
 1. Objective: reduce DISC-003 process-trust risk by adding immutable upload-evidence digests/provenance fields for Style-DNA images.
 2. Scope: surgical Style-DNA image upload/persistence/verification hardening and docs updates only.
 3. Out of scope: worker queue architecture redesign, frontend redesign/new UI, non-Style-DNA work.
-4. DoD: image evidence records include deterministic digest fields and verification evidence is captured in handoff.
+4. DoD: image evidence records include deterministic digest + provenance receipt fields and verification evidence is captured in handoff.
 
 Canonical task detail location:
 1. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md` (`Current next task`).
@@ -93,6 +93,47 @@ Canonical task detail location:
 
 ### Recommended next task kickoff
 1. Continue SDNA-37 with provenance receipt contract + handover evidence template updates (surgical docs/API scope).
+
+## Addendum - 2026-03-01 (SDNA-37 DISC-003 Provenance Receipt Baseline Slice)
+
+### Status
+1. In progress (second slice completed).
+
+### Completed in this slice
+1. Added provenance receipt persistence fields to Style-DNA images:
+- `provenance_source`
+- `provenance_captured_at`
+- `provenance_operator_assertion`
+2. Added shared-contract support for optional upload payload `provenanceReceipt` with validation:
+- required when present: `source`, `capturedAtUtc` (valid ISO timestamp)
+- optional: `operatorAssertion`
+3. Added backward-compatible API defaults when receipt is omitted:
+- `provenanceSource = operator_upload_unverified`
+- `provenanceCapturedAtUtc = <server now>`
+- `provenanceOperatorAssertion = null`
+4. Exposed provenance fields in image response payloads and upload metadata.
+5. Extended baseline smoke coverage to assert explicit receipt round-trip and default provenance behavior.
+
+### Files changed
+1. `scripts/db/migrations/20260301134000_style_dna_image_provenance_receipt.sql`
+2. `scripts/db/repository.js`
+3. `packages/shared-contracts/src/style-dna-admin.js`
+4. `apps/api/src/index.js`
+5. `scripts/style-dna/baseline-smoke.js`
+6. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_PLAN.md`
+7. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+
+### Verification command order
+1. `DATABASE_URL=file:./data/prostyle.local.db node scripts/db/migrate.js apply`
+2. `set -a && source .env.local && set +a && npm run style-dna:baseline-smoke`
+3. `npm run contracts`
+
+### Risks / follow-up notes
+1. Provenance receipt is operator-provided metadata and improves accountability, but is not cryptographic proof of external render origin.
+2. Next slice should add explicit evidence template fields in active runbook/tasks docs so handoff records consistently include digest + provenance tuple.
+
+### Recommended next task kickoff
+1. Continue SDNA-37 with evidence template/runbook contract updates and optional stricter receipt-policy enforcement by environment.
 
 ## Addendum - 2026-03-01 (SDNA-35 LLM-Only Trait Inference Cutover Kickoff)
 

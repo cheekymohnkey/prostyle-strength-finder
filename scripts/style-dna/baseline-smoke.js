@@ -206,6 +206,11 @@ async function main() {
           fileName: "baseline-smoke-image.png",
           mimeType: "image/png",
           fileBase64: ONE_PIXEL_PNG_BASE64,
+          provenanceReceipt: {
+            source: "midjourney_manual_export",
+            capturedAtUtc: "2026-03-01T12:05:00Z",
+            operatorAssertion: "grid captured from MJ job console export",
+          },
         }),
       },
       201
@@ -236,6 +241,26 @@ async function main() {
     assertCondition(/^[a-f0-9]{64}$/.test(baselineImageSha), "Expected baseline image contentSha256");
     assertCondition(/^[a-f0-9]{64}$/.test(testImageSha), "Expected test image contentSha256");
     assertCondition(baselineImageSha === testImageSha, "Expected identical digest for identical uploaded image bytes");
+    assertCondition(
+      baselineImage?.image?.provenanceSource === "midjourney_manual_export",
+      "Expected explicit baseline provenanceSource"
+    );
+    assertCondition(
+      baselineImage?.image?.provenanceCapturedAtUtc === "2026-03-01T12:05:00Z",
+      "Expected explicit baseline provenanceCapturedAtUtc"
+    );
+    assertCondition(
+      baselineImage?.image?.provenanceOperatorAssertion === "grid captured from MJ job console export",
+      "Expected explicit baseline provenanceOperatorAssertion"
+    );
+    assertCondition(
+      testImage?.image?.provenanceSource === "operator_upload_unverified",
+      "Expected default test provenanceSource"
+    );
+    assertCondition(
+      Number.isFinite(Date.parse(String(testImage?.image?.provenanceCapturedAtUtc || ""))),
+      "Expected default test provenanceCapturedAtUtc"
+    );
     createdImageIds.push(baselineImageId, testImageId);
 
     suiteId = `suite_style_dna_baseline_smoke_${Date.now()}`;

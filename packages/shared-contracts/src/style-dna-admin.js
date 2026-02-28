@@ -219,11 +219,32 @@ function validateStyleDnaImageUploadPayload(value) {
     throw new Error("mimeType must be image/png, image/jpeg, or image/webp");
   }
   const fileBase64 = assertRequiredString(value.fileBase64, "fileBase64");
+  let provenanceReceipt = null;
+  if (value.provenanceReceipt !== undefined && value.provenanceReceipt !== null) {
+    if (!isObject(value.provenanceReceipt)) {
+      throw new Error("provenanceReceipt must be an object when provided");
+    }
+    const source = assertRequiredString(value.provenanceReceipt.source, "provenanceReceipt.source");
+    const capturedAtUtc = assertRequiredString(value.provenanceReceipt.capturedAtUtc, "provenanceReceipt.capturedAtUtc");
+    if (!Number.isFinite(Date.parse(capturedAtUtc))) {
+      throw new Error("provenanceReceipt.capturedAtUtc must be a valid ISO-8601 timestamp");
+    }
+    const operatorAssertion = typeof value.provenanceReceipt.operatorAssertion === "string"
+      && value.provenanceReceipt.operatorAssertion.trim() !== ""
+      ? value.provenanceReceipt.operatorAssertion.trim()
+      : null;
+    provenanceReceipt = {
+      source,
+      capturedAtUtc,
+      operatorAssertion,
+    };
+  }
   return {
     imageKind,
     fileName,
     mimeType,
     fileBase64,
+    provenanceReceipt,
   };
 }
 

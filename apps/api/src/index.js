@@ -798,6 +798,9 @@ function mapStyleDnaImageRow(row) {
     fileName: row.file_name,
     sizeBytes: Number(row.size_bytes || 0),
     contentSha256: row.content_sha256 || null,
+    provenanceSource: row.provenance_source || null,
+    provenanceCapturedAtUtc: row.provenance_captured_at || null,
+    provenanceOperatorAssertion: row.provenance_operator_assertion || null,
     createdBy: row.created_by,
     createdAt: row.created_at,
   };
@@ -2633,6 +2636,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
       }
       const styleDnaImageId = `sdimg_${crypto.randomUUID()}`;
       const contentSha256 = crypto.createHash("sha256").update(buffer).digest("hex");
+      const provenanceSource = payload.provenanceReceipt?.source || "operator_upload_unverified";
+      const provenanceCapturedAtUtc = payload.provenanceReceipt?.capturedAtUtc || new Date().toISOString();
+      const provenanceOperatorAssertion = payload.provenanceReceipt?.operatorAssertion || null;
       const ext = extensionForMimeType(payload.mimeType);
       const key = `uploads/style-dna/${payload.imageKind}/${styleDnaImageId}.${ext}`;
       const put = await storageAdapter.putObject({
@@ -2643,6 +2649,8 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
           style_dna_image_id: styleDnaImageId,
           image_kind: payload.imageKind,
           content_sha256: contentSha256,
+          provenance_source: provenanceSource,
+          provenance_captured_at: provenanceCapturedAtUtc,
           uploaded_by: authenticatedUserId,
           created_at: new Date().toISOString(),
         },
@@ -2656,6 +2664,9 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
         fileName: payload.fileName,
         sizeBytes: put.sizeBytes,
         contentSha256,
+        provenanceSource,
+        provenanceCapturedAt: provenanceCapturedAtUtc,
+        provenanceOperatorAssertion,
         createdBy: authenticatedUserId,
       });
       sendJson(
