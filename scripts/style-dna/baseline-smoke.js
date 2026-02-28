@@ -73,6 +73,15 @@ async function requestJson(url, options, expectedStatus) {
   return json;
 }
 
+async function requestJsonAllowStatus(url, options) {
+  const response = await fetch(url, options);
+  const json = await response.json().catch(() => ({}));
+  return {
+    status: response.status,
+    json,
+  };
+}
+
 function seedAdmin(dbPath) {
   const now = new Date().toISOString();
   runSql(
@@ -170,6 +179,7 @@ async function main() {
   seedAdmin(dbPath);
 
   const adminToken = buildToken("admin-style-dna-baseline-smoke-user");
+  const strictProvenancePolicy = String(process.env.STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT || "").trim().toLowerCase() === "true";
   const smokePort = process.env.SMOKE_API_PORT || "3026";
   const baseUrl = `http://127.0.0.1:${smokePort}/v1`;
 
@@ -228,6 +238,15 @@ async function main() {
           fileName: "baseline-smoke-test-image.png",
           mimeType: "image/png",
           fileBase64: ONE_PIXEL_PNG_BASE64,
+          ...(strictProvenancePolicy
+            ? {
+              provenanceReceipt: {
+                source: "midjourney_manual_export",
+                capturedAtUtc: "2026-03-01T12:05:05Z",
+                operatorAssertion: "test grid captured from MJ export",
+              },
+            }
+            : {}),
         }),
       },
       201
@@ -253,14 +272,42 @@ async function main() {
       baselineImage?.image?.provenanceOperatorAssertion === "grid captured from MJ job console export",
       "Expected explicit baseline provenanceOperatorAssertion"
     );
-    assertCondition(
-      testImage?.image?.provenanceSource === "operator_upload_unverified",
-      "Expected default test provenanceSource"
-    );
-    assertCondition(
-      Number.isFinite(Date.parse(String(testImage?.image?.provenanceCapturedAtUtc || ""))),
-      "Expected default test provenanceCapturedAtUtc"
-    );
+    if (strictProvenancePolicy) {
+      assertCondition(
+        testImage?.image?.provenanceSource === "midjourney_manual_export",
+        "Expected explicit test provenanceSource when strict policy enabled"
+      );
+      assertCondition(
+        testImage?.image?.provenanceCapturedAtUtc === "2026-03-01T12:05:05Z",
+        "Expected explicit test provenanceCapturedAtUtc when strict policy enabled"
+      );
+      const strictMissing = await requestJsonAllowStatus(
+        `${baseUrl}/admin/style-dna/images`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            imageKind: "test",
+            fileName: "baseline-smoke-test-image-missing-provenance.png",
+            mimeType: "image/png",
+            fileBase64: ONE_PIXEL_PNG_BASE64,
+          }),
+        }
+      );
+      assertCondition(strictMissing.status === 400, "Expected 400 when provenanceReceipt missing under strict policy");
+    } else {
+      assertCondition(
+        testImage?.image?.provenanceSource === "operator_upload_unverified",
+        "Expected default test provenanceSource"
+      );
+      assertCondition(
+        Number.isFinite(Date.parse(String(testImage?.image?.provenanceCapturedAtUtc || ""))),
+        "Expected default test provenanceCapturedAtUtc"
+      );
+    }
     createdImageIds.push(baselineImageId, testImageId);
 
     suiteId = `suite_style_dna_baseline_smoke_${Date.now()}`;

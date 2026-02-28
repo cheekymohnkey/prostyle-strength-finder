@@ -2621,6 +2621,17 @@ async function requestHandler(req, res, config, dbPath, queueAdapter, storageAda
     try {
       const body = await parseJsonBody(req);
       const payload = validateStyleDnaImageUploadPayload(body);
+      if (config.styleDna.requireProvenanceReceipt && !payload.provenanceReceipt) {
+        sendError(res, 400, "INVALID_REQUEST", "Style-DNA image upload failed validation", ctx, {
+          reason: "provenanceReceipt is required by current environment policy",
+          policy: {
+            requireProvenanceReceipt: true,
+            appEnv: config.runtime.appEnv,
+            envVar: "STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT",
+          },
+        });
+        return;
+      }
       const buffer = Buffer.from(payload.fileBase64, "base64");
       if (!buffer || buffer.length === 0) {
         sendError(res, 400, "INVALID_REQUEST", "Style-DNA image upload failed validation", ctx, {

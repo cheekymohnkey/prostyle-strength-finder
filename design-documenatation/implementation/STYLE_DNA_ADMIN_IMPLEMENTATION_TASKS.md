@@ -30,6 +30,15 @@ SDNA-37 progress snapshot:
 2. Provenance receipt baseline fields are now implemented for Style-DNA image uploads with backward-compatible defaults.
 3. Remaining SDNA-37 work is documentation/runbook evidence-template consistency and any policy tightening decisions.
 
+SDNA-37 handover evidence template (required fields):
+1. `runUrl` or execution reference.
+2. `styleDnaImageId`.
+3. `contentSha256`.
+4. `provenanceSource`.
+5. `provenanceCapturedAtUtc`.
+6. `provenanceOperatorAssertion` (nullable, but field must be present).
+7. `policy.requireProvenanceReceipt` and `policy.appEnv`.
+
 Do not start with:
 1. Worker inference redesign.
 2. UI redesign work.

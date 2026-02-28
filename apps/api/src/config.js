@@ -35,6 +35,17 @@ function parseIntStrict(value, key) {
   return parsed;
 }
 
+function parseBooleanLike(value, key) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["false", "0", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  throw new Error(`Invalid boolean for ${key}: ${value}`);
+}
+
 function loadConfig() {
   REQUIRED_ENV_KEYS.forEach(requireEnv);
 
@@ -79,6 +90,11 @@ function loadConfig() {
         model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
         baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
       },
+    },
+    styleDna: {
+      requireProvenanceReceipt: process.env.STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT === undefined
+        ? requireEnv("APP_ENV") !== "local"
+        : parseBooleanLike(process.env.STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT, "STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT"),
     },
     observability: {
       logLevel: requireEnv("LOG_LEVEL"),

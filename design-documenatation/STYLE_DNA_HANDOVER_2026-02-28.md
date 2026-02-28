@@ -135,6 +135,52 @@ Canonical task detail location:
 ### Recommended next task kickoff
 1. Continue SDNA-37 with evidence template/runbook contract updates and optional stricter receipt-policy enforcement by environment.
 
+## Addendum - 2026-03-01 (SDNA-37 Provenance Policy Enforcement + Evidence Template Contract)
+
+### Status
+1. In progress (third slice completed).
+
+### Completed in this slice
+1. Added API env-gated policy `STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT`:
+- default `false` for `APP_ENV=local`
+- default `true` for non-local environments
+- explicit env override supported (`true|false`)
+2. Enforced provenance requirement on `POST /v1/admin/style-dna/images` when policy is active (returns `400 INVALID_REQUEST` if `provenanceReceipt` missing).
+3. Extended baseline smoke to verify:
+- explicit provenance receipt path,
+- local default fallback path,
+- strict-policy rejection path for missing receipt.
+4. Updated environment contract and env templates (`.env.local.example`, `.env.uat.example`, `.env.prod.example`).
+5. Added required SDNA-37 handover evidence tuple fields in active tasks doc:
+- `contentSha256`,
+- `provenanceSource`,
+- `provenanceCapturedAtUtc`,
+- `provenanceOperatorAssertion`,
+- policy fields (`requireProvenanceReceipt`, `appEnv`).
+
+### Files changed
+1. `apps/api/src/config.js`
+2. `apps/api/src/index.js`
+3. `scripts/style-dna/baseline-smoke.js`
+4. `.env.local.example`
+5. `.env.uat.example`
+6. `.env.prod.example`
+7. `design-documenatation/ENVIRONMENT_CONFIGURATION_CONTRACT.md`
+8. `design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md`
+9. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
+
+### Verification command order
+1. `set -a && source .env.local && set +a && npm run style-dna:baseline-smoke`
+2. `set -a && source .env.local && set +a && STYLE_DNA_REQUIRE_PROVENANCE_RECEIPT=true npm run style-dna:baseline-smoke`
+3. `npm run contracts`
+
+### Risks / follow-up notes
+1. Strict policy can break legacy admin upload flows if clients do not send `provenanceReceipt`; rollout should be coordinated with frontend/admin operator guidance.
+2. Provenance fields remain operator-declared evidence context, not external cryptographic attestation.
+
+### Recommended next task kickoff
+1. Continue SDNA-37 by wiring provenance receipt fields into admin UI upload payloads and adding explicit user-facing guidance for required evidence fields in strict mode.
+
 ## Addendum - 2026-03-01 (SDNA-35 LLM-Only Trait Inference Cutover Kickoff)
 
 ### Status
