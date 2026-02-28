@@ -78,9 +78,13 @@ function listArtifactNames(artifactDir) {
 function main() {
   const dbPath = createTempDbPath();
   const artifactDir = path.join(os.tmpdir(), `style-dna-rollout-artifacts-${Date.now()}-${crypto.randomUUID()}`);
+  const replayArtifactDirA = path.join(os.tmpdir(), `style-dna-rollout-artifacts-replay-a-${Date.now()}-${crypto.randomUUID()}`);
+  const replayArtifactDirB = path.join(os.tmpdir(), `style-dna-rollout-artifacts-replay-b-${Date.now()}-${crypto.randomUUID()}`);
   const seedV2 = path.resolve(process.cwd(), "scripts/style-dna/seeds/style-dna-taxonomy-seed-v2.json");
   const seedV1 = path.resolve(process.cwd(), "scripts/style-dna/seeds/style-dna-taxonomy-seed-v1.json");
   fs.mkdirSync(artifactDir, { recursive: true });
+  fs.mkdirSync(replayArtifactDirA, { recursive: true });
+  fs.mkdirSync(replayArtifactDirB, { recursive: true });
 
   try {
     applyAllMigrations(dbPath);
@@ -110,6 +114,23 @@ function main() {
     assertCondition(
       success.json?.preview?.blocked === false,
       "Expected success preview blocked=false"
+    );
+    assertCondition(
+      success.json?.namingConventionVersion === "sdna_rollout_artifacts_v1",
+      "Expected success namingConventionVersion=sdna_rollout_artifacts_v1"
+    );
+    assertCondition(
+      success.json?.namingConventionTemplate === "{runId}__{coverage|diff_before|apply|diff_after|summary}.json",
+      "Expected namingConventionTemplate contract"
+    );
+    assertCondition(
+      Array.isArray(success.json?.artifactStagesInOrder)
+      && success.json.artifactStagesInOrder.join("|") === "coverage|diff_before|apply|diff_after|summary",
+      "Expected artifact stage ordering contract"
+    );
+    assertCondition(
+      success.json?.artifactFileNames?.summary === `${successRunId}__summary.json`,
+      "Expected success artifactFileNames summary entry"
     );
     const successNames = listArtifactNames(artifactDir);
     const expectedSuccess = [
@@ -179,6 +200,37 @@ function main() {
       "Expected blocked summary rolloutEvidenceSignature to match command output"
     );
 
+    const replayA = runRolloutScript({
+      dbPath,
+      seedPath: seedV2,
+      artifactDir: replayArtifactDirA,
+      runId: "smoke_replay_a",
+      apply: false,
+      requireCoverage: false,
+      minCanonical: 4,
+      minAliases: 16,
+    });
+    const replayB = runRolloutScript({
+      dbPath,
+      seedPath: seedV2,
+      artifactDir: replayArtifactDirB,
+      runId: "smoke_replay_b",
+      apply: false,
+      requireCoverage: false,
+      minCanonical: 4,
+      minAliases: 16,
+    });
+    assertCondition(replayA.status === 0 && replayB.status === 0, "Expected replay runs to succeed");
+    assertCondition(
+      replayA.json?.rolloutEvidenceSignature === replayB.json?.rolloutEvidenceSignature,
+      "Expected replay evidence signature stability across run-id/artifact-dir changes"
+    );
+    assertCondition(
+      replayA.json?.preview?.coverageReportSignature === replayB.json?.preview?.coverageReportSignature
+      && replayA.json?.preview?.diffBeforeSignature === replayB.json?.preview?.diffBeforeSignature,
+      "Expected replay preview signatures to remain stable"
+    );
+
     console.log(
       JSON.stringify(
         {
@@ -198,6 +250,12 @@ function main() {
     }
     if (fs.existsSync(artifactDir)) {
       fs.rmSync(artifactDir, { recursive: true, force: true });
+    }
+    if (fs.existsSync(replayArtifactDirA)) {
+      fs.rmSync(replayArtifactDirA, { recursive: true, force: true });
+    }
+    if (fs.existsSync(replayArtifactDirB)) {
+      fs.rmSync(replayArtifactDirB, { recursive: true, force: true });
     }
   }
 }

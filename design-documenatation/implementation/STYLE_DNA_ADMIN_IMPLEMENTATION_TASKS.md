@@ -18,11 +18,11 @@ Translate the Style-DNA admin feature plan into executable tasks with clear sequ
 ## START HERE (Next Session)
 
 Current next task:
-1. `SDNA-19` Consolidated Rollout Artifact Generation + Naming Standards.
+1. `SDNA-20` Artifact Index + Prune Tooling.
 
 Quick start:
-1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-19`.
-2. Implement only SDNA-19 scope in a fresh chat.
+1. Jump to section: `Suggested Ticket Breakdown` and prioritize `SDNA-20`.
+2. Implement only SDNA-20 scope in a fresh chat.
 3. End with handoff summary + verification outcomes.
 
 Do not start with:
@@ -845,8 +845,39 @@ Risks / notes:
 2. Readiness full-scope runtime remains elevated due to broad smoke coverage, but stayed green end-to-end.
 
 Next kickoff:
-1. `SDNA-19` Consolidated Rollout Artifact Generation + Naming Standards.
-2. Scope: rollout artifact generator/naming contract hardening only; no worker/frontend redesign.
+1. `SDNA-20` Artifact Index + Prune Tooling.
+2. Scope: artifact index/prune contract hardening only; no worker/frontend redesign.
+
+## Next Task (SDNA-19 / Consolidated Rollout Artifact Generation + Naming Standards)
+
+Status: Completed 2026-02-28.
+
+Completed:
+1. Hardened rollout artifact naming contract output with explicit deterministic metadata:
+- `namingConventionVersion`,
+- `namingConventionTemplate`,
+- `artifactStagesInOrder`,
+- `artifactFileNames`.
+2. Hardened rollout evidence signature contract to remove path/run-id dependent variance from hash payload while preserving explicit naming identity fields.
+3. Expanded rollout artifact smoke assertions to verify naming contract fields and deterministic replay stability across changed run-id/artifact-dir inputs.
+4. Re-verified readiness full scope to confirm launch/readiness behavior remains unchanged.
+
+Files changed:
+1. `scripts/style-dna/taxonomy-seed-rollout-artifacts.js`
+2. `scripts/style-dna/taxonomy-seed-rollout-artifacts-smoke.js`
+
+Verification:
+1. `npm run contracts` (pass).
+2. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-rollout-artifacts-smoke` (pass).
+3. `set -a && source .env.local && set +a && npm run style-dna:taxonomy-seed-v2-rollout-smoke` (pass).
+4. `set -a && source .env.local && set +a && npm run launch:readiness-smoke` (pass).
+
+Risks / notes:
+1. Evidence signature excludes path/run-id specific values by design; file identity remains explicit via `runId` + `artifactFileNames`.
+2. Naming contract is versioned (`sdna_rollout_artifacts_v1`) and should be bumped if stage schema changes.
+
+Next kickoff:
+1. `SDNA-20` Artifact Index + Prune Tooling.
 
 ## Verification Runbook (Target End-State)
 

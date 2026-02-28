@@ -7,6 +7,10 @@ const { buildSeedCoverageReport } = require("./taxonomy-seed-coverage-core");
 const { buildTaxonomySeedDiffReport } = require("./taxonomy-seed-diff-core");
 const { applyStyleDnaTaxonomySeed } = require("./taxonomy-seed-service");
 
+const ARTIFACT_STAGES = ["coverage", "diff_before", "apply", "diff_after", "summary"];
+const ROLLOUT_NAMING_CONVENTION_VERSION = "sdna_rollout_artifacts_v1";
+const RUN_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,126}[A-Za-z0-9])?$/;
+
 function resolveArgs(argv) {
   const args = {
     file: "scripts/style-dna/seeds/style-dna-taxonomy-seed-v2.json",
@@ -92,9 +96,29 @@ function resolvePath(rawPath) {
     : path.resolve(process.cwd(), trimmed);
 }
 
+function normalizeRunIdSegment(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return normalized || "taxonomy";
+}
+
 function makeRunId(taxonomyVersion) {
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace("T", "_").replace(/\..+$/, "Z");
-  return `${String(taxonomyVersion || "taxonomy").replace(/[^a-zA-Z0-9_]+/g, "_")}__${stamp}`;
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "");
+  return `${normalizeRunIdSegment(taxonomyVersion)}__${stamp}`;
+}
+
+function assertValidRunId(runId) {
+  const value = String(runId || "").trim();
+  if (!value) {
+    throw new Error("run-id is required");
+  }
+  if (!RUN_ID_PATTERN.test(value)) {
+    throw new Error("run-id must match /^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,126}[A-Za-z0-9])?$/");
+  }
+  return value;
 }
 
 function toDeterministicJson(value) {
@@ -114,8 +138,12 @@ function sha256Hex(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
 }
 
+function artifactFileName(runId, stage) {
+  return `${runId}__${stage}.json`;
+}
+
 function writeArtifact(artifactDir, runId, stage, value) {
-  const filePath = path.join(artifactDir, `${runId}__${stage}.json`);
+  const filePath = path.join(artifactDir, artifactFileName(runId, stage));
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
   return filePath;
 }
@@ -151,7 +179,7 @@ function main() {
   }
   const seedRaw = fs.readFileSync(seedPath, "utf8");
   const payload = validateStyleDnaTaxonomySeedPayload(JSON.parse(seedRaw));
-  const runId = String(args.runId || "").trim() || makeRunId(payload.taxonomyVersion);
+  const runId = assertValidRunId(String(args.runId || "").trim() || makeRunId(payload.taxonomyVersion));
 
   fs.mkdirSync(artifactDir, { recursive: true });
   const ready = assertDatabaseReady(databaseUrl);
@@ -176,6 +204,7 @@ function main() {
 
   let applyArtifactPath = null;
   let diffAfterArtifactPath = null;
+  let diffAfterReportSignature = null;
   let applyResult = null;
   let blocked = false;
   if (args.apply) {
@@ -200,6 +229,7 @@ function main() {
     applyArtifactPath = writeArtifact(artifactDir, runId, "apply", applyResult);
     if (!blocked) {
       const diffAfter = buildTaxonomySeedDiffReport(ready.dbPath, payload);
+      diffAfterReportSignature = diffAfter.reportSignature;
       diffAfterArtifactPath = writeArtifact(artifactDir, runId, "diff_after", {
         ok: true,
         seedPath,
@@ -214,14 +244,23 @@ function main() {
     taxonomyVersion: payload.taxonomyVersion,
     seedPath,
     artifactDir,
+    namingConventionVersion: ROLLOUT_NAMING_CONVENTION_VERSION,
+    namingConventionTemplate: `{runId}__{${ARTIFACT_STAGES.join("|")}}.json`,
     namingConvention: `${runId}__{coverage|diff_before|apply|diff_after|summary}.json`,
+    artifactStagesInOrder: [...ARTIFACT_STAGES],
+    artifactFileNames: ARTIFACT_STAGES.reduce((accumulator, stage) => {
+      accumulator[stage] = artifactFileName(runId, stage);
+      return accumulator;
+    }, {}),
     steps: {
       coverage: {
         ok: coverage.ok,
+        artifactFileName: artifactFileName(runId, "coverage"),
         artifactPath: coverageArtifactPath,
       },
       diffBefore: {
         ok: true,
+        artifactFileName: artifactFileName(runId, "diff_before"),
         artifactPath: diffBeforeArtifactPath,
       },
       apply: args.apply
@@ -229,6 +268,7 @@ function main() {
             ok: !blocked,
             blocked,
             requireCoverage: args.requireCoverage,
+            artifactFileName: artifactFileName(runId, "apply"),
             artifactPath: applyArtifactPath,
           }
         : {
@@ -239,6 +279,7 @@ function main() {
         ? (!blocked
           ? {
               ok: true,
+              artifactFileName: artifactFileName(runId, "diff_after"),
               artifactPath: diffAfterArtifactPath,
             }
           : {
@@ -257,9 +298,7 @@ function main() {
     preview: {
       coverageReportSignature: coverage.reportSignature,
       diffBeforeSignature: diffBefore.reportSignature,
-      diffAfterSignature: diffAfterArtifactPath
-        ? JSON.parse(fs.readFileSync(diffAfterArtifactPath, "utf8")).report.reportSignature
-        : null,
+      diffAfterSignature: diffAfterReportSignature,
       blocked,
       applyRequested: args.apply,
       requireCoverage: args.requireCoverage,
@@ -267,10 +306,37 @@ function main() {
   };
   summary.rolloutEvidenceSignature = sha256Hex(
     toDeterministicJson({
-      runId: summary.runId,
       taxonomyVersion: summary.taxonomyVersion,
+      namingConventionVersion: summary.namingConventionVersion,
+      namingConventionTemplate: summary.namingConventionTemplate,
+      artifactStagesInOrder: summary.artifactStagesInOrder,
       thresholds: summary.thresholds,
-      steps: summary.steps,
+      steps: {
+        coverage: {
+          ok: summary.steps.coverage.ok,
+        },
+        diffBefore: {
+          ok: summary.steps.diffBefore.ok,
+        },
+        apply: summary.steps.apply?.skipped
+          ? {
+              skipped: true,
+              reason: summary.steps.apply.reason,
+            }
+          : {
+              ok: summary.steps.apply.ok,
+              blocked: summary.steps.apply.blocked,
+              requireCoverage: summary.steps.apply.requireCoverage,
+            },
+        diffAfter: summary.steps.diffAfter?.skipped
+          ? {
+              skipped: true,
+              reason: summary.steps.diffAfter.reason,
+            }
+          : {
+              ok: summary.steps.diffAfter.ok,
+            },
+      },
       preview: summary.preview,
     })
   );

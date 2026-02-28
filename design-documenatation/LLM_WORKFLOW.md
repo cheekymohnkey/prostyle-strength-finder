@@ -7,7 +7,7 @@ Purpose: Keep LLM behavior stable and predictable as context windows fill over t
 ## NEXT SESSION START HERE (as of 2026-02-28)
 
 Current next implementation task:
-1. `SDNA-19` Consolidated Rollout Artifact Generation + Naming Standards.
+1. `SDNA-20` Artifact Index + Prune Tooling.
 
 Primary pointers:
 1. `design-documenatation/STYLE_DNA_HANDOVER_2026-02-28.md`
@@ -27,11 +27,11 @@ Use these docs as source of truth:
 - design-documenatation/implementation/STYLE_DNA_ADMIN_IMPLEMENTATION_TASKS.md
 
 Task objective:
-Implement SDNA-19 Consolidated Rollout Artifact Generation + Naming Standards.
+Implement SDNA-20 Artifact Index + Prune Tooling.
 
 Scope:
-1) Harden consolidated rollout artifact generation contracts and naming consistency.
-2) Ensure rollout artifact evidence remains deterministic and explicit across repeated runs.
+1) Harden rollout artifact index/prune contracts and retention consistency.
+2) Ensure index/prune evidence remains deterministic and explicit across repeated runs.
 3) Preserve existing Style-DNA launch/readiness gate behavior with explicit evidence.
 4) Keep changes surgical to rollout artifact tooling surfaces only.
 
@@ -41,7 +41,7 @@ Out of scope:
 3) Non-Style-DNA surfaces.
 
 Definition of done:
-1) SDNA-19 rollout artifact generation/naming acceptance criteria are implemented.
+1) SDNA-20 rollout artifact index/prune acceptance criteria are implemented.
 2) Relevant smokes/checks are listed and passing (or explicitly marked not run with reason).
 3) Task end includes handoff summary with files changed + risks + next task.
 ```
